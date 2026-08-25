@@ -10,11 +10,18 @@ namespace RedHollow.Game.Host
     /// It exists only because <see cref="MatchSim"/> is sealed and its clock is injected rather
     /// than settable — there is no rule here and there must never be one. Every member is a
     /// forward.
-    ///
-    /// SHAPE ONLY (ticket 010, TDD stub) — implementation belongs to the implementing agent.
     /// </summary>
     public sealed class MatchSimHost : ISimHost
     {
+        private readonly MatchSim _sim;
+        private readonly SimClock _clock;
+
+        /// <param name="sim">The host-authoritative sim. Must already have been handed <paramref name="clock"/>.</param>
+        /// <param name="clock">
+        /// R-51 — the same clock instance <paramref name="sim"/> reads its deadlines from. The host
+        /// owns it because the sim schedules nothing for itself; handing the sim a different clock
+        /// than the one advanced here leaves every deadline frozen at zero.
+        /// </param>
         public MatchSimHost(MatchSim sim, SimClock clock)
         {
             if (sim == null)
@@ -26,40 +33,40 @@ namespace RedHollow.Game.Host
             {
                 throw new ArgumentNullException(nameof(clock));
             }
+
+            _sim = sim;
+            _clock = clock;
         }
 
-        public MatchState State => throw NotYet(nameof(State));
+        public MatchState State => _sim.State;
 
-        public SimConfig Config => throw NotYet(nameof(Config));
+        public SimConfig Config => _sim.Config;
 
-        public IClock Clock => throw NotYet(nameof(Clock));
+        public IClock Clock => _clock;
 
-        public SimObservation LastObservation => throw NotYet(nameof(LastObservation));
+        public SimObservation LastObservation => _sim.LastObservation;
 
-        public void AdvanceClock(double deltaSeconds) => throw NotYet(nameof(AdvanceClock));
+        public void AdvanceClock(double deltaSeconds) => _clock.Advance(deltaSeconds);
 
-        public void TickPlanningTimer() => throw NotYet(nameof(TickPlanningTimer));
+        public void TickPlanningTimer() => _sim.TickPlanningTimer();
 
-        public StatusTickResult TickStatusEffects() => throw NotYet(nameof(TickStatusEffects));
+        public StatusTickResult TickStatusEffects() => _sim.TickStatusEffects();
 
-        public void TickHeroRegen() => throw NotYet(nameof(TickHeroRegen));
+        public void TickHeroRegen() => _sim.TickHeroRegen();
 
-        public void TickHeroRespawns() => throw NotYet(nameof(TickHeroRespawns));
+        public void TickHeroRespawns() => _sim.TickHeroRespawns();
 
-        public void TickMedStations() => throw NotYet(nameof(TickMedStations));
+        public void TickMedStations() => _sim.TickMedStations();
 
-        public bool TryMonsterAttack(string monsterId) => throw NotYet(nameof(TryMonsterAttack));
+        public bool TryMonsterAttack(string monsterId) => _sim.TryMonsterAttack(monsterId);
 
         public HotspotAttackResult ApplyHotspotAttack(HotspotAttackRequest request) =>
-            throw NotYet(nameof(ApplyHotspotAttack));
+            _sim.ApplyHotspotAttack(request);
 
         public HeroDamageResult ApplyHeroDamage(HeroDamageRequest request) =>
-            throw NotYet(nameof(ApplyHeroDamage));
+            _sim.ApplyHeroDamage(request);
 
         public PlaceableDamageResult ApplyPlaceableDamage(PlaceableDamageRequest request) =>
-            throw NotYet(nameof(ApplyPlaceableDamage));
-
-        private static NotImplementedException NotYet(string member) =>
-            new NotImplementedException("T-10 not implemented: MatchSimHost." + member);
+            _sim.ApplyPlaceableDamage(request);
     }
 }

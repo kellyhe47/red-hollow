@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 
 namespace RedHollow.Game.Host
@@ -10,8 +9,6 @@ namespace RedHollow.Game.Host
     /// Transport (Netcode for GameObjects, Lobby join codes, Relay) is ticket 011; this is only the
     /// size rule, which is the half R-50 states as a number and the half a fifth joiner must bounce
     /// off regardless of how they arrived.
-    ///
-    /// SHAPE ONLY (ticket 010, TDD stub) — implementation belongs to the implementing agent.
     /// </summary>
     public sealed class PartyRoster
     {
@@ -21,17 +18,54 @@ namespace RedHollow.Game.Host
         /// <summary>R-50 — 4-player co-op is the ceiling.</summary>
         public const int MaxPlayers = 4;
 
-        public int Count => throw NotYet(nameof(Count));
+        /// <summary>
+        /// A list rather than a set: join order is the slot order the lobby shows, and R-50 caps the
+        /// party at four, so a linear membership check costs nothing worth optimising away.
+        /// </summary>
+        private readonly List<string> _accountIds = new List<string>(MaxPlayers);
 
-        public IReadOnlyList<string> AccountIds => throw NotYet(nameof(AccountIds));
+        public int Count => _accountIds.Count;
 
-        /// <summary>Adds a player; false when the party is already at <see cref="MaxPlayers"/>.</summary>
-        public bool TryAdd(string accountId) => throw NotYet(nameof(TryAdd));
+        public IReadOnlyList<string> AccountIds => _accountIds.AsReadOnly();
+
+        /// <summary>
+        /// Adds a player; false when the party is already at <see cref="MaxPlayers"/>.
+        ///
+        /// Refuses rather than throws, and refusing must not grow the party: a fifth joiner is an
+        /// ordinary lobby outcome (the party filled while they were connecting), not a fault in the
+        /// host. An account already seated is refused for the same reason — one account holds one
+        /// slot, so a reconnect that races its own timeout cannot take two.
+        /// </summary>
+        public bool TryAdd(string accountId)
+        {
+            if (string.IsNullOrEmpty(accountId))
+            {
+                return false;
+            }
+
+            if (_accountIds.Count >= MaxPlayers)
+            {
+                return false;
+            }
+
+            if (_accountIds.Contains(accountId))
+            {
+                return false;
+            }
+
+            _accountIds.Add(accountId);
+            return true;
+        }
 
         /// <summary>R-53 — a mid-match disconnect frees the slot; the match carries on.</summary>
-        public bool Remove(string accountId) => throw NotYet(nameof(Remove));
+        public bool Remove(string accountId)
+        {
+            if (string.IsNullOrEmpty(accountId))
+            {
+                return false;
+            }
 
-        private static NotImplementedException NotYet(string member) =>
-            new NotImplementedException("T-10 not implemented: PartyRoster." + member);
+            return _accountIds.Remove(accountId);
+        }
     }
 }
