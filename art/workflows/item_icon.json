@@ -1,0 +1,203 @@
+{
+  "1": {
+    "inputs": {
+      "ckpt_name": "sd_xl_base_1.0.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {
+      "title": "CKPT — sd_xl_base_1.0 (locked)"
+    }
+  },
+  "2": {
+    "inputs": {
+      "value": "wooden barricade of rough stacked planks"
+    },
+    "class_type": "PrimitiveString",
+    "_meta": {
+      "title": "① ITEM — edit ONLY this per icon"
+    }
+  },
+  "3": {
+    "inputs": {
+      "value": "game item icon, centered single object, 3/4 view, dark leather-and-brass circular badge background, subtle rim light, thick readable silhouette, warm white-gold lantern rim light, cinematic subterranean Mars colony, monochromatic burnt-sienna palette, volumetric dust haze, matte painterly semi-realism, muted matte surfaces, no text, no watermark"
+    },
+    "class_type": "PrimitiveString",
+    "_meta": {
+      "title": "② FRAMING+STYLE — contract, do not edit"
+    }
+  },
+  "4": {
+    "inputs": {
+      "string_a": [
+        "2",
+        0
+      ],
+      "string_b": [
+        "3",
+        0
+      ],
+      "delimiter": ", "
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "prompt = item + contract"
+    }
+  },
+  "5": {
+    "inputs": {
+      "text": [
+        "4",
+        0
+      ],
+      "clip": [
+        "1",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "POSITIVE (from concat)"
+    }
+  },
+  "6": {
+    "inputs": {
+      "text": "photo, photorealistic, blurry, text, watermark, signature, extra limbs, deformed, low quality, jpeg artifacts, sun, blue sky, daylight, teal, cool blue tones, oversaturated color",
+      "clip": [
+        "1",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "NEGATIVE — contract, do not edit"
+    }
+  },
+  "7": {
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 1
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "LATENT 1024²"
+    }
+  },
+  "8": {
+    "inputs": {
+      "seed": 20260824,
+      "steps": 28,
+      "cfg": 7,
+      "sampler_name": "dpmpp_2m",
+      "scheduler": "karras",
+      "denoise": 1,
+      "model": [
+        "1",
+        0
+      ],
+      "positive": [
+        "5",
+        0
+      ],
+      "negative": [
+        "6",
+        0
+      ],
+      "latent_image": [
+        "7",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler — seed 20260824 FIXED"
+    }
+  },
+  "9": {
+    "inputs": {
+      "samples": [
+        "8",
+        0
+      ],
+      "vae": [
+        "1",
+        2
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "10": {
+    "inputs": {
+      "filename_prefix": "icons/1024/icon",
+      "images": [
+        "9",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "SAVE 1024"
+    }
+  },
+  "11": {
+    "inputs": {
+      "upscale_method": "area",
+      "width": 256,
+      "height": 256,
+      "crop": "disabled",
+      "image": [
+        "9",
+        0
+      ]
+    },
+    "class_type": "ImageScale",
+    "_meta": {
+      "title": "downscale 256"
+    }
+  },
+  "12": {
+    "inputs": {
+      "filename_prefix": "icons/256/icon",
+      "images": [
+        "11",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "SAVE 256"
+    }
+  },
+  "13": {
+    "inputs": {
+      "upscale_method": "area",
+      "width": 128,
+      "height": 128,
+      "crop": "disabled",
+      "image": [
+        "9",
+        0
+      ]
+    },
+    "class_type": "ImageScale",
+    "_meta": {
+      "title": "downscale 128"
+    }
+  },
+  "14": {
+    "inputs": {
+      "filename_prefix": "icons/128/icon",
+      "images": [
+        "13",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "SAVE 128"
+    }
+  }
+}
