@@ -1,10 +1,10 @@
 ---
 id: 002
 title: Monster roster + nearest-target AI + barricade blocking
-status: tests-written
+status: in-progress
 depends_on: [001]
 touches: [unity/RedHollow/Assets/GameSim/MatchSim.Targeting.cs, sim/GameSim.Tests/T02_TargetingTests.cs]
-iterations: 0
+iterations: 1
 test_files: [sim/GameSim.Tests/T02_TargetingTests.cs]
 branch: "tdd/002"
 board_id: T-02
@@ -37,3 +37,4 @@ Sad paths: no-available-target, unknown-monster-id. G-001..005 not re-encoded.
 - tests locked on tdd/002 @ 60cf5fc: 12 tests, 0 passing (roster rows throw KeyNotFoundException,
   targeting rows throw NotImplementedException T-02). Orchestrator-verified.
 - DEC-RUN-1 resolved the roster-defaults conflict the test-writer raised; tests stand as written.
+- iter 1: implementer dispatched in worktree .tdd/worktrees/002.

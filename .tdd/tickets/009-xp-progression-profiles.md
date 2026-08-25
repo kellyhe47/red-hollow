@@ -1,10 +1,10 @@
 ---
 id: 009
 title: XP, leveling, skill points, persistent profiles
-status: tests-written
+status: in-progress
 depends_on: [001]
 touches: [unity/RedHollow/Assets/GameSim/MatchSim.Progression.cs, unity/RedHollow/Assets/GameSim/SqliteProfileStore.cs, sim/GameSim.Tests/T09_ProgressionTests.cs]
-iterations: 0
+iterations: 1
 test_files: [sim/GameSim.Tests/T09_ProgressionTests.cs]
 branch: "tdd/009"
 board_id: T-09
@@ -41,3 +41,4 @@ Stubs added: `JsonProfileStore.cs`, `MatchSim.SaveProfilesAtMatchEnd()`.
   MatchSim). My prompt had put all MatchSim*.cs off-limits to test-writers, which was too blunt --
   a missing stub takes the golden adapter down with it. Stub requested and added; suite now builds.
 - DEC-RUN-3 binds this implementer: persist on level-up, accepted spend AND match end.
+- iter 1: implementer dispatched in worktree .tdd/worktrees/009.

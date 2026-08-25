@@ -1,10 +1,10 @@
 ---
 id: 003
 title: Colony, hotspots, civilian pool, defeat rule
-status: tests-written
+status: in-progress
 depends_on: [001]
 touches: [unity/RedHollow/Assets/GameSim/MatchSim.Hotspots.cs, sim/GameSim.Tests/T03_HotspotTests.cs]
-iterations: 0
+iterations: 1
 test_files: [sim/GameSim.Tests/T03_HotspotTests.cs]
 branch: "tdd/003"
 board_id: T-03
@@ -42,3 +42,4 @@ Stub added: `unity/RedHollow/Assets/GameSim/ColonyMap.cs` (shape only).
   branches after it merges, so extending ColonyMap then is safe and non-concurrent.
 - Test-writer's reading accepted: `hotspot_emptied` is a transition event, not a level — not
   re-emitted when an already-empty hotspot is hit. No fixture covers this; consistent with R-13.
+- iter 1: implementer dispatched in worktree .tdd/worktrees/003.

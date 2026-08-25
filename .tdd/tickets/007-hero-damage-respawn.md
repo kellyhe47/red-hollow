@@ -1,10 +1,10 @@
 ---
 id: 007
 title: Hero damage, death/respawn, no friendly fire
-status: tests-written
+status: in-progress
 depends_on: [001]
 touches: [unity/RedHollow/Assets/GameSim/MatchSim.Heroes.cs, unity/RedHollow/Assets/GameSim/Entities.cs, sim/GameSim.Tests/T07_HeroTests.cs]
-iterations: 0
+iterations: 1
 test_files: [sim/GameSim.Tests/T07_HeroTests.cs]
 branch: "tdd/007"
 board_id: T-07
@@ -45,3 +45,4 @@ G-020/021/030 not re-encoded.
   avoids editing the shared Commands.cs. Accepted.
 - DEC-RUN-2 binds this ticket's implementer: reduced damage is
   `Math.Floor(damage * (1.0 - reduction) + 1e-9)`.
+- iter 1: implementer dispatched in worktree .tdd/worktrees/007.
