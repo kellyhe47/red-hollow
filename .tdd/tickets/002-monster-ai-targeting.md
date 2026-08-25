@@ -1,7 +1,7 @@
 ---
 id: 002
 title: Monster roster + nearest-target AI + barricade blocking
-status: awaiting-merge
+status: green
 depends_on: [001]
 touches: [unity/RedHollow/Assets/GameSim/MatchSim.Targeting.cs, sim/GameSim.Tests/T02_TargetingTests.cs]
 iterations: 1
@@ -18,9 +18,9 @@ select_target: nearest of {living hero, hotspot with >=1 civilian} by straight-l
 
 ## Acceptance criteria
 
-- [ ] G-001..G-005 pass
-- [ ] monster stats live in config, not code
-- [ ] B-003 Burrower carve-out beats B-001/B-002 per PRD precedence
+- [x] G-001..G-005 pass
+- [x] monster stats live in config, not code
+- [x] B-003 Burrower carve-out beats B-001/B-002 per PRD precedence
 
 ## Test plan
 
@@ -41,3 +41,5 @@ Sad paths: no-available-target, unknown-monster-id. G-001..005 not re-encoded.
 - iter 1 GREEN in worktree: 25 failed / 36 passed / 61 total, exactly the target. Locked tests
   untouched. G-001..005 pass; remaining 25 fixtures keep their original owning-ticket tags.
   Verified: oracle-based blocking (no position scan), ordinal tiebreak. Checkpoint 91d96eb.
+- MERGED to main @ e46799b. Post-merge full suite on main: 25 failed / 36 passed / 61 total, tags
+  unchanged (T-03x4 T-04x5 T-05x4 T-06x3 T-07x3 T-08x2 T-09x4). validate-spec and coverage green.
