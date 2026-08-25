@@ -27,3 +27,13 @@ This is the **hardest class to get clean**: it needs **real transparency and exa
 
 ## Control rung
 Fixed seed + the dual-render alpha branch (rung 2 + technique). img2img off an approved frame to keep chrome consistent across the set. No LoRA.
+
+## Pipeline-specific overrides (locked 2026-08-25, after first drafts)
+
+- **Workflow:** Comfy Cloud "UI & Props". Canonical export: `art/workflows/ui_props.json` (single file — the two alpha branches live in it, so no separate `ui_alpha.json`).
+- **Alpha, as built:** the mandated dual-render (white/black, shared seed) branch exists and its three outputs are saved every run (`ui/white`, `ui/black`, `ui/rgba`). But the two branches *diverge in interior detail* (same seed, different background conditioning), so the subtraction matte alone ships ~75% semi-alpha interiors — unusable directly. **Primary matte is a `BiRefNetRMBG` node** (model `BiRefNet-general`, `refine_foreground: true`, background Alpha) run on the black-branch decode → `ui/rgba2` output. Dual-render outputs are kept as the mandated cross-check and as raw material for local recovery on any asset where BiRefNet mis-judges subject-vs-background.
+- **Broken on cloud:** `LayerMask: LoadBiRefNetModelV2` / `BiRefNetUltraV2` fail with an HF repo-id error (both "BiRefNet-General" and "RMBG-2.0"). Use `BiRefNetRMBG` (RMBG node pack) instead.
+- **Framing contract (② node):** `game user interface element of the named subject, (a single isolated object, nothing else in frame:1.2), (flat front-on orthographic view:1.2), weathered dark wood and aged brass western frame style, riveted iron plate, crisp clean silhouette edges, centered composition, monochromatic burnt-sienna palette, warm white-gold lantern glow accents, matte painterly semi-realism, muted matte dusty surfaces, no text, no watermark` — scene tail stripped per 00-shared-style's icons/UI exemption.
+- **Negative additions:** `checkerboard pattern, transparency grid` appended to the contract negative.
+- **Sizes:** SDXL can't render the extreme UI aspect ratios (1920×120 etc). Generate at SDXL-safe sizes (table in `art/ui-props-plan.md`), deliver exact target sizes via scripted lanczos resize in `art/tools/ui_deliver.py` (which also runs the mandatory alpha-halo and size checks).
+- Runs queue via `app.queuePrompt(0,1)` from the console (same as icons pipeline).

@@ -1,0 +1,364 @@
+{
+ "1": {
+  "inputs": {
+   "ckpt_name": "sd_xl_base_1.0.safetensors"
+  },
+  "class_type": "CheckpointLoaderSimple",
+  "_meta": {
+   "title": "MODEL (contract)"
+  }
+ },
+ "2": {
+  "inputs": {
+   "value": "(a square game UI ability slot frame, weathered dark wood border with aged brass corner rivets and iron plate edging, empty open center:1.2)"
+  },
+  "class_type": "PrimitiveString",
+  "_meta": {
+   "title": "① ITEM"
+  }
+ },
+ "3": {
+  "inputs": {
+   "value": "game user interface element of the named subject, (a single isolated object, nothing else in frame:1.2), (flat front-on orthographic view:1.2), weathered dark wood and aged brass western frame style, riveted iron plate, crisp clean silhouette edges, centered composition, monochromatic burnt-sienna palette, warm white-gold lantern glow accents, matte painterly semi-realism, muted matte dusty surfaces, no text, no watermark"
+  },
+  "class_type": "PrimitiveString",
+  "_meta": {
+   "title": "② FRAMING (contract)"
+  }
+ },
+ "4": {
+  "inputs": {
+   "value": "(isolated on a plain solid pure white background:1.4)"
+  },
+  "class_type": "PrimitiveString",
+  "_meta": {
+   "title": "③ BG WHITE (alpha branch)"
+  }
+ },
+ "5": {
+  "inputs": {
+   "value": "(isolated on a plain solid pure black background:1.4)"
+  },
+  "class_type": "PrimitiveString",
+  "_meta": {
+   "title": "④ BG BLACK (alpha branch)"
+  }
+ },
+ "6": {
+  "inputs": {
+   "string_a": [
+    "2",
+    0
+   ],
+   "string_b": [
+    "3",
+    0
+   ],
+   "delimiter": ", "
+  },
+  "class_type": "StringConcatenate",
+  "_meta": {
+   "title": "item+framing"
+  }
+ },
+ "7": {
+  "inputs": {
+   "string_a": [
+    "6",
+    0
+   ],
+   "string_b": [
+    "4",
+    0
+   ],
+   "delimiter": ", "
+  },
+  "class_type": "StringConcatenate",
+  "_meta": {
+   "title": "pos WHITE"
+  }
+ },
+ "8": {
+  "inputs": {
+   "string_a": [
+    "6",
+    0
+   ],
+   "string_b": [
+    "5",
+    0
+   ],
+   "delimiter": ", "
+  },
+  "class_type": "StringConcatenate",
+  "_meta": {
+   "title": "pos BLACK"
+  }
+ },
+ "9": {
+  "inputs": {
+   "text": [
+    "7",
+    0
+   ],
+   "clip": [
+    "1",
+    1
+   ]
+  },
+  "class_type": "CLIPTextEncode",
+  "_meta": {
+   "title": "encode WHITE"
+  }
+ },
+ "10": {
+  "inputs": {
+   "text": [
+    "8",
+    0
+   ],
+   "clip": [
+    "1",
+    1
+   ]
+  },
+  "class_type": "CLIPTextEncode",
+  "_meta": {
+   "title": "encode BLACK"
+  }
+ },
+ "11": {
+  "inputs": {
+   "text": "photo, photorealistic, blurry, text, watermark, signature, extra limbs, deformed, low quality, jpeg artifacts, sun, blue sky, daylight, teal, cool blue tones, oversaturated color, checkerboard pattern, transparency grid",
+   "clip": [
+    "1",
+    1
+   ]
+  },
+  "class_type": "CLIPTextEncode",
+  "_meta": {
+   "title": "NEGATIVE (contract)"
+  }
+ },
+ "12": {
+  "inputs": {
+   "width": 1024,
+   "height": 1024,
+   "batch_size": 1
+  },
+  "class_type": "EmptyLatentImage",
+  "_meta": {
+   "title": "SIZE (per asset)"
+  }
+ },
+ "13": {
+  "inputs": {
+   "seed": 20260824,
+   "steps": 12,
+   "cfg": 7,
+   "sampler_name": "dpmpp_2m",
+   "scheduler": "karras",
+   "denoise": 1,
+   "model": [
+    "1",
+    0
+   ],
+   "positive": [
+    "9",
+    0
+   ],
+   "negative": [
+    "11",
+    0
+   ],
+   "latent_image": [
+    "12",
+    0
+   ]
+  },
+  "class_type": "KSampler",
+  "_meta": {
+   "title": "sample WHITE"
+  }
+ },
+ "14": {
+  "inputs": {
+   "seed": 20260824,
+   "steps": 12,
+   "cfg": 7,
+   "sampler_name": "dpmpp_2m",
+   "scheduler": "karras",
+   "denoise": 1,
+   "model": [
+    "1",
+    0
+   ],
+   "positive": [
+    "10",
+    0
+   ],
+   "negative": [
+    "11",
+    0
+   ],
+   "latent_image": [
+    "12",
+    0
+   ]
+  },
+  "class_type": "KSampler",
+  "_meta": {
+   "title": "sample BLACK"
+  }
+ },
+ "15": {
+  "inputs": {
+   "samples": [
+    "13",
+    0
+   ],
+   "vae": [
+    "1",
+    2
+   ]
+  },
+  "class_type": "VAEDecode",
+  "_meta": {
+   "title": "decode W"
+  }
+ },
+ "16": {
+  "inputs": {
+   "samples": [
+    "14",
+    0
+   ],
+   "vae": [
+    "1",
+    2
+   ]
+  },
+  "class_type": "VAEDecode",
+  "_meta": {
+   "title": "decode B"
+  }
+ },
+ "17": {
+  "inputs": {
+   "blend_factor": 1,
+   "blend_mode": "difference",
+   "image1": [
+    "15",
+    0
+   ],
+   "image2": [
+    "16",
+    0
+   ]
+  },
+  "class_type": "ImageBlend",
+  "_meta": {
+   "title": "diff = W-B"
+  }
+ },
+ "19": {
+  "inputs": {
+   "channel": "red",
+   "image": [
+    "17",
+    0
+   ]
+  },
+  "class_type": "ImageToMask",
+  "_meta": {
+   "title": "diff→mask"
+  }
+ },
+ "20": {
+  "inputs": {
+   "image": [
+    "16",
+    0
+   ],
+   "alpha": [
+    "19",
+    0
+   ]
+  },
+  "class_type": "JoinImageWithAlpha",
+  "_meta": {
+   "title": "RGBA join"
+  }
+ },
+ "21": {
+  "inputs": {
+   "filename_prefix": "ui/white/draft",
+   "images": [
+    "15",
+    0
+   ]
+  },
+  "class_type": "SaveImage",
+  "_meta": {
+   "title": "save WHITE raw"
+  }
+ },
+ "22": {
+  "inputs": {
+   "filename_prefix": "ui/black/draft",
+   "images": [
+    "16",
+    0
+   ]
+  },
+  "class_type": "SaveImage",
+  "_meta": {
+   "title": "save BLACK raw"
+  }
+ },
+ "23": {
+  "inputs": {
+   "filename_prefix": "ui/rgba/draft",
+   "images": [
+    "20",
+    0
+   ]
+  },
+  "class_type": "SaveImage",
+  "_meta": {
+   "title": "save RGBA"
+  }
+ },
+ "26": {
+  "inputs": {
+   "filename_prefix": "ui/rgba2/draft",
+   "images": [
+    "27",
+    0
+   ]
+  },
+  "class_type": "SaveImage",
+  "_meta": {
+   "title": "save RGBA-birefnet"
+  }
+ },
+ "27": {
+  "inputs": {
+   "model": "BiRefNet-general",
+   "mask_blur": 0,
+   "mask_offset": 0,
+   "invert_output": false,
+   "refine_foreground": true,
+   "background": "Alpha",
+   "background_color": "#222222",
+   "image": [
+    "16",
+    0
+   ]
+  },
+  "class_type": "BiRefNetRMBG",
+  "_meta": {
+   "title": "matte (BiRefNet)"
+  }
+ }
+}
