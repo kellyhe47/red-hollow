@@ -50,6 +50,14 @@ namespace RedHollow.Sim
         public double MaxHp;
         public bool Alive = true;
         public double? RespawnAt;
+
+        /// <summary>
+        /// R-35 — sim time of the most recent hit this hero took. Out-of-combat regen begins
+        /// <see cref="SimConfig.RegenDelaySeconds"/> after this and runs at
+        /// <see cref="SimConfig.RegenHpPerSecond"/> until MaxHp. Ticket 007 declares the shape;
+        /// nothing writes or reads it yet.
+        /// </summary>
+        public double LastDamagedAt;
     }
 
     /// <summary>
