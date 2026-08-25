@@ -1,10 +1,10 @@
 ---
 id: 012
 title: UI screens S1-S7 and cross-cutting states
-status: pending
+status: green
 depends_on: [010]
 touches: [unity/RedHollow/Assets/Game/UI/]
-iterations: 0
+iterations: 1
 test_files:
   - unity/RedHollow/Assets/Tests/EditMode/T12_UiScreensTests.cs
   - unity/RedHollow/Assets/Tests/EditMode/T12_UiHudTests.cs
@@ -20,8 +20,8 @@ Every screen and state in docs/ui-wireframes.html: Title/Join, Lobby, Planning, 
 
 ## Acceptance criteria
 
-- [ ] every wireframe screen and state is present and reachable
-- [ ] the sim never pauses for the level-up overlay
+- [x] every wireframe screen and state is present and reachable
+- [x] the sim never pauses for the level-up overlay
 
 ## Test plan
 
@@ -74,6 +74,8 @@ calls only. MonoBehaviours may only mirror these models.
 - PlayerDisconnected notice → toast naming peer; match continues (R-53)
 
 ## Attempt log
+
+- 2026-08-25 green in 1 implementation pass. Red verified: 39/39 NotImplementedException, 70 prior green. Green verified by orchestrator: EditMode 109/109, dotnet 356/356. Locked tests and sim untouched (git diff empty over Tests/, GameSim/, sim/, eval/, docs/).
 
 - ~~BLOCKED (environment, pre-run)~~ RESOLVED 2026-08-25 — owner installed Unity. Original note: Unity Editor is not installed on this machine and needs the owner's Unity account/licence. `unity/RedHollow/` currently holds only `Assets/GameSim` — there is no Unity project (no ProjectSettings/, no Packages/). T-01..T-09 carry the entire 30-fixture acceptance contract and need no Unity.
 
