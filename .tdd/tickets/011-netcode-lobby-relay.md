@@ -29,3 +29,16 @@ _Filled in by the test-writer._
 ## Attempt log
 
 - BLOCKED (environment, pre-run): Unity Editor is not installed on this machine and needs the owner's Unity account/licence. `unity/RedHollow/` currently holds only `Assets/GameSim` — there is no Unity project (no ProjectSettings/, no Packages/). T-01..T-09 carry the entire 30-fixture acceptance contract and need no Unity.
+
+## Handoff notes from the sim run (read before starting)
+
+- All fixture-covered rules are in `GameSim`, host-only (R-51). Clients send commands, receive
+  replicated state. `SimObservation` (`Result` / `StateChanges` / `EmittedEvents` / `ExternalCalls`)
+  is the replication payload — one per command.
+- **`LastObservation` is overwritten by every command.** Replicate it before issuing the next one.
+- R-53 disconnect: `PlayerSlot.Connected` already gates the all-ready early start (ticket 004), so a
+  disconnected player cannot hold planning hostage. Nothing else reads it yet.
+- R-07 rematch: `MatchState` is a plain object — build a fresh one from
+  `ColonyMap.V1().CreateMatchState(config)` to reset scrip, waves, placeables and civilians. Profiles
+  persist separately through `IProfileStore`, so `SaveProfilesAtMatchEnd()` must run before the reset.
+- UGS project id is still needed from the owner for Relay; local loopback needs none.

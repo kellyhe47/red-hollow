@@ -28,3 +28,15 @@ _Filled in by the test-writer._
 ## Attempt log
 
 - BLOCKED (environment, pre-run): Unity Editor is not installed on this machine and needs the owner's Unity account/licence. `unity/RedHollow/` currently holds only `Assets/GameSim` — there is no Unity project (no ProjectSettings/, no Packages/). T-01..T-09 carry the entire 30-fixture acceptance contract and need no Unity.
+
+## Handoff notes from the sim run (read before starting)
+
+`WaveTable.V1()` ships a first-pass 10-wave table (R-19, deliberately unfixtured). Design intent:
+one new archetype layered in at a time — ravagers w2, spitters w4, behemoths w5, burrowers w6 —
+with the active breach set rotating every wave so the previous wave's wall line is never simply
+reusable. Wave 8 is an all-four rehearsal, wave 9 trades width for weight (two behemoths from three
+breaches), wave 10 is 30 mixed from all four.
+
+It is per-instance config: retune without touching rule code. Numbers most likely to need it are
+listed in the final report — the ability damage values and the R-24 placement radii are guesses the
+PRD never specified.
