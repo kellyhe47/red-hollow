@@ -1,7 +1,7 @@
 ---
 id: 009
 title: XP, leveling, skill points, persistent profiles
-status: in-progress
+status: awaiting-merge
 depends_on: [001]
 touches: [unity/RedHollow/Assets/GameSim/MatchSim.Progression.cs, unity/RedHollow/Assets/GameSim/SqliteProfileStore.cs, sim/GameSim.Tests/T09_ProgressionTests.cs]
 iterations: 1
@@ -42,3 +42,5 @@ Stubs added: `JsonProfileStore.cs`, `MatchSim.SaveProfilesAtMatchEnd()`.
   a missing stub takes the golden adapter down with it. Stub requested and added; suite now builds.
 - DEC-RUN-3 binds this implementer: persist on level-up, accepted spend AND match end.
 - iter 1: implementer dispatched in worktree .tdd/worktrees/009.
+- iter 1 GREEN in worktree: 26 failed / 47 passed / 73 total, exactly the target. Locked tests
+  untouched. No csproj change (no NuGet package); JSON hand-rolled per the netstandard2.1 constraint.
