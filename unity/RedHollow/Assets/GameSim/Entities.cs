@@ -58,6 +58,32 @@ namespace RedHollow.Sim
         /// nothing writes or reads it yet.
         /// </summary>
         public double LastDamagedAt;
+
+        /// <summary>
+        /// R-31 / R-43 — ability rank per slot ("Q", "E"), 0 = still locked. Applied at match
+        /// start from the player's <see cref="AccountProfile"/>, which is what makes a veteran
+        /// account start with abilities and a fresh one start basic-attack-only. Shape only;
+        /// ticket 008 fills it.
+        /// </summary>
+        public readonly Dictionary<string, int> Abilities = new Dictionary<string, int>
+        {
+            { "Q", 0 },
+            { "E", 0 },
+        };
+
+        /// <summary>
+        /// R-32 — sim time each slot becomes castable again, keyed by slot. Absent means ready.
+        /// Per hero and per slot: one player's cooldown must never gate another's. Shape only;
+        /// ticket 008 fills it.
+        /// </summary>
+        public readonly Dictionary<string, double> CooldownReadyAt = new Dictionary<string, double>();
+
+        /// <summary>
+        /// R-31 — timed effects riding on the hero, the way <see cref="Monster.StatusEffects"/>
+        /// carries the lasso slow. Today: Sawbones' Bulwark damage reduction. Shape only;
+        /// ticket 008 fills it.
+        /// </summary>
+        public readonly List<StatusEffect> StatusEffects = new List<StatusEffect>();
     }
 
     /// <summary>

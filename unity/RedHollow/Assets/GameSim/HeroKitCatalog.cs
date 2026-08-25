@@ -3,6 +3,46 @@ using System.Collections.Generic;
 namespace RedHollow.Sim
 {
     /// <summary>
+    /// One ability's numbers (R-31), shape only — every field here is balance data that
+    /// <see cref="SimConfig.HeroKits"/> supplies per class per slot, never a constant in the
+    /// ability code. Not every ability uses every field: a burst reads
+    /// <see cref="Damage"/> and <see cref="Hits"/>, an AoE reads <see cref="Radius"/>, a buff or
+    /// slow reads <see cref="Magnitude"/> and <see cref="DurationSeconds"/>.
+    ///
+    /// The lasso is the one exception: its slow multiplier and duration are fixture-locked on
+    /// <see cref="SimConfig.LassoSlowMultiplier"/> / <see cref="SimConfig.LassoDurationSeconds"/>
+    /// because G-018 supplies them by those names, so the Rancher's Q row carries only its
+    /// identity and its rank scaling.
+    /// </summary>
+    public sealed class AbilitySpec
+    {
+        /// <summary>R-31 — which ability this slot is, one of the <see cref="AbilityName"/> constants.</summary>
+        public string Name;
+
+        /// <summary>R-31 — damage per hit: per shot of a burst, per monster of an AoE.</summary>
+        public double Damage;
+
+        /// <summary>R-31 — hits one cast resolves (Fan the Hammer's 6-shot burst).</summary>
+        public int Hits;
+
+        /// <summary>R-31 — reach: AoE radius, dash distance, knockback distance.</summary>
+        public double Radius;
+
+        /// <summary>R-31 — how long this ability's status effect lasts (Bulwark's 2s).</summary>
+        public double DurationSeconds;
+
+        /// <summary>R-31 — the ability's multiplier-shaped number (Bulwark's 0.6 damage reduction).</summary>
+        public double Magnitude;
+
+        /// <summary>
+        /// R-32 — fraction each rank above 1 adds to this ability's numbers ("~+25%/rank").
+        /// Config rather than a constant so the curve is tunable without a code change, and
+        /// per-ability so a class whose Q scales differently does not need a special case.
+        /// </summary>
+        public double RankScalingPerRank;
+    }
+
+    /// <summary>
     /// One class's kit numbers from R-31 plus its R-32 cooldowns. Kit values beyond the ones the
     /// fixtures pin are config-tunable, which is why they live here and not in the ability code.
     /// </summary>
@@ -19,6 +59,12 @@ namespace RedHollow.Sim
 
         /// <summary>R-32 — E cooldown in seconds; per-class tuning is allowed.</summary>
         public double ECooldownSeconds;
+
+        /// <summary>R-31 — this class's Q ability and its numbers.</summary>
+        public AbilitySpec Q = new AbilitySpec();
+
+        /// <summary>R-31 — this class's E ability and its numbers.</summary>
+        public AbilitySpec E = new AbilitySpec();
     }
 
     /// <summary>
