@@ -55,8 +55,9 @@ namespace RedHollow.Sim
         public double MonsterAttackIntervalSeconds = 1.0;
 
         /// <summary>
-        /// R-17 roster stats, bounty included (R-40). Empty by default: R-16 requires the roster be
-        /// data the shell supplies, so an unpopulated archetype throws instead of defaulting.
+        /// R-17 roster stats, bounty included (R-40). Ships with the five PRD archetypes like every
+        /// other tunable here; R-16 keeps it data, so the shell overrides rows rather than editing
+        /// code. An archetype outside the roster throws instead of defaulting.
         /// </summary>
         public MonsterCatalog Monsters = new MonsterCatalog();
 
