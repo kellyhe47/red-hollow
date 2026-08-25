@@ -45,3 +45,26 @@ run with zero Unity present.
    A ticket in `awaiting-merge` has already passed its gate — resume at merge-back, not
    at its implementation loop.
 4. Re-derive from disk. Never trust a summary over `dotnet test` output.
+
+## Orchestrator decisions (resolved during the run)
+
+### DEC-RUN-1 — catalog defaults mirror the PRD (raised by 002's test-writer, 2026-08-25)
+The 001 catalog seams shipped **empty** with a throwing lookup, but `SimConfig`'s own class
+doc already establishes the opposite convention: *"Defaults mirror the PRD; the Unity shell
+overrides them from ScriptableObjects so balance changes never require a code change
+(R-16, R-17, R-23, R-31)"* — and every scalar tunable in the file follows it
+(`StartingScrip = 500`, `TotalWaves = 10`, `SawbonesDamageReduction = 0.3`, …).
+
+**Resolution:** the three catalogs follow the same convention as every other tunable —
+`new SimConfig()` carries the PRD table, overridable per instance. `StatsFor`/`KitFor` keeps
+throwing for a genuinely unknown key (a typo, or a custom catalog missing a row), which is
+what the loud-failure design was actually for. "Config, not code" is satisfied by the values
+being *per-instance overridable data*, not by the table being absent — there is no external
+config file in this repo and no ScriptableObject asset yet, so an empty default would just
+make the sim unusable outside the fixtures.
+
+Each owning ticket populates only its own catalog and fixes only its own `Config.cs` doc line:
+002 → `Monsters`, 005 → `Placeables`, 008 → `HeroKits`. `MonsterCatalog.cs`'s type-level
+"Ships empty" comment is 002's to correct.
+
+002's tests as written (`new SimConfig().Monsters.StatsFor(...)`) are **correct and stay**.
