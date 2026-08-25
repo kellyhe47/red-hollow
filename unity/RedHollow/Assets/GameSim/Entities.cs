@@ -3,16 +3,32 @@ using System.Linq;
 
 namespace RedHollow.Sim
 {
-    /// <summary>A timed effect riding on a monster (today: lasso slow, R-31 / G-018 / G-019).</summary>
+    /// <summary>
+    /// A timed effect riding on a monster or a hero (R-31 / G-018 / G-019): the Rancher's lasso
+    /// slow and the Sawbones' Bulwark guard are both one of these.
+    /// </summary>
     public sealed class StatusEffect
     {
         public readonly string Type;
         public readonly double ExpiresAt;
 
-        public StatusEffect(string type, double expiresAt)
+        /// <summary>
+        /// R-31 / R-32 — the effect's resolved strength (Bulwark's damage reduction), frozen at
+        /// cast time so a rank-up or a config edit part-way through cannot retune a buff that is
+        /// already running. Zero for effects whose strength lives elsewhere: the lasso's
+        /// multiplier is fixture-locked on <see cref="SimConfig.LassoSlowMultiplier"/>, and it is
+        /// spent the moment the slow is applied rather than read again each tick.
+        ///
+        /// Deliberately absent from <see cref="ToFields"/>: G-018 and G-019 pin the replicated
+        /// shape of a status effect to exactly `type` and `expires_at`.
+        /// </summary>
+        public readonly double Magnitude;
+
+        public StatusEffect(string type, double expiresAt, double magnitude = 0.0)
         {
             Type = type;
             ExpiresAt = expiresAt;
+            Magnitude = magnitude;
         }
 
         public IDictionary<string, object> ToFields() => new Dictionary<string, object>
@@ -62,8 +78,8 @@ namespace RedHollow.Sim
         /// <summary>
         /// R-31 / R-43 — ability rank per slot ("Q", "E"), 0 = still locked. Applied at match
         /// start from the player's <see cref="AccountProfile"/>, which is what makes a veteran
-        /// account start with abilities and a fresh one start basic-attack-only. Shape only;
-        /// ticket 008 fills it.
+        /// account start with abilities and a fresh one start basic-attack-only. Filled by
+        /// <see cref="MatchSim.ApplySavedAbilityAllocations"/> at match start.
         /// </summary>
         public readonly Dictionary<string, int> Abilities = new Dictionary<string, int>
         {
@@ -73,15 +89,17 @@ namespace RedHollow.Sim
 
         /// <summary>
         /// R-32 — sim time each slot becomes castable again, keyed by slot. Absent means ready.
-        /// Per hero and per slot: one player's cooldown must never gate another's. Shape only;
-        /// ticket 008 fills it.
+        /// Per hero and per slot: one player's cooldown must never gate another's. Written by
+        /// <see cref="MatchSim.CastAbility"/> only when a cast is actually accepted (R-32): a
+        /// refused cast must never re-arm the timer it was refused by.
         /// </summary>
         public readonly Dictionary<string, double> CooldownReadyAt = new Dictionary<string, double>();
 
         /// <summary>
         /// R-31 — timed effects riding on the hero, the way <see cref="Monster.StatusEffects"/>
-        /// carries the lasso slow. Today: Sawbones' Bulwark damage reduction. Shape only;
-        /// ticket 008 fills it.
+        /// carries the lasso slow. Today: Sawbones' Bulwark damage reduction, applied by
+        /// <see cref="MatchSim.CastAbility"/> and removed by
+        /// <see cref="MatchSim.TickStatusEffects"/>.
         /// </summary>
         public readonly List<StatusEffect> StatusEffects = new List<StatusEffect>();
     }
