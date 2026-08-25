@@ -143,6 +143,11 @@ namespace RedHollow.Sim
                 TargetHpAfter = 0.0,
             };
 
+            // R-31 Gunslinger passive (ticket 008): every 4th basic crits for double. Resolved
+            // before the line is read so a shot that crossed only friendlies still advances the
+            // shooter's rhythm — a basic is a basic whether or not it found a body.
+            var damage = BasicAttackDamage(request.AttackerId, request.AttackerClass, request.Damage);
+
             var target = FirstMonsterOnLine(request.EntitiesOnLine);
             if (target == null)
             {
@@ -152,20 +157,25 @@ namespace RedHollow.Sim
             }
 
             var hpBefore = target.Hp;
-            var hpAfter = Math.Max(0.0, hpBefore - request.Damage);
+            var hpAfter = Math.Max(0.0, hpBefore - damage);
             target.Hp = hpAfter;
 
             RecordChange(target.Id, "hp", hpBefore, hpAfter);
             Emit("monster_damaged", new Dictionary<string, object>
             {
                 { "monster_id", target.Id },
-                { "amount", request.Damage },
+                { "amount", damage },
                 { "by", request.AttackerId },
             });
 
             result.HitId = target.Id;
-            result.DamageDealt = request.Damage;
+            result.DamageDealt = damage;
             result.TargetHpAfter = hpAfter;
+
+            // R-31 Rancher passive (ticket 008): a spread basic carries to a second monster on the
+            // same line. The result keeps naming the primary target — G-030 pins it to four fields
+            // — so the second body rides the delta and event streams instead.
+            ResolveSpreadTargets(request, target, damage);
 
             // Reaching 0 HP does not kill here: R-40's kill accounting (bounty, XP, wave progress)
             // runs through RecordMonsterKill, which is another ticket's operation.
@@ -299,12 +309,17 @@ namespace RedHollow.Sim
         /// </summary>
         private double IncomingDamageFor(Hero hero, double rawDamage)
         {
+            // R-31 / DEC-RUN-7 (ticket 008): timed reductions the hero is carrying — today only
+            // Bulwark — compose MULTIPLICATIVELY with the class passive below, so a guarded
+            // Sawbones takes 0.7 * 0.4 of the raw hit.
+            var damage = AfterTimedDamageReduction(hero, rawDamage);
+
             if (hero.HeroClass != HeroClass.Sawbones)
             {
-                return rawDamage;
+                return damage;
             }
 
-            return Math.Floor((rawDamage * (1.0 - _config.SawbonesDamageReduction)) + FloorEpsilon);
+            return Math.Floor((damage * (1.0 - _config.SawbonesDamageReduction)) + FloorEpsilon);
         }
 
         /// <summary>

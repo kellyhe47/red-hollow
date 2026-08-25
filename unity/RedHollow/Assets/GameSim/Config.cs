@@ -68,8 +68,9 @@ namespace RedHollow.Sim
         public PlaceableCatalog Placeables = new PlaceableCatalog();
 
         /// <summary>
-        /// R-31 hero kits and their R-32 cooldowns. Empty by default; an unconfigured class throws
-        /// rather than spawning a hero with no HP.
+        /// R-31 hero kits and their R-32 cooldowns. Ships the PRD's three-class table like every
+        /// other tunable here (DEC-RUN-1), so a config is playable out of the box; a class outside
+        /// that roster still throws rather than spawning a hero with no HP.
         /// </summary>
         public HeroKitCatalog HeroKits = new HeroKitCatalog();
 
