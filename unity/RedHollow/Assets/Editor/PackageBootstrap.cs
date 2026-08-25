@@ -26,6 +26,7 @@ namespace RedHollow.EditorTools
             "com.unity.services.lobby",      // R-50 join codes
             "com.unity.services.relay",      // R-50 relay
             "com.unity.inputsystem",         // R-30 WASD + mouse aim
+            "com.unity.render-pipelines.universal", // R-15 Lantern Deep: fog, bloom, colour grading
         };
 
         public static void AddMultiplayerStack()
