@@ -122,3 +122,23 @@ not a blocker and not an implementer's call.
 - **`LineEntity.Kind` has no closed vocabulary.** The fixture loader understands
   hero/hotspot/monster/barricade and throws otherwise, but the production field is a free string.
   007's tests assume an allowlist (`== "monster"` damages) rather than a denylist.
+
+### DEC-RUN-4 — R-33's respawn *execution* was unowned (found by 007's implementer, 2026-08-25)
+R-33: *"Hero at 0 HP dies instantly and respawns at the team spawn at full HP after 10s."*
+Only the **scheduling** half existed — `Hp` → 0, `Alive` → false, `RespawnAt` set, `hero_died`
+carrying `respawn_at`. **Nothing ever revived the hero.** Verified by grep across the whole
+assembly: no respawn tick, and `SimConfig.RespawnPoint` was read nowhere outside its own
+declaration. As shipped, a dead hero stays dead for the rest of the match.
+
+G-021 pins only that the deadline is *set*, so no fixture catches this, and it was not among
+ticket 007's written acceptance criteria — it fell in the gap between "what the fixtures grade"
+and "what the requirement promises". Ticket 007 owns R-33, so it owns the revive.
+
+**Resolution:** routed back through 007's test-writer for a `TickHeroRespawns`-style seam and
+tests (including the exact-deadline boundary, which "after exactly 10 seconds" leaves ambiguous),
+then re-locked and implemented. Same handling as the R-35 regen gap.
+
+**Pattern worth noting for the remaining tickets:** twice now a requirement owned by a ticket had
+no fixture *and* no acceptance criterion, and was therefore about to ship unimplemented. Fixture
+coverage is not requirement coverage. When dispatching 004/005/006/008, check each ticket's
+`owns_requirements` against what its criteria actually exercise, not just against its fixtures.
