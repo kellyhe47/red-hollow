@@ -9,7 +9,7 @@ cites an id that does not exist.
 
 ```bash
 python3 eval/verify_claims.py && python3 eval/verify_fixtures.py   # validate-spec
-dotnet test sim/RedHollow.sln                                       # test-golden (all 30 fixtures)
+dotnet test sim/RedHollow.slnx                                      # test-golden (all 30 fixtures)
 python3 run/coverage_check.py                                       # board coverage
 ```
 

@@ -3,7 +3,7 @@
   "run": "red-hollow-implementation",
   "verification_commands": {
     "validate-spec": "python3 eval/verify_claims.py && python3 eval/verify_fixtures.py",
-    "test-golden": "dotnet test sim/RedHollow.sln",
+    "test-golden": "dotnet test sim/RedHollow.slnx",
     "coverage": "python3 run/coverage_check.py"
   },
   "tickets": [
