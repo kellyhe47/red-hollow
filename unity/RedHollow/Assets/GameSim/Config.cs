@@ -62,9 +62,10 @@ namespace RedHollow.Sim
         public MonsterCatalog Monsters = new MonsterCatalog();
 
         /// <summary>
-        /// R-23 placeable catalog — cost and effect numbers. Ships the PRD's five-row cost column
-        /// like every other tunable here (DEC-RUN-1), so a config can be bought from out of the box;
-        /// the mechanics are fixture-locked but these numbers are tuned in config, never in code. A
+        /// R-23 placeable catalog — cost and effect numbers. Ships the PRD's whole five-row table,
+        /// cost column and effect columns alike, like every other tunable here (DEC-RUN-1): a
+        /// config is both buyable and playable out of the box. The mechanics are fixture-locked
+        /// (G-027, G-028, G-029) but every number they read is tuned in config, never in code. A
         /// placeable outside that catalog throws rather than defaulting to a free placement.
         /// </summary>
         public PlaceableCatalog Placeables = new PlaceableCatalog();

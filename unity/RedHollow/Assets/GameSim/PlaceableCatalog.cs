@@ -89,24 +89,48 @@ namespace RedHollow.Sim
         }
 
         /// <summary>
-        /// The R-23 cost column, verbatim from the PRD: barricade 100, spike trap 75, dynamite trap
-        /// 150, turret 250, med station 200. <see cref="PlaceableStats.Cost"/> is what R-21 charges
-        /// and what R-22 refunds half of, so it is the one column the economy cannot run without.
+        /// R-23 / DEC-023, verbatim from the PRD table — cost *and* effect columns:
         ///
-        /// The effect columns (HP, damage, trigger count, blast radius, range, heal rate) stay at
-        /// their defaults here — they belong to the fixture-locked mechanics of G-027/G-028/G-029
-        /// and are ticket 006's to fill in.
+        ///   barricade     100 — a 300 HP wall that blocks paths (R-16 / B-002, not Burrowers);
+        ///   spike trap     75 — 30 damage per monster crossing, 10 triggers then it breaks;
+        ///   dynamite trap 150 — 150 AoE damage, single use;
+        ///   turret        250 — 20 damage per tick at range 8, nearest living monster;
+        ///   med station   200 — heals heroes 5 HP/s inside radius 5 (R-35 says it stacks with
+        ///                       out-of-combat regen, so it is a second source and not a cap).
+        ///
+        /// A row carries only the columns its mechanic reads: R-23 gives HP to the barricade row
+        /// alone, which is what makes a wall the one placeable
+        /// <see cref="MatchSim.ApplyPlaceableDamage"/> can destroy. Leaving the other four at
+        /// <see cref="PlaceableStats.MaxHp"/> = 0 is deliberate — a turret is not a 0 HP entity
+        /// waiting to be deleted, it is an entity the damage rule does not apply to.
+        ///
+        /// <see cref="PlaceableStats.BlastRadius"/> is the one number the PRD does NOT state:
+        /// R-23's dynamite row says only "150 dmg AoE, single use", and 3.0 exists solely inside
+        /// G-029's `given.inputs`. It is seeded to that 3.0 so the shipped catalog and the
+        /// acceptance fixture describe the same weapon — flagged as owner-confirmable rather than
+        /// spec, and tunable here like every other number.
         ///
         /// Fresh <see cref="PlaceableStats"/> per catalog, never a shared static table — a caller
         /// that retunes its own config's row must not move every other match's prices with it.
         /// </summary>
         private void SeedCatalogDefaults()
         {
-            Set(PlaceableType.Barricade, new PlaceableStats { Cost = 100 });
-            Set(PlaceableType.SpikeTrap, new PlaceableStats { Cost = 75 });
-            Set(PlaceableType.DynamiteTrap, new PlaceableStats { Cost = 150 });
-            Set(PlaceableType.Turret, new PlaceableStats { Cost = 250 });
-            Set(PlaceableType.MedStation, new PlaceableStats { Cost = 200 });
+            Set(PlaceableType.Barricade, new PlaceableStats { Cost = 100, MaxHp = 300.0 });
+            Set(PlaceableType.SpikeTrap, new PlaceableStats { Cost = 75, Damage = 30.0, TriggerCount = 10 });
+            Set(PlaceableType.DynamiteTrap, new PlaceableStats
+            {
+                Cost = 150,
+                Damage = 150.0,
+                TriggerCount = 1,
+                BlastRadius = 3.0,
+            });
+            Set(PlaceableType.Turret, new PlaceableStats { Cost = 250, Damage = 20.0, Range = 8.0 });
+            Set(PlaceableType.MedStation, new PlaceableStats
+            {
+                Cost = 200,
+                HealPerSecond = 5.0,
+                Range = 5.0,
+            });
         }
     }
 }
