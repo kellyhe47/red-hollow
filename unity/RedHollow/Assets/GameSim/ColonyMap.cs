@@ -72,8 +72,19 @@ namespace RedHollow.Sim
         /// civilian count, which R-11 then spends as the shelter's HP. The colony total is never
         /// copied across: <see cref="MatchState.TotalCivilians"/> derives it from the hotspots
         /// (R-02 / R-72), so the two can never drift apart.
+        ///
+        /// R-20's starting stake crosses the same bridge, which is why the configuration comes in
+        /// here rather than through a seam of its own: this is already the one place where authored
+        /// map/config data becomes live match state, so a pool seeded anywhere else is a pool some
+        /// caller forgets to seed. <paramref name="config"/> is optional — a caller with no tuned
+        /// config gets the shipped defaults (<see cref="SimConfig.StartingScrip"/> = 500) rather
+        /// than a match that starts broke.
         /// </summary>
-        public MatchState CreateMatchState()
+        /// <param name="config">
+        /// The match's tunables; null means the shipped defaults. Seeding is ticket 005's — this
+        /// signature is the seam, not the behaviour.
+        /// </param>
+        public MatchState CreateMatchState(SimConfig config = null)
         {
             var state = new MatchState();
             foreach (var spec in Hotspots)

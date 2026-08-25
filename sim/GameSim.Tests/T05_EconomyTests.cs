@@ -572,6 +572,51 @@ namespace RedHollow.Sim.Tests
             });
         }
 
+        // ---- R-20: the stake is not just declared, it is seeded ---------------------------------------
+
+        /// <summary>
+        /// R-20: "Starting stake 500". The structural guard above pins the number;
+        /// this pins that something actually *reads* it. Nothing did —
+        /// <see cref="SimConfig.StartingScrip"/> was declared and never referenced anywhere in the
+        /// sim, and <see cref="ColonyMap.CreateMatchState"/> never touched
+        /// <see cref="TeamState.Scrip"/>, so a real match opened with an empty pool and the entire
+        /// first planning phase was unaffordable. No fixture catches it: G-013/G-014/G-015/G-022
+        /// each state their own opening pool, and G-016 grades carryover between waves rather than
+        /// the initial credit.
+        ///
+        /// <see cref="ColonyMap.CreateMatchState"/> is where the seed belongs — it is already the
+        /// config-to-state bridge that turns authored civilian counts into live hotspots, so a pool
+        /// seeded anywhere else is a pool some caller forgets to seed.
+        ///
+        /// The tuned case is the one that carries the weight: 500 on its own would be satisfied by
+        /// a literal written into the bridge, which is the same bug relocated.
+        /// </summary>
+        [TestCase(500, TestName = "starting_stake_seeded_from_the_shipped_default")]
+        [TestCase(275, TestName = "starting_stake_seeded_from_a_tuned_config")]
+        public void Match_state_built_from_the_map_starts_with_the_configured_stake(int stake)
+        {
+            var state = ColonyMap.V1().CreateMatchState(new SimConfig { StartingScrip = stake });
+
+            Assert.That(state.Team.Scrip, Is.EqualTo(stake),
+                "R-20: the opening pool is read from SimConfig.StartingScrip, not hardcoded");
+        }
+
+        /// <summary>
+        /// The optional half of the seam. Every existing caller in this suite passes no config, and
+        /// so will the Unity shell until it authors one — they must still get the shipped stake
+        /// rather than a match that starts broke. Compared against
+        /// <see cref="SimConfig.StartingScrip"/> rather than against a literal 500 so the two halves
+        /// of R-20 cannot drift apart.
+        /// </summary>
+        [Test]
+        public void Match_state_built_without_a_config_starts_with_the_shipped_stake()
+        {
+            var state = ColonyMap.V1().CreateMatchState();
+
+            Assert.That(state.Team.Scrip, Is.EqualTo(new SimConfig().StartingScrip),
+                "a caller that supplied no config got a match that starts broke");
+        }
+
         // ---- shared assertions -------------------------------------------------------------------------
 
         /// <summary>
