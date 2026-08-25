@@ -207,3 +207,38 @@ inclusive boundary (G-019 convention) and a `trigger` distinguishable from G-017
 pre-dispatch audit's nine. Every one was a requirement whose fixture graded a *neighbouring*
 behaviour, leaving the requirement itself unenforced. The tell is a requirement whose fixture pins
 an exception, an override, or an "early" path: the *ordinary* path is the one nobody grades.
+
+### DEC-RUN-7 — Bulwark stacks multiplicatively with the Sawbones passive (raised by 008's test-writer, 2026-08-25)
+R-31 gives Sawbones a **flat 30% damage reduction** passive *and* Bulwark at **60% DR for 2s**, and
+says nothing about how they combine. Three readings are defensible: multiplicative (takes 0.7×0.4 =
+**28%**), additive (takes **10%**), or replacing (takes **40%**). 008's tests deliberately accept all
+three (`taken <= 0.4 * raw` and strictly less than unguarded), so this is a live choice.
+
+**Resolution: multiplicative.** DEC-016 states combat is modelled on League of Legends, and
+multiplicative stacking of damage reduction is that game's convention — so it is the reading most
+consistent with the spec's own stated model, rather than a taste call. It also avoids the additive
+reading's 90% total reduction, which would make a 2-second cooldown-gated button close to immunity.
+
+This is **balance, not correctness** — no fixture constrains it and the numbers are config-tunable.
+Flag for the owner; trivially reversible.
+
+### DEC-RUN-8 — Rancher `BasicAttackDamage` is 12, the per-pellet quantum
+R-31's Rancher row reads "cone shotgun, **12×5 pellets**", against Gunslinger's flat "25 dmg" and
+Sawbones' "40 dmg". Ambiguous whether the kit's `BasicAttackDamage` is 12 (per pellet) or 60 (full
+burst).
+
+**Resolution: 12.** The `x5` is spread geometry — how many pellets connect is the shell's raycast
+answer, and the Rancher passive ("basics hit up to 2 targets") only makes sense if pellets are
+resolved individually. Storing 60 would bake a best-case assumption into the kit table.
+DEC-RUN-1 keeps it per-instance overridable either way.
+
+### Accepted without change (008's other flags)
+- **Crit counter has no home on `Hero`.** G-030 calls `ResolveHeroAttack` with an attacker absent
+  from `State.Heroes`, so the every-4th-basic counter cannot be required to live on the entity.
+  A private per-attacker-id map inside the sim is correct; tests pin only the observable sequence.
+- **Lasso rank scaling is untested and stays that way.** `SimConfig.LassoSlowMultiplier` /
+  `LassoDurationSeconds` are fixture-locked *by name* (the adapter maps `given.configuration` onto
+  them), so scaling them risks G-018. The Rancher's Q kit row carries identity and rank scaling only.
+- **008 may edit `MatchSim.Heroes.cs`** (ticket 007's green file) for the two passives, which hook
+  `ResolveHeroAttack`. No other wave-B ticket touches it, so there is no concurrency hazard — but the
+  implementer must re-run the golden suite after, since G-030 lives in that path.
