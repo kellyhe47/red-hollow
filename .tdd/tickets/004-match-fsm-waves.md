@@ -1,7 +1,7 @@
 ---
 id: 004
 title: Match FSM, wave lifecycle, kills, bounty, victory
-status: awaiting-merge
+status: green
 depends_on: [001, 003]
 touches: [unity/RedHollow/Assets/GameSim/MatchSim.Waves.cs, unity/RedHollow/Assets/GameSim/WaveTable.cs, sim/GameSim.Tests/T04_WaveTests.cs]
 iterations: 1
@@ -18,12 +18,12 @@ record_monster_kill (bounty to shared pool, wave complete on last kill, victory 
 
 ## Acceptance criteria
 
-- [ ] G-010, G-011, G-012, G-016, G-017 pass
-- [ ] lobby -> (planning -> combat) x10 -> victory with combat -> defeat edge in every wave
-- [ ] wave table is config, tunable without code change
-- [ ] R-04: the sim exposes wave-complete interstitial data (bounty earned this wave, civilians remaining) and planning auto-advances after it
-- [ ] R-05: the sim exposes which entry points activate next wave WITHOUT exposing monster types or counts
-- [ ] R-14: which subset of the 4 fixed entry tunnels is active varies per wave via the wave table
+- [x] G-010, G-011, G-012, G-016, G-017 pass
+- [x] lobby -> (planning -> combat) x10 -> victory with combat -> defeat edge in every wave
+- [x] wave table is config, tunable without code change
+- [x] R-04: the sim exposes wave-complete interstitial data (bounty earned this wave, civilians remaining) and planning auto-advances after it
+- [x] R-05: the sim exposes which entry points activate next wave WITHOUT exposing monster types or counts
+- [x] R-14: which subset of the 4 fixed entry tunnels is active varies per wave via the wave table
 
 ## Test plan
 
@@ -44,3 +44,5 @@ G-010/011/012/016/017 not re-encoded.
 - iter 1: implementer dispatched.
 - iter 1 GREEN in worktree: 9 failed / 187 passed / 196 total, exactly the target. Zero T-04 stubs.
   Locked tests untouched.
+- MERGED to main @ 48c1100. Post-merge full suite: 9 failed / 187 passed / 196 total; 21/30 fixtures
+  green. Only T-05x4 T-06x3 T-08x2 remain. validate-spec and coverage green.
