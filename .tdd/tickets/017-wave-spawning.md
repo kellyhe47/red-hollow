@@ -1,11 +1,11 @@
 ---
 id: 017
 title: Wave spawning — turn the wave table into live monsters
-status: pending
+status: green
 depends_on: [004, 002]
 touches: [unity/RedHollow/Assets/GameSim/MatchSim.Spawning.cs, sim/GameSim.Tests/T17_SpawningTests.cs]
-iterations: 0
-test_files: []
+iterations: 1
+test_files: [sim/GameSim.Tests/T17_SpawningTests.cs]
 branch: ""
 board_id: T-17
 owns_requirements: []
@@ -28,15 +28,20 @@ Sim-side, not shell-side: how many monsters of what type exist is a game rule, a
 
 ## Acceptance criteria
 
-- [ ] spawning wave N creates exactly the monsters its `WaveSpec` describes
-- [ ] each spawned monster carries its R-17 catalog stats - hp, speed, damage - not invented numbers
-- [ ] monsters are placed at the entry tunnels the wave table marks active for that wave (R-14)
-- [ ] spawned ids are unique and land in `WaveState.LivingMonsterIds` so wave completion works
-- [ ] spawning is deterministic - same wave and seed yields the same result (R-54)
-- [ ] the existing 30 golden fixtures still pass unchanged
+- [x] spawning wave N creates exactly the monsters its `WaveSpec` describes
+- [x] each spawned monster carries its R-17 catalog stats - hp, speed, damage - not invented numbers
+- [x] monsters are placed at the entry tunnels the wave table marks active for that wave (R-14)
+- [x] spawned ids are unique and land in `WaveState.LivingMonsterIds` so wave completion works
+- [x] spawning is deterministic - same wave and seed yields the same result (R-54)
+- [x] the existing 30 golden fixtures still pass unchanged
 
 ## Test plan
 
-_Filled in by the test-writer._
+`T17_SpawningTests.cs` — 19 cases covering composition, catalog-not-constants (from both
+sides), R-14 tunnel membership, id uniqueness within and across spawns, a full spawned wave
+cleared kill-by-kill to WaveComplete, R-54 determinism via ordered result ids, and three sad paths.
 
 ## Attempt log
+- iter 1 GREEN @ 8533ad4: full suite 338/338, fixtures 30/30, zero NotYet call sites.
+- All-or-nothing partial spawn; per-match id counter; round-robin breaches keyed on whole-wave index.
+- NOTE: MatchSim.cs:85 still declares the now-unreferenced NotYet helper. Harmless, one-line cleanup.
