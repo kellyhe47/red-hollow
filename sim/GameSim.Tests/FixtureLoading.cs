@@ -69,6 +69,10 @@ namespace RedHollow.Sim.Tests
         internal static JsonArray Arr(JsonNode parent, string key) =>
             Has(parent, key) ? parent[key].AsArray() : new JsonArray();
 
+        /// <summary>Key set of a JSON object, in declaration order. Empty when the node is absent.</summary>
+        internal static IEnumerable<string> Keys(JsonNode parent) =>
+            parent is JsonObject obj ? obj.Select(kv => kv.Key).ToList() : (IEnumerable<string>)new List<string>();
+
         /// <summary>Converts a sim observation's object graph into JsonNode for comparison.</summary>
         internal static JsonNode FromObject(object value)
         {
@@ -139,5 +143,55 @@ namespace RedHollow.Sim.Tests
         internal JsonNode Expected => Root["expect"]["exact"];
 
         public override string ToString() => Id + " " + Name;
+    }
+
+    /// <summary>
+    /// Enumerates and parses eval/golden at run time. Deliberately never a hardcoded list of 30:
+    /// a fixture added by a later spec change must surface as a new NUnit case without the adapter
+    /// being edited, and a fixture silently disappearing must show up as a count mismatch.
+    ///
+    /// Every read here is read-only. eval/ is the acceptance contract; the adapter grades against
+    /// it and must never write to it.
+    /// </summary>
+    internal static class FixtureCatalog
+    {
+        /// <summary>Absolute paths of every golden fixture, ordered so case order is reproducible.</summary>
+        internal static IReadOnlyList<string> Paths()
+        {
+            var paths = Directory.GetFiles(Repo.GoldenDir, "*.json");
+            Array.Sort(paths, StringComparer.Ordinal);
+            return paths;
+        }
+
+        internal static Fixture Load(string path)
+        {
+            JsonNode root;
+            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                root = JsonNode.Parse(stream);
+            }
+
+            if (root == null)
+            {
+                throw new InvalidOperationException("fixture parsed to nothing: " + path);
+            }
+
+            return new Fixture
+            {
+                Id = Json.Str(root, "id"),
+                Name = Json.Str(root, "name"),
+                FileName = Path.GetFileName(path),
+                Root = root,
+            };
+        }
+
+        /// <summary>The manifest, parsed read-only. Its canonicalization rules are contract.</summary>
+        internal static JsonNode LoadManifest()
+        {
+            using (var stream = new FileStream(Repo.ManifestPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                return JsonNode.Parse(stream);
+            }
+        }
     }
 }
