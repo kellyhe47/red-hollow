@@ -1,5 +1,5 @@
-using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace RedHollow.Sim
 {
@@ -24,11 +24,16 @@ namespace RedHollow.Sim
         /// </summary>
         public readonly List<int> ActiveEntryTunnels = new List<int>();
 
-        public IDictionary<string, object> ToFields() =>
-            throw NotYet("the replicated shape of the partial wave preview (R-05)");
-
-        private static NotImplementedException NotYet(string behavior) =>
-            new NotImplementedException("T-04 not implemented: " + behavior);
+        /// <summary>
+        /// Two fields, both safe to replicate. The indices are copied out as plain numbers rather
+        /// than handing over the list the wave table owns, so a client holds a snapshot of the
+        /// breaches and no route back to the <see cref="WaveSpec"/> they were read from (DEC-018).
+        /// </summary>
+        public IDictionary<string, object> ToFields() => new Dictionary<string, object>
+        {
+            { "wave", Wave },
+            { "active_entry_tunnels", ActiveEntryTunnels.Cast<object>().ToList() },
+        };
     }
 
     /// <summary>
@@ -50,10 +55,11 @@ namespace RedHollow.Sim
         /// <summary>R-04 / R-02 — civilians still alive across the whole colony.</summary>
         public int CiviliansRemaining;
 
-        public IDictionary<string, object> ToFields() =>
-            throw NotYet("the replicated shape of the wave-complete interstitial (R-04)");
-
-        private static NotImplementedException NotYet(string behavior) =>
-            new NotImplementedException("T-04 not implemented: " + behavior);
+        public IDictionary<string, object> ToFields() => new Dictionary<string, object>
+        {
+            { "wave", Wave },
+            { "bounty_earned", BountyEarned },
+            { "civilians_remaining", CiviliansRemaining },
+        };
     }
 }
