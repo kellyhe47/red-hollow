@@ -60,3 +60,10 @@ Gotchas for future runs (cost half a day):
   `/api/upload/image` to copy the canon into the input space and a plain `LoadImage` instead.
 - `/api/history` display_names always say `_00001_`; resolve real per-run files via
   `/api/jobs/{id}` (needs `app.api.fetchApi`, not raw fetch).
+
+## Sawbones back-frame follow-up (2026-08-25, session 2)
+Recipe that finally produced a true back view without ControlNet — **3-stage pose transplant**:
+1. img2img: gunslinger's good back frame as latent init, IPA "style transfer", denoise 0.5 → back pose kept, but gunslinger's hat/coat survive (denoise ≥0.62 flips the pose back to frontal — the IPA frontal reference is a strong attractor).
+2. img2img refine at 0.6 WITHOUT IPAdapter (init already carries the palette) → clean back view, hat still baked into pixels.
+3. Masked head inpaint (SolidMask 340px column + FeatherMask 40 + SetLatentNoiseMask, denoise 0.85, "back of a bald head, no headwear" + anti-hat negatives) → bald back view.
+Delivered as art/characters/sawbones-turnaround_v3_back.png + sheet_v3. **Known mismatch: build reads leaner than the canon tank** — pose transplant inherits the donor's silhouette. A faithful back view for bulky silhouettes still needs the LoRA rung (or ControlNet, if Comfy Cloud ever fixes it). 12 draft attempts across pure-prompt seeds/weights all stayed frontal; logged so nobody repeats them.
