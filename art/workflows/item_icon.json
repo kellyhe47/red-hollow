@@ -61,7 +61,7 @@
   },
   "6": {
     "inputs": {
-      "text": "photo, photorealistic, blurry, text, watermark, signature, extra limbs, deformed, low quality, jpeg artifacts, sun, blue sky, daylight, teal, cool blue tones, oversaturated color",
+      "text": "photo, photorealistic, blurry, text, watermark, signature, extra limbs, deformed, low quality, jpeg artifacts, sun, blue sky, daylight, teal, cool blue tones, oversaturated color, light background, white background, pale grey background, engraved lettering, inscription, letters, numbers",
       "clip": [
         "1",
         1
