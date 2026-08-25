@@ -1,0 +1,14 @@
+{
+    "name": "RedHollow.Game",
+    "rootNamespace": "RedHollow.Game",
+    "references": ["GameSim"],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
