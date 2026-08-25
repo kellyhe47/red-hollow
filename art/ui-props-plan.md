@@ -35,10 +35,12 @@ State file for the run. Update statuses as work lands. Resume procedure at botto
 - [x] Alpha branch verified — NOTE: diff-matte alone unusable (branch divergence); primary matte = BiRefNetRMBG node (`ui/rgba2` output), diff branch kept as cross-check. LayerMask BiRefNet nodes broken on cloud. See 04 doc overrides.
 - [x] ui_props.json exported + committed (c900f1f)
 - [x] All 32 keeper runs queued 2026-08-25 (19 chrome + 10 props + 3 facades), steps 28, order: hud-topbar, shop-bar, slot-frame, slot-frame-locked, hp-bar-frame, hp-bar-fill, xp-bar-frame, xp-bar-fill, button-normal/hover/pressed, levelup-card, dialog-panel, toast-banner, wave-banner, victory-banner, defeat-banner, cursor, crosshair, spawn-banner, water-tower, string-lights, hay-bale, barrel-cluster, cactus-pot, hitching-post, antenna-mast, lantern-post, saloon-sign, tumbleweed, saloon-facade, chapel-facade, homestead-facade. Cloud filenames are hashes — map history entries to slugs BY THIS ORDER (draft run t=1787689782228 precedes them).
-- [ ] Items 1–14 UI chrome (draft→keeper→download→verify→commit `art/ui/`)
-- [ ] Items 15–24 props (`art/ui/props/` … actually `art/props/`? use `art/ui/` for chrome, `art/props/` for world props)
-- [ ] Items 25–27 facades (opaque branch, `art/props/`)
-- [ ] asset-log.csv rows per keeper
+- [x] Items 1–14 UI chrome delivered (`art/ui/`, exact sizes, alpha/size checks scripted)
+- [x] Items 15–24 props delivered (`art/props/`)
+- [x] Items 25–27 facades delivered as BiRefNet cutouts (`art/props/`)
+- [x] asset-log.csv rows per keeper (33 rows)
+
+**SET COMPLETE 2026-08-25.** Remaining niceties (not blocking): none. Bar-aspect fallback + framing variants documented in 04 doc.
 
 ## Local delivery script
 `art/tools/ui_deliver.py` (to write): input W/B renders or Comfy RGBA → un-premultiply → exact resize (lanczos) → size assert → magenta/blue composite halo check → write `art/ui/<slug>_v<N>_<WxH>.png`.
