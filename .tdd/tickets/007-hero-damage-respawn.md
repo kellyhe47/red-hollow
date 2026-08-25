@@ -1,7 +1,7 @@
 ---
 id: 007
 title: Hero damage, death/respawn, no friendly fire
-status: awaiting-merge
+status: green
 depends_on: [001]
 touches: [unity/RedHollow/Assets/GameSim/MatchSim.Heroes.cs, unity/RedHollow/Assets/GameSim/Entities.cs, sim/GameSim.Tests/T07_HeroTests.cs]
 iterations: 2
@@ -18,9 +18,9 @@ apply_hero_damage (Sawbones flat 30% DR, floor applied; 0 HP -> dies instantly, 
 
 ## Acceptance criteria
 
-- [ ] G-020, G-021, G-030 pass
-- [ ] all heroes dead is not defeat
-- [ ] dead heroes excluded from monster target candidates (feeds T-02)
+- [x] G-020, G-021, G-030 pass
+- [x] all heroes dead is not defeat
+- [x] dead heroes excluded from monster target candidates (feeds T-02)
 
 ## Test plan
 
@@ -50,3 +50,6 @@ G-020/021/030 not re-encoded.
   incl. the inclusive-deadline boundary grounded in G-019 precedent; implementer closed it.
 - GREEN in worktree: 27 failed / 59 passed / 86 total. 37/37 T07 pass, zero T-07 stubs remain,
   locked tests untouched.
+- MERGED to main @ fecf5d3. Post-merge full suite (all of wave A): 14 failed / 132 passed / 146 total,
+  16/30 fixtures green. Only T-04/05/06/08 tags remain. validate-spec, coverage, and the R-51
+  standalone build all green.
