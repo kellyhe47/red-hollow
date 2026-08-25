@@ -23,8 +23,6 @@ namespace RedHollow.Sim
     /// can pick the right agent type / area mask — R-18's parenthetical is that a Burrower's path
     /// ignores barricade obstacles, which is a *pathing* carve-out and therefore the shell's, the
     /// same way <see cref="Monster.IgnoresBarricadesAndHeroes"/> is the sim's half of DEC-007.
-    ///
-    /// Ticket 018 (T-18) declares the shape; nothing implements it yet.
     /// </summary>
     public interface IDirectionOracle
     {
@@ -46,14 +44,22 @@ namespace RedHollow.Sim
     /// <see cref="OpenPathOracle"/> is the default when nothing is known to block — solo play,
     /// editor scenarios and the whole sim test suite run on this, with no shell attached.
     ///
-    /// Ticket 018 (T-18) declares the shape; nothing implements it yet.
+    /// The mover's identity is ignored here: R-18's per-archetype pathing carve-out (a Burrower
+    /// tunnels past barricade obstacles) is a property of navigation *data*, and an open field has
+    /// none to differ over. The parameter exists for the shell implementation that does.
     /// </summary>
     public sealed class StraightLineDirectionOracle : IDirectionOracle
     {
         public Vec2 DirectionFor(string moverId, Vec2 from, Vec2 to)
         {
-            throw new NotImplementedException(
-                "T-18 not implemented: unit-length direction from a mover straight toward its target");
+            var dx = to.X - from.X;
+            var dy = to.Y - from.Y;
+            var length = Math.Sqrt((dx * dx) + (dy * dy));
+
+            // Standing on the target answers with the interface's "no step" rather than a 0/0 that
+            // would poison the mover's position with NaN — and it is also true: a mover already
+            // where it is going has no direction to be pointed in.
+            return length > 0.0 ? new Vec2(dx / length, dy / length) : new Vec2(0.0, 0.0);
         }
     }
 
@@ -68,7 +74,7 @@ namespace RedHollow.Sim
     /// Plain fields, no resolution logic: which of the two a hero reads is a rule, and rules live in
     /// <see cref="MatchSim"/>.
     ///
-    /// Ticket 018 (T-18) declares the shape; nothing reads it yet.
+    /// Read by <see cref="MatchSim.MoveHero"/>, which owns the default-or-override rule.
     /// </summary>
     public sealed class HeroMovementConfig
     {
@@ -99,8 +105,6 @@ namespace RedHollow.Sim
     /// <c>HeroInput</c> into <c>HeroIntent.MoveDirection</c> and sent to the host like every other
     /// command (R-51). Monsters get their direction from <see cref="IDirectionOracle"/> because
     /// nobody is driving them; heroes are driven.
-    ///
-    /// Ticket 018 (T-18) declares the shape; nothing fills it in yet.
     /// </summary>
     public sealed class HeroMoveRequest
     {
@@ -117,7 +121,7 @@ namespace RedHollow.Sim
     }
 
     /// <summary>
-    /// What one hero's step produced. Ticket 018 (T-18) declares the shape; nothing fills it in yet.
+    /// What one hero's step produced.
     /// </summary>
     public sealed class HeroMoveResult : ISimResult
     {
@@ -147,8 +151,6 @@ namespace RedHollow.Sim
     /// times a second for information the client already re-reads from replicated positions.
     /// G-013 set the precedent by replicating <c>placeables.count</c> rather than the placeable, and
     /// <see cref="MatchSim.RecordMonsterKill"/> by declining to replicate the roster field by field.
-    ///
-    /// Ticket 018 (T-18) declares the shape; nothing fills it in yet.
     /// </summary>
     public sealed class MonsterMovementResult : ISimResult
     {
