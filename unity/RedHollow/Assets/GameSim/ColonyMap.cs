@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 
 namespace RedHollow.Sim
@@ -8,8 +7,6 @@ namespace RedHollow.Sim
     /// Kept separate from the live <see cref="Hotspot"/> entity because R-10 is authorable config
     /// (the shell overrides it from a ScriptableObject) while the entity carries mutable match
     /// state that a rematch resets (R-07).
-    ///
-    /// STUB — ticket T-03 owns populating this. Shape only.
     /// </summary>
     public sealed class HotspotSpec
     {
@@ -25,7 +22,10 @@ namespace RedHollow.Sim
     /// civilians), 4 breach entry tunnels at the cavern edges (R-14), and the single team spawn
     /// near the map centre where heroes enter and respawn (R-33).
     ///
-    /// STUB — ticket T-03 owns populating this. Shape only; no data and no behaviour here yet.
+    /// Everything here is mutable *instance* data rather than constants, for the same reason the
+    /// stat catalogs are (DEC-RUN-1): the shell authors the layout, so rule code must never be able
+    /// to assume a particular number. <see cref="V1"/> supplies the shipped defaults; a caller is
+    /// free to edit the returned instance, and every derived figure follows from the edit.
     /// </summary>
     public sealed class ColonyMap
     {
@@ -38,14 +38,55 @@ namespace RedHollow.Sim
         /// <summary>R-10 / R-33 — one team spawn point, near the map centre.</summary>
         public Vec2 TeamSpawn;
 
-        /// <summary>The one v1 map. Defaults live here so balance edits never touch rule code.</summary>
-        public static ColonyMap V1() =>
-            throw new NotImplementedException(
-                "T-03 not implemented: the v1 colony map (3 hotspots 8/6/6, 4 entry tunnels, 1 team spawn)");
+        /// <summary>
+        /// The one v1 map. Defaults live here so balance edits never touch rule code.
+        ///
+        /// The civilian counts are the contract (R-10 / R-02: 8 + 6 + 6 = 20 is a match's whole loss
+        /// budget). The coordinates are layout taste — no fixture pins them — and describe a cavern
+        /// roughly 60 units across: the three shelters ring the centre, the four tunnels breach the
+        /// edges, and the team spawn sits at the middle so every shelter is a comparable run away.
+        /// </summary>
+        public static ColonyMap V1()
+        {
+            var map = new ColonyMap();
 
-        /// <summary>Opening live state for a match on this map — the config-to-state bridge.</summary>
-        public MatchState CreateMatchState() =>
-            throw new NotImplementedException(
-                "T-03 not implemented: building MatchState from colony map config");
+            map.Hotspots.Add(new HotspotSpec { Id = "hs_saloon", Pos = new Vec2(-12.0, 6.0), Civilians = 8 });
+            map.Hotspots.Add(new HotspotSpec { Id = "hs_chapel", Pos = new Vec2(11.0, 9.0), Civilians = 6 });
+            map.Hotspots.Add(new HotspotSpec { Id = "hs_homestead", Pos = new Vec2(2.0, -13.0), Civilians = 6 });
+
+            // R-14 — four breaches, one per cavern edge, so no shelter is safe by geometry alone.
+            map.EntryTunnels.Add(new Vec2(-30.0, 0.0));
+            map.EntryTunnels.Add(new Vec2(30.0, 0.0));
+            map.EntryTunnels.Add(new Vec2(0.0, 30.0));
+            map.EntryTunnels.Add(new Vec2(0.0, -30.0));
+
+            // R-33 — heroes enter at wave 1 and respawn here; mirrors SimConfig.RespawnPoint.
+            map.TeamSpawn = new Vec2(0.0, 0.0);
+
+            return map;
+        }
+
+        /// <summary>
+        /// Opening live state for a match on this map — the config-to-state bridge. Each
+        /// <see cref="HotspotSpec"/> becomes one live <see cref="Hotspot"/> carrying its starting
+        /// civilian count, which R-11 then spends as the shelter's HP. The colony total is never
+        /// copied across: <see cref="MatchState.TotalCivilians"/> derives it from the hotspots
+        /// (R-02 / R-72), so the two can never drift apart.
+        /// </summary>
+        public MatchState CreateMatchState()
+        {
+            var state = new MatchState();
+            foreach (var spec in Hotspots)
+            {
+                state.Hotspots[spec.Id] = new Hotspot
+                {
+                    Id = spec.Id,
+                    Pos = spec.Pos,
+                    Civilians = spec.Civilians,
+                };
+            }
+
+            return state;
+        }
     }
 }
