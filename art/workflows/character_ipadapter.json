@@ -1,0 +1,295 @@
+{
+ "1": {
+  "inputs": {
+   "value": "massive mutated bull monster, exposed ribcage bones, broken jagged horns, towering muscular bulk, torn hide"
+  },
+  "class_type": "PrimitiveString",
+  "_meta": {
+   "title": "① ITEM token (change per character)"
+  }
+ },
+ "2": {
+  "inputs": {
+   "value": "three-quarter view from the left, body angled 45 degrees away from camera, head turned to the left, left shoulder closer to camera"
+  },
+  "class_type": "PrimitiveString",
+  "_meta": {
+   "title": "② VIEW token (front view / left side profile view / back view)"
+  }
+ },
+ "3": {
+  "inputs": {
+   "value": "character turnaround reference sheet frame, full body, single character, centered, neutral standing A-pose, arms slightly away from body, full figure head to toe with feet visible, feet on same ground line, plain featureless dark umber backdrop, even warm lantern illumination, crisp character silhouette, consistent proportions, no background scenery, no architecture"
+  },
+  "class_type": "PrimitiveStringMultiline",
+  "_meta": {
+   "title": "③ TURNAROUND MODIFIER"
+  }
+ },
+ "4": {
+  "inputs": {
+   "value": "cinematic subterranean Mars colony, colossal cavern interior, monochromatic burnt-sienna palette, dense blocky settlement lit by scattered warm artificial lights, volumetric dust haze, glowing distance behind dark silhouetted foreground, no sun, no sky, no horizon, matte painterly semi-realism, muted matte surfaces, no text, no watermark"
+  },
+  "class_type": "PrimitiveStringMultiline",
+  "_meta": {
+   "title": "④ STYLE TAIL (Lantern Deep, DEC-025)"
+  }
+ },
+ "5": {
+  "inputs": {
+   "value": "photo, photorealistic, blurry, text, watermark, signature, extra limbs, deformed, low quality, jpeg artifacts, sun, blue sky, daylight, teal, cool blue tones, oversaturated color, multiple characters, crowd, duplicate character, second figure, cropped head, cropped feet, out of frame, landscape, buildings, cityscape, settlement, scenery background, front view, facing camera, face visible, eyes, frontal pose, three-quarter view, both shoulders squared to camera, symmetrical frontal stance, two eyes visible"
+  },
+  "class_type": "PrimitiveStringMultiline",
+  "_meta": {
+   "title": "⑤ NEGATIVE (assembled)"
+  }
+ },
+ "6": {
+  "inputs": {
+   "string_a": [
+    "1",
+    0
+   ],
+   "string_b": [
+    "2",
+    0
+   ],
+   "delimiter": ", "
+  },
+  "class_type": "StringConcatenate",
+  "_meta": {
+   "title": "item + view"
+  }
+ },
+ "7": {
+  "inputs": {
+   "string_a": [
+    "6",
+    0
+   ],
+   "string_b": [
+    "3",
+    0
+   ],
+   "delimiter": ", "
+  },
+  "class_type": "StringConcatenate",
+  "_meta": {
+   "title": "+ modifier"
+  }
+ },
+ "8": {
+  "inputs": {
+   "string_a": [
+    "7",
+    0
+   ],
+   "string_b": [
+    "4",
+    0
+   ],
+   "delimiter": ", "
+  },
+  "class_type": "StringConcatenate",
+  "_meta": {
+   "title": "+ style tail"
+  }
+ },
+ "9": {
+  "inputs": {
+   "ckpt_name": "sd_xl_base_1.0.safetensors"
+  },
+  "class_type": "CheckpointLoaderSimple",
+  "_meta": {
+   "title": "Load Checkpoint"
+  }
+ },
+ "12": {
+  "inputs": {
+   "preset": "PLUS (high strength)",
+   "model": [
+    "9",
+    0
+   ]
+  },
+  "class_type": "IPAdapterUnifiedLoader",
+  "_meta": {
+   "title": "IPAdapter Unified Loader"
+  }
+ },
+ "13": {
+  "inputs": {
+   "weight": 1,
+   "weight_type": "style transfer",
+   "combine_embeds": "concat",
+   "start_at": 0,
+   "end_at": 1,
+   "embeds_scaling": "V only",
+   "model": [
+    "12",
+    0
+   ],
+   "ipadapter": [
+    "12",
+    1
+   ],
+   "image": [
+    "24",
+    0
+   ]
+  },
+  "class_type": "IPAdapterAdvanced",
+  "_meta": {
+   "title": "IP-Adapter — canon identity lock"
+  }
+ },
+ "14": {
+  "inputs": {
+   "text": [
+    "8",
+    0
+   ],
+   "clip": [
+    "9",
+    1
+   ]
+  },
+  "class_type": "CLIPTextEncode",
+  "_meta": {
+   "title": "Positive"
+  }
+ },
+ "15": {
+  "inputs": {
+   "text": [
+    "5",
+    0
+   ],
+   "clip": [
+    "9",
+    1
+   ]
+  },
+  "class_type": "CLIPTextEncode",
+  "_meta": {
+   "title": "Negative"
+  }
+ },
+ "16": {
+  "inputs": {
+   "detect_hand": "enable",
+   "detect_body": "enable",
+   "detect_face": "enable",
+   "resolution": 1024,
+   "scale_stick_for_xinsr_cn": "disable",
+   "image": [
+    "25",
+    0
+   ]
+  },
+  "class_type": "OpenposePreprocessor",
+  "_meta": {
+   "title": "Openpose from canon"
+  }
+ },
+ "19": {
+  "inputs": {
+   "width": 1024,
+   "height": 1024,
+   "batch_size": 1
+  },
+  "class_type": "EmptyLatentImage",
+  "_meta": {
+   "title": "Latent 1024"
+  }
+ },
+ "20": {
+  "inputs": {
+   "seed": 20260825,
+   "steps": 28,
+   "cfg": 7,
+   "sampler_name": "dpmpp_2m",
+   "scheduler": "karras",
+   "denoise": 1,
+   "model": [
+    "13",
+    0
+   ],
+   "positive": [
+    "14",
+    0
+   ],
+   "negative": [
+    "15",
+    0
+   ],
+   "latent_image": [
+    "19",
+    0
+   ]
+  },
+  "class_type": "KSampler",
+  "_meta": {
+   "title": "KSampler — seed pinned"
+  }
+ },
+ "21": {
+  "inputs": {
+   "samples": [
+    "20",
+    0
+   ],
+   "vae": [
+    "9",
+    2
+   ]
+  },
+  "class_type": "VAEDecode",
+  "_meta": {
+   "title": "VAE Decode"
+  }
+ },
+ "22": {
+  "inputs": {
+   "filename_prefix": "characters/turnaround/bull_behemoth_threequarter_v2",
+   "images": [
+    "21",
+    0
+   ]
+  },
+  "class_type": "SaveImage",
+  "_meta": {
+   "title": "SAVE turnaround frame"
+  }
+ },
+ "23": {
+  "inputs": {
+   "images": [
+    "16",
+    0
+   ]
+  },
+  "class_type": "PreviewImage",
+  "_meta": {
+   "title": "pose map preview"
+  }
+ },
+ "24": {
+  "inputs": {
+   "image": "3cfb3978572041d07ef93b326a40f42f9047ad6758bce9755843fa9c315e7fbd.png"
+  },
+  "class_type": "LoadImage",
+  "_meta": {
+   "title": "⑥ CANON reference image (per character)"
+  }
+ },
+ "25": {
+  "inputs": {
+   "image": "3cfb3978572041d07ef93b326a40f42f9047ad6758bce9755843fa9c315e7fbd.png"
+  },
+  "class_type": "LoadImage",
+  "_meta": {
+   "title": "⑦ POSE source image (canon front)"
+  }
+ }
+}

@@ -1,0 +1,445 @@
+{
+ "1": {
+  "inputs": {
+   "value": "lean human gunslinger hero, long charcoal duster coat with brass buckles, twin revolvers in low-slung holsters, wide low-brimmed hat, weathered western frontier outfit"
+  },
+  "class_type": "PrimitiveString",
+  "_meta": {
+   "title": "① ITEM token (change per character)"
+  }
+ },
+ "2": {
+  "inputs": {
+   "value": "cinematic subterranean Mars colony, colossal cavern interior, monochromatic burnt-sienna palette, dense blocky settlement lit by scattered warm artificial lights, volumetric dust haze, glowing distance behind dark silhouetted foreground, no sun, no sky, no horizon, matte painterly semi-realism, muted matte surfaces, no text, no watermark"
+  },
+  "class_type": "PrimitiveStringMultiline",
+  "_meta": {
+   "title": "② STYLE TAIL (Lantern Deep, DEC-025)"
+  }
+ },
+ "3": {
+  "inputs": {
+   "value": "full body character concept art, single character, centered, front three-quarter view, neutral standing pose, arms slightly away from body, full figure head to toe with feet visible, plain dark umber background, lit by warm lantern light from one side, strong warm rim light, crisp character silhouette, no background scenery, no architecture"
+  },
+  "class_type": "PrimitiveStringMultiline",
+  "_meta": {
+   "title": "③ FULL-BODY MODIFIER"
+  }
+ },
+ "4": {
+  "inputs": {
+   "value": "extreme close-up character portrait, head and shoulders only, bust framing, face and upper chest fill the frame, centered, facing slightly off camera, plain featureless dark umber backdrop, dramatic warm lantern light from below and side, crisp silhouette"
+  },
+  "class_type": "PrimitiveStringMultiline",
+  "_meta": {
+   "title": "④ PORTRAIT MODIFIER"
+  }
+ },
+ "5": {
+  "inputs": {
+   "value": "photo, photorealistic, blurry, text, watermark, signature, extra limbs, deformed, low quality, jpeg artifacts, sun, blue sky, daylight, teal, cool blue tones, oversaturated color"
+  },
+  "class_type": "PrimitiveStringMultiline",
+  "_meta": {
+   "title": "⑤ NEGATIVE — contract"
+  }
+ },
+ "6": {
+  "inputs": {
+   "value": "multiple characters, crowd, duplicate character, second figure, cropped head, cropped feet, out of frame, landscape, buildings, cityscape, settlement, scenery background"
+  },
+  "class_type": "PrimitiveStringMultiline",
+  "_meta": {
+   "title": "⑥ NEGATIVE — character add-on"
+  }
+ },
+ "7": {
+  "inputs": {
+   "ckpt_name": "sd_xl_base_1.0.safetensors"
+  },
+  "class_type": "CheckpointLoaderSimple",
+  "_meta": {
+   "title": "Load Checkpoint"
+  }
+ },
+ "8": {
+  "inputs": {
+   "string_a": [
+    "1",
+    0
+   ],
+   "string_b": [
+    "3",
+    0
+   ],
+   "delimiter": ", "
+  },
+  "class_type": "StringConcatenate",
+  "_meta": {
+   "title": "item + fullbody mod"
+  }
+ },
+ "9": {
+  "inputs": {
+   "string_a": [
+    "8",
+    0
+   ],
+   "string_b": [
+    "2",
+    0
+   ],
+   "delimiter": ", "
+  },
+  "class_type": "StringConcatenate",
+  "_meta": {
+   "title": "+ style tail (FULL)"
+  }
+ },
+ "10": {
+  "inputs": {
+   "string_a": [
+    "1",
+    0
+   ],
+   "string_b": [
+    "4",
+    0
+   ],
+   "delimiter": ", "
+  },
+  "class_type": "StringConcatenate",
+  "_meta": {
+   "title": "item + portrait mod"
+  }
+ },
+ "11": {
+  "inputs": {
+   "string_a": [
+    "10",
+    0
+   ],
+   "string_b": [
+    "2",
+    0
+   ],
+   "delimiter": ", "
+  },
+  "class_type": "StringConcatenate",
+  "_meta": {
+   "title": "+ style tail (PORTRAIT)"
+  }
+ },
+ "12": {
+  "inputs": {
+   "string_a": [
+    "5",
+    0
+   ],
+   "string_b": [
+    "6",
+    0
+   ],
+   "delimiter": ", "
+  },
+  "class_type": "StringConcatenate",
+  "_meta": {
+   "title": "NEGATIVE assembled"
+  }
+ },
+ "13": {
+  "inputs": {
+   "text": [
+    "9",
+    0
+   ],
+   "clip": [
+    "7",
+    1
+   ]
+  },
+  "class_type": "CLIPTextEncode",
+  "_meta": {
+   "title": "Positive FULL"
+  }
+ },
+ "14": {
+  "inputs": {
+   "text": [
+    "11",
+    0
+   ],
+   "clip": [
+    "7",
+    1
+   ]
+  },
+  "class_type": "CLIPTextEncode",
+  "_meta": {
+   "title": "Positive PORTRAIT"
+  }
+ },
+ "15": {
+  "inputs": {
+   "text": [
+    "12",
+    0
+   ],
+   "clip": [
+    "7",
+    1
+   ]
+  },
+  "class_type": "CLIPTextEncode",
+  "_meta": {
+   "title": "Negative"
+  }
+ },
+ "16": {
+  "inputs": {
+   "width": 1024,
+   "height": 1024,
+   "batch_size": 1
+  },
+  "class_type": "EmptyLatentImage",
+  "_meta": {
+   "title": "Latent 1024 FULL"
+  }
+ },
+ "17": {
+  "inputs": {
+   "width": 1024,
+   "height": 1024,
+   "batch_size": 1
+  },
+  "class_type": "EmptyLatentImage",
+  "_meta": {
+   "title": "Latent 1024 PORTRAIT"
+  }
+ },
+ "18": {
+  "inputs": {
+   "seed": 20260824,
+   "steps": 28,
+   "cfg": 7,
+   "sampler_name": "dpmpp_2m",
+   "scheduler": "karras",
+   "denoise": 1,
+   "model": [
+    "7",
+    0
+   ],
+   "positive": [
+    "13",
+    0
+   ],
+   "negative": [
+    "15",
+    0
+   ],
+   "latent_image": [
+    "16",
+    0
+   ]
+  },
+  "class_type": "KSampler",
+  "_meta": {
+   "title": "KSampler FULL — seed pinned"
+  }
+ },
+ "19": {
+  "inputs": {
+   "seed": 20260824,
+   "steps": 28,
+   "cfg": 7,
+   "sampler_name": "dpmpp_2m",
+   "scheduler": "karras",
+   "denoise": 1,
+   "model": [
+    "7",
+    0
+   ],
+   "positive": [
+    "14",
+    0
+   ],
+   "negative": [
+    "27",
+    0
+   ],
+   "latent_image": [
+    "17",
+    0
+   ]
+  },
+  "class_type": "KSampler",
+  "_meta": {
+   "title": "KSampler PORTRAIT — seed pinned"
+  }
+ },
+ "20": {
+  "inputs": {
+   "samples": [
+    "18",
+    0
+   ],
+   "vae": [
+    "7",
+    2
+   ]
+  },
+  "class_type": "VAEDecode",
+  "_meta": {
+   "title": "VAE Decode"
+  }
+ },
+ "21": {
+  "inputs": {
+   "samples": [
+    "19",
+    0
+   ],
+   "vae": [
+    "7",
+    2
+   ]
+  },
+  "class_type": "VAEDecode",
+  "_meta": {
+   "title": "VAE Decode"
+  }
+ },
+ "22": {
+  "inputs": {
+   "filename_prefix": "characters/canon/gunslinger",
+   "images": [
+    "20",
+    0
+   ]
+  },
+  "class_type": "SaveImage",
+  "_meta": {
+   "title": "SAVE canon full-body"
+  }
+ },
+ "23": {
+  "inputs": {
+   "upscale_method": "area",
+   "width": 512,
+   "height": 512,
+   "crop": "disabled",
+   "image": [
+    "21",
+    0
+   ]
+  },
+  "class_type": "ImageScale",
+  "_meta": {
+   "title": "Upscale Image"
+  }
+ },
+ "24": {
+  "inputs": {
+   "filename_prefix": "characters/portrait/gunslinger",
+   "images": [
+    "23",
+    0
+   ]
+  },
+  "class_type": "SaveImage",
+  "_meta": {
+   "title": "SAVE portrait 512"
+  }
+ },
+ "25": {
+  "inputs": {
+   "value": "full body, legs, feet, boots, wide shot, distant figure, landscape, canyon, rocks, moon, celestial body, glowing disk, sky, horizon"
+  },
+  "class_type": "PrimitiveStringMultiline",
+  "_meta": {
+   "title": "⑦ NEGATIVE — portrait add-on"
+  }
+ },
+ "26": {
+  "inputs": {
+   "string_a": [
+    "12",
+    0
+   ],
+   "string_b": [
+    "25",
+    0
+   ],
+   "delimiter": ", "
+  },
+  "class_type": "StringConcatenate",
+  "_meta": {
+   "title": "NEGATIVE portrait assembled"
+  }
+ },
+ "27": {
+  "inputs": {
+   "text": [
+    "26",
+    0
+   ],
+   "clip": [
+    "7",
+    1
+   ]
+  },
+  "class_type": "CLIPTextEncode",
+  "_meta": {
+   "title": "Negative PORTRAIT"
+  }
+ },
+ "28": {
+  "inputs": {
+   "image": "62b3c4e9c17f78450701e15fee554c42d6f8004321a60a240f11d7330b3ecf81.png"
+  },
+  "class_type": "LoadImage",
+  "_meta": {
+   "title": "⑧ DEAD VARIANT input (hero portrait, parked)"
+  }
+ },
+ "29": {
+  "inputs": {
+   "factor": 0.8,
+   "method": "luminance (Rec.709)",
+   "image": [
+    "28",
+    0
+   ]
+  },
+  "class_type": "ImageDesaturate+",
+  "_meta": {
+   "title": "dead: desaturate"
+  }
+ },
+ "30": {
+  "inputs": {
+   "factor": 0.6,
+   "images": [
+    "29",
+    0
+   ]
+  },
+  "class_type": "AdjustBrightness",
+  "_meta": {
+   "title": "dead: darken"
+  }
+ },
+ "31": {
+  "inputs": {
+   "filename_prefix": "characters/portrait/gunslinger_dead",
+   "images": [
+    "30",
+    0
+   ]
+  },
+  "class_type": "SaveImage",
+  "_meta": {
+   "title": "SAVE dead portrait"
+  }
+ }
+}
