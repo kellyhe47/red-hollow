@@ -1,7 +1,7 @@
 ---
 id: 010
 title: Sim host loop + shell architecture invariant
-status: in-progress
+status: green
 depends_on: [001]
 touches: [unity/RedHollow/Assets/Game/Host/, unity/RedHollow/Assets/Tests/EditMode/]
 iterations: 1
@@ -18,9 +18,9 @@ Unity project that references GameSim via asmdef (noEngineReferences on GameSim 
 
 ## Acceptance criteria
 
-- [ ] a playable solo session runs with primitive placeholder art
-- [ ] no game rule appears in a MonoBehaviour
-- [ ] GameSim asmdef has noEngineReferences: true
+- [x] a playable solo session runs with primitive placeholder art
+- [x] no game rule appears in a MonoBehaviour
+- [x] GameSim asmdef has noEngineReferences: true
 
 ## Test plan
 
@@ -79,3 +79,5 @@ starting stake.
 - Invariant mechanism: Mono.Cecil IL walk over MonoBehaviour-derived types and their
   compiler-generated nested types; world-state type set DERIVED as the transitive closure from
   MatchState and AccountProfile, so new entity fields are covered without editing a list.
+- iter 1 GREEN @ b5f87da: EditMode 26/26 (all 4 structural guards still green), dotnet 319/319.
+  Locked tests and GameSim/ byte-identical.
