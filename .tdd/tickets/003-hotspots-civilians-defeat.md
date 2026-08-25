@@ -1,7 +1,7 @@
 ---
 id: 003
 title: Colony, hotspots, civilian pool, defeat rule
-status: awaiting-merge
+status: green
 depends_on: [001]
 touches: [unity/RedHollow/Assets/GameSim/MatchSim.Hotspots.cs, sim/GameSim.Tests/T03_HotspotTests.cs]
 iterations: 1
@@ -18,9 +18,9 @@ apply_hotspot_attack: ceil(damage/10) civilians killed, clamped at 0; hotspot_em
 
 ## Acceptance criteria
 
-- [ ] G-006..G-009 pass
-- [ ] 3 hotspots 8/6/6 = 20 civilians in map config
-- [ ] no civilian agent simulation
+- [x] G-006..G-009 pass
+- [x] 3 hotspots 8/6/6 = 20 civilians in map config
+- [x] no civilian agent simulation
 
 ## Test plan
 
@@ -46,3 +46,5 @@ Stub added: `unity/RedHollow/Assets/GameSim/ColonyMap.cs` (shape only).
 - iter 1 GREEN in worktree: 26 failed / 47 passed / 73 total, exactly the target. Locked tests
   untouched; both R-72 structural guards still pass. Verified it writes State.Status and records
   field "status", never Phase.
+- MERGED to main @ 68dbbb1. Post-merge full suite on main with 002: 21 failed / 64 passed / 85 total.
+  T-02 and T-03 tags both gone; remaining tags unchanged. validate-spec and coverage green.
