@@ -1,11 +1,11 @@
 ---
 id: 011
 title: Netcode: Lobby, Relay, loopback, disconnects, rematch
-status: pending
+status: green
 depends_on: [010]
 touches: [unity/RedHollow/Assets/Game/Net/]
-iterations: 0
-test_files: []
+iterations: 1
+test_files: [unity/RedHollow/Assets/Tests/EditMode/T11_SessionTests.cs]
 branch: ""
 board_id: T-11
 owns_requirements: [R-07, R-53, R-55]
@@ -18,13 +18,16 @@ Netcode for GameObjects host-authoritative; Unity Lobby join codes + Relay with 
 
 ## Acceptance criteria
 
-- [ ] 2-player loopback session completes a 10-wave match
-- [ ] victory, defeat and rematch paths all exercised
-- [ ] no UGS id required for loopback
+- [x] 2-player loopback session completes a 10-wave match
+- [x] victory, defeat and rematch paths all exercised
+- [x] no UGS id required for loopback
 
 ## Test plan
 
-_Filled in by the test-writer._
+`T11_SessionTests.cs` — 9 EditMode cases: a 2-player 10-wave loopback match to victory,
+mid-wave defeat, rematch full-reset with join code/picks/profiles surviving, host-only rematch,
+disconnect despawn + retarget through real SelectTarget, host disconnect, no mid-match join,
+non-pausing ESC, and UGS config with and without an id.
 
 ## Attempt log
 
@@ -46,3 +49,7 @@ _Filled in by the test-writer._
   need a UGS project id, which is written into ProjectSettings.asset by linking the project from
   the Editor (Project Settings > Services) — it does NOT need a dashboard toggle. Local-loopback
   2-player must work without it, so the ticket is not gated on the owner.
+- iter 1 GREEN @ 4a449c4: EditMode 70/70, sim 356/356, Cecil invariant green.
+- SCOPE NOTE: covers everything EXCEPT real NGO transport, Lobby join-code minting and Relay
+  allocation. LoopbackNetTransport is in-process by design; INetTransport is the swap point.
+  Those three need a hand-verified follow-up ticket and are NOT claimed as done.
