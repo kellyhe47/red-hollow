@@ -70,128 +70,363 @@ namespace RedHollow.Game.UI
     /// </summary>
     public sealed class CombatHudModel
     {
-        public CombatHudModel(
-            HostedMatch match, string accountId, IProfileStore profiles) =>
-            throw new NotImplementedException("T-12 / R-61: the combat HUD");
+        private static readonly string[] Slots = { AbilitySlot.Q, AbilitySlot.E };
+
+        private readonly HostedMatch _match;
+
+        private readonly string _accountId;
+
+        private readonly IProfileStore _profiles;
+
+        private readonly List<HotspotReadout> _hotspots = new List<HotspotReadout>();
+
+        private readonly List<HudToast> _toasts = new List<HudToast>();
+
+        private readonly List<int> _expectedEntryTunnels = new List<int>();
+
+        private readonly List<int> _entryFlares = new List<int>();
+
+        /// <summary>R-12 — hotspots the sim reported emptied.</summary>
+        private readonly HashSet<string> _lostHotspots = new HashSet<string>();
+
+        private AccountProfile _profile;
+
+        private bool _redFlashActive;
+
+        private bool _pickerOpen;
+
+        private string _lastSpendRejection;
+
+        public CombatHudModel(HostedMatch match, string accountId, IProfileStore profiles)
+        {
+            _match = match;
+            _accountId = accountId;
+            _profiles = profiles;
+        }
 
         // ---- top bar (R-61) -------------------------------------------------------------------
 
-        public int WaveNumber =>
-            throw new NotImplementedException("T-12 / R-61: wave number");
+        public int WaveNumber => _match.State.Wave.Number;
 
-        public int TotalWaves =>
-            throw new NotImplementedException("T-12 / R-61: total waves");
+        public int TotalWaves => _match.State.Wave.TotalWaves;
 
         /// <summary>R-61 — monsters remaining, off the living roster and nothing else.</summary>
-        public int MonstersRemaining =>
-            throw new NotImplementedException("T-12 / R-61: monsters remaining");
+        public int MonstersRemaining => _match.State.Wave.LivingMonsterIds.Count;
 
-        public int Scrip =>
-            throw new NotImplementedException("T-12 / R-61: shared scrip");
+        public int Scrip => _match.State.Team.Scrip;
 
-        public IReadOnlyList<HotspotReadout> Hotspots =>
-            throw new NotImplementedException("T-12 / R-61: per-hotspot civilians");
+        public IReadOnlyList<HotspotReadout> Hotspots => _hotspots;
 
         // ---- self bar (R-61) ------------------------------------------------------------------
 
-        public double Hp =>
-            throw new NotImplementedException("T-12 / R-61: own HP");
+        public double Hp
+        {
+            get
+            {
+                var hero = OwnHero();
+                return hero == null ? 0.0 : hero.Hp;
+            }
+        }
 
-        public double MaxHp =>
-            throw new NotImplementedException("T-12 / R-61: own max HP");
+        public double MaxHp
+        {
+            get
+            {
+                var hero = OwnHero();
+                return hero == null ? 0.0 : hero.MaxHp;
+            }
+        }
 
-        public string HeroClass =>
-            throw new NotImplementedException("T-12 / R-61: class icon");
+        public string HeroClass
+        {
+            get
+            {
+                var hero = OwnHero();
+                return hero == null ? null : hero.HeroClass;
+            }
+        }
 
         /// <summary>R-41 — the account level, off the profile store.</summary>
-        public int Level =>
-            throw new NotImplementedException("T-12 / R-61: account level");
+        public int Level => Profile().Level;
 
-        public double LifetimeXp =>
-            throw new NotImplementedException("T-12 / R-61: the XP bar");
+        public double LifetimeXp => Profile().LifetimeXp;
 
-        public int UnspentSkillPoints =>
-            throw new NotImplementedException("T-12 / R-61: unspent points");
+        public int UnspentSkillPoints => Profile().SkillPoints;
 
         /// <summary>R-61 — the badge shows exactly when a point is banked.</summary>
-        public bool SkillPointBadge =>
-            throw new NotImplementedException("T-12 / R-61: the badge");
+        public bool SkillPointBadge => Profile().SkillPoints > 0;
 
         /// <summary>The readout for "Q" or "E" (R-31 padlock, R-32 sweep).</summary>
-        public AbilitySlotReadout SlotFor(string slot) =>
-            throw new NotImplementedException("T-12 / R-31 / R-32: a slot readout");
+        public AbilitySlotReadout SlotFor(string slot)
+        {
+            var profile = Profile();
+            profile.Abilities.TryGetValue(slot, out var rank);
+
+            var remaining = 0.0;
+            var hero = OwnHero();
+            if (hero != null && hero.CooldownReadyAt.TryGetValue(slot, out var readyAt))
+            {
+                // Inclusive deadline: at now == ready-at the slot is ready with nothing left.
+                remaining = readyAt - _match.Clock.ElapsedSeconds;
+                if (remaining < 0.0)
+                {
+                    remaining = 0.0;
+                }
+            }
+
+            return new AbilitySlotReadout
+            {
+                Slot = slot,
+                Locked = rank <= 0,
+                Rank = rank,
+                CooldownRemainingSeconds = remaining,
+                Ready = remaining <= 0.0,
+            };
+        }
 
         // ---- wireframe combat states ----------------------------------------------------------
 
         /// <summary>Oldest first. Kinds and subjects are contract; copy is not.</summary>
-        public IReadOnlyList<HudToast> Toasts =>
-            throw new NotImplementedException("T-12: HUD toasts");
+        public IReadOnlyList<HudToast> Toasts => _toasts;
 
         /// <summary>R-13 — raised by a `civilians_killed` event that actually killed somebody.</summary>
-        public bool RedFlashActive =>
-            throw new NotImplementedException("T-12 / R-13: the red flash");
+        public bool RedFlashActive => _redFlashActive;
 
         /// <summary>Entry-tunnel indices flaring because the wave just spawned out of them.</summary>
-        public IReadOnlyList<int> EntryFlares =>
-            throw new NotImplementedException("T-12: monster-spawn entry flare");
+        public IReadOnlyList<int> EntryFlares => _entryFlares;
 
         /// <summary>
         /// R-05 — the entries the planning preview named, carried across the phase change so a
         /// `wave_spawned` event knows where to flare (the event itself names no tunnels).
         /// </summary>
-        public void SetExpectedEntryTunnels(IReadOnlyList<int> tunnels) =>
-            throw new NotImplementedException("T-12: where the flare goes");
+        public void SetExpectedEntryTunnels(IReadOnlyList<int> tunnels)
+        {
+            _expectedEntryTunnels.Clear();
+            if (tunnels != null)
+            {
+                _expectedEntryTunnels.AddRange(tunnels);
+            }
+        }
 
         /// <summary>R-33 — own hero down → grey overlay "Respawning in Ns".</summary>
-        public bool SpectateOverlayVisible =>
-            throw new NotImplementedException("T-12 / R-33: dead-hero spectate");
+        public bool SpectateOverlayVisible
+        {
+            get
+            {
+                var hero = OwnHero();
+                return hero != null && !hero.Alive;
+            }
+        }
 
         /// <summary>Seconds until respawn, clamped at 0; the deadline is INCLUSIVE (R-33).</summary>
-        public double RespawnInSeconds =>
-            throw new NotImplementedException("T-12 / R-33: the respawn countdown");
+        public double RespawnInSeconds
+        {
+            get
+            {
+                var hero = OwnHero();
+                if (hero == null || hero.Alive || !hero.RespawnAt.HasValue)
+                {
+                    return 0.0;
+                }
+
+                var remaining = hero.RespawnAt.Value - _match.Clock.ElapsedSeconds;
+                return remaining > 0.0 ? remaining : 0.0;
+            }
+        }
 
         /// <summary>The living ally the camera follows, or null when nobody is left standing.</summary>
-        public string SpectateTargetHeroId =>
-            throw new NotImplementedException("T-12: the spectate camera target");
+        public string SpectateTargetHeroId
+        {
+            get
+            {
+                var own = OwnHero();
+                foreach (var hero in _match.State.Heroes.Values)
+                {
+                    if (hero.Alive && (own == null || !ReferenceEquals(hero, own)))
+                    {
+                        return hero.Id;
+                    }
+                }
+
+                return null;
+            }
+        }
 
         // ---- level-up picker (R-62 / R-42) ----------------------------------------------------
 
         /// <summary>R-62 — a non-blocking overlay. Opening it stops NOTHING.</summary>
-        public bool PickerOpen =>
-            throw new NotImplementedException("T-12 / R-62: the picker overlay");
+        public bool PickerOpen => _pickerOpen;
 
         /// <summary>Hotkey L and clicking the badge both land here (R-62).</summary>
-        public void OpenPicker() =>
-            throw new NotImplementedException("T-12 / R-62: open the picker");
+        public void OpenPicker()
+        {
+            // One assignment: no clock, no session, no Time.timeScale (R-62).
+            _pickerOpen = true;
+        }
 
-        public void ClosePicker() =>
-            throw new NotImplementedException("T-12 / R-62: close the picker");
+        public void ClosePicker()
+        {
+            _pickerOpen = false;
+        }
 
         /// <summary>
         /// R-42 — the cards: unlock for a locked ability, rank-up for an unlocked one below max
         /// rank. Derived from the profile and the config's max, never hardcoded.
         /// </summary>
-        public IReadOnlyList<LevelUpChoice> PickerChoices =>
-            throw new NotImplementedException("T-12 / R-42: the choice cards");
+        public IReadOnlyList<LevelUpChoice> PickerChoices
+        {
+            get
+            {
+                var profile = Profile();
+                var maxRank = _match.Sim.Config.MaxAbilityRank;
+                var choices = new List<LevelUpChoice>();
+
+                foreach (var slot in Slots)
+                {
+                    profile.Abilities.TryGetValue(slot, out var rank);
+                    if (rank <= 0)
+                    {
+                        choices.Add(new LevelUpChoice { Choice = "unlock_" + slot });
+                    }
+                    else if (rank < maxRank)
+                    {
+                        choices.Add(new LevelUpChoice { Choice = "rank_" + slot });
+                    }
+
+                    // An ability at max rank offers nothing further (R-42).
+                }
+
+                return choices;
+            }
+        }
 
         /// <summary>One <see cref="MatchSim.SpendSkillPoint"/> command — a normal command (R-62).</summary>
-        public SpendSkillPointResult Spend(string choice) =>
-            throw new NotImplementedException("T-12 / R-42: spend a point");
+        public SpendSkillPointResult Spend(string choice)
+        {
+            var hero = OwnHero();
+            var result = _match.Sim.SpendSkillPoint(new SpendSkillPointRequest
+            {
+                AccountId = _accountId,
+                HeroId = hero == null ? null : hero.Id,
+                Choice = choice,
+            });
+
+            _lastSpendRejection = result.Accepted ? null : result.RejectionReason;
+
+            return result;
+        }
 
         /// <summary>The reason string off the last `spend_rejected` event, or null.</summary>
-        public string LastSpendRejection =>
-            throw new NotImplementedException("T-12 / R-42: spend rejection reason");
+        public string LastSpendRejection => _lastSpendRejection;
 
         // ---- feeds ----------------------------------------------------------------------------
 
-        public void OnSimEvent(SimEvent evt) =>
-            throw new NotImplementedException("T-12: the sim event feed");
+        public void OnSimEvent(SimEvent evt)
+        {
+            if (evt == null || evt.Fields == null)
+            {
+                return;
+            }
 
-        public void OnSessionNotice(SessionNotice notice) =>
-            throw new NotImplementedException("T-12 / R-53: the disconnect toast");
+            switch (evt.Type)
+            {
+                case "level_up":
+                    _toasts.Add(new HudToast
+                    {
+                        Kind = HudToastKind.LevelUp,
+                        SubjectId = FieldString(evt, "hero_id"),
+                        Text = "Level up!",
+                    });
+                    break;
+
+                case "civilians_killed":
+                    // R-13 — flashing red for nobody dying is crying wolf.
+                    if (FieldInt(evt, "count") > 0)
+                    {
+                        _redFlashActive = true;
+                        _toasts.Add(new HudToast
+                        {
+                            Kind = HudToastKind.CiviliansLost,
+                            SubjectId = FieldString(evt, "hotspot_id"),
+                            Text = "Civilians lost!",
+                        });
+                    }
+
+                    break;
+
+                case "hotspot_emptied":
+                    var emptied = FieldString(evt, "hotspot_id");
+                    if (!string.IsNullOrEmpty(emptied))
+                    {
+                        _lostHotspots.Add(emptied);
+                    }
+
+                    break;
+
+                case "wave_spawned":
+                    // DEC-018 — the event names no tunnels; the flare targets are the entries the
+                    // planning preview named, carried across the phase change.
+                    _entryFlares.Clear();
+                    _entryFlares.AddRange(_expectedEntryTunnels);
+                    break;
+            }
+        }
+
+        public void OnSessionNotice(SessionNotice notice)
+        {
+            if (notice == null || notice.Kind != SessionNoticeKind.PlayerDisconnected)
+            {
+                return;
+            }
+
+            _toasts.Add(new HudToast
+            {
+                Kind = HudToastKind.PlayerDisconnected,
+                SubjectId = notice.PeerId,
+                Text = notice.Text,
+            });
+        }
 
         /// <summary>Re-read the replicated state and the profile.</summary>
-        public void Refresh() =>
-            throw new NotImplementedException("T-12: refresh the HUD");
+        public void Refresh()
+        {
+            _profile = _profiles.Load(_accountId);
+
+            _hotspots.Clear();
+            foreach (var hotspot in _match.State.Hotspots.Values)
+            {
+                _hotspots.Add(new HotspotReadout
+                {
+                    HotspotId = hotspot.Id,
+                    Civilians = hotspot.Civilians,
+                    Lost = _lostHotspots.Contains(hotspot.Id) || hotspot.Civilians <= 0,
+                });
+            }
+        }
+
+        // ---- helpers --------------------------------------------------------------------------
+
+        private AccountProfile Profile() => _profile ?? (_profile = _profiles.Load(_accountId));
+
+        private Hero OwnHero()
+        {
+            foreach (var hero in _match.State.Heroes.Values)
+            {
+                if (string.Equals(hero.AccountId, _accountId, StringComparison.Ordinal))
+                {
+                    return hero;
+                }
+            }
+
+            return null;
+        }
+
+        private static string FieldString(SimEvent evt, string key) =>
+            evt.Fields.TryGetValue(key, out var value) ? value as string : null;
+
+        private static int FieldInt(SimEvent evt, string key) =>
+            evt.Fields.TryGetValue(key, out var value) && value != null
+                ? Convert.ToInt32(value)
+                : 0;
     }
 }

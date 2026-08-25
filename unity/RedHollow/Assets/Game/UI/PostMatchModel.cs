@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using RedHollow.Game.Net;
 using RedHollow.Sim;
 
@@ -14,19 +15,56 @@ namespace RedHollow.Game.UI
     /// </summary>
     public sealed class MatchStatsTracker
     {
-        public MatchStatsTracker(PlaceableCatalog catalog) =>
-            throw new NotImplementedException("T-12: the stats tracker");
+        private readonly PlaceableCatalog _catalog;
 
-        public void OnSimEvent(SimEvent evt) =>
-            throw new NotImplementedException("T-12: count the match");
+        private readonly Dictionary<string, int> _killsByHero = new Dictionary<string, int>();
+
+        private int _scripSpent;
+
+        public MatchStatsTracker(PlaceableCatalog catalog)
+        {
+            _catalog = catalog;
+        }
+
+        public void OnSimEvent(SimEvent evt)
+        {
+            if (evt == null || evt.Fields == null)
+            {
+                return;
+            }
+
+            switch (evt.Type)
+            {
+                case "xp_awarded":
+                    // R-40 — one xp_awarded per credited kill, naming the killer.
+                    if (evt.Fields.TryGetValue("hero_id", out var heroId) && heroId is string hero)
+                    {
+                        _killsByHero.TryGetValue(hero, out var kills);
+                        _killsByHero[hero] = kills + 1;
+                    }
+
+                    break;
+
+                case "placeable_created":
+                    // R-23 — the event names the type; the catalog names the price.
+                    if (evt.Fields.TryGetValue("placeable_type", out var typeValue)
+                        && typeValue is string placeableType)
+                    {
+                        _scripSpent += _catalog.StatsFor(placeableType).Cost;
+                    }
+
+                    break;
+            }
+        }
 
         /// <summary>Kills credited to this hero (one per `xp_awarded` naming it).</summary>
         public int KillsBy(string heroId) =>
-            throw new NotImplementedException("T-12: kills per player");
+            !string.IsNullOrEmpty(heroId) && _killsByHero.TryGetValue(heroId, out var kills)
+                ? kills
+                : 0;
 
         /// <summary>Total scrip spent on placeables across the match.</summary>
-        public int ScripSpent =>
-            throw new NotImplementedException("T-12: scrip spent");
+        public int ScripSpent => _scripSpent;
     }
 
     /// <summary>
@@ -43,33 +81,58 @@ namespace RedHollow.Game.UI
     /// </summary>
     public sealed class PostMatchModel
     {
+        private readonly NetSession _session;
+
+        private readonly string _localPeerId;
+
+        private readonly MatchStatsTracker _stats;
+
+        private readonly int _civiliansAtStart;
+
         public PostMatchModel(
-            NetSession session, string localPeerId, MatchStatsTracker stats, int civiliansAtStart) =>
-            throw new NotImplementedException("T-12 / R-60: the post-match screen");
+            NetSession session, string localPeerId, MatchStatsTracker stats, int civiliansAtStart)
+        {
+            _session = session;
+            _localPeerId = localPeerId;
+            _stats = stats;
+            _civiliansAtStart = civiliansAtStart;
+        }
 
         /// <summary>"THE COLONY STANDS" vs "THE COLONY HAS FALLEN" — off the status field only.</summary>
-        public bool IsVictory =>
-            throw new NotImplementedException("T-12 / R-01 / R-02: the outcome");
+        public bool IsVictory => _session.Match != null
+                                 && _session.Match.State.Status == MatchStatus.Victory;
 
-        public int CiviliansSaved =>
-            throw new NotImplementedException("T-12: civilians saved");
+        public int CiviliansSaved => _session.Match == null
+            ? 0
+            : _session.Match.State.TotalCivilians;
 
-        public int CiviliansAtStart =>
-            throw new NotImplementedException("T-12: the denominator");
+        public int CiviliansAtStart => _civiliansAtStart;
 
         /// <summary>S7 — "reached wave N".</summary>
-        public int ReachedWave =>
-            throw new NotImplementedException("T-12: reached wave");
+        public int ReachedWave => _session.Match == null
+            ? 0
+            : _session.Match.State.Wave.Number;
 
-        public MatchStatsTracker Stats =>
-            throw new NotImplementedException("T-12: the stats table");
+        public MatchStatsTracker Stats => _stats;
 
         /// <summary>R-07 — true only for the host; the button is disabled for everyone else.</summary>
-        public bool CanRematch =>
-            throw new NotImplementedException("T-12 / R-07: host-only rematch");
+        public bool CanRematch
+        {
+            get
+            {
+                foreach (var peer in _session.Seats)
+                {
+                    if (string.Equals(peer.PeerId, _localPeerId, StringComparison.Ordinal))
+                    {
+                        return peer.IsHost;
+                    }
+                }
+
+                return false;
+            }
+        }
 
         /// <summary>PLAY AGAIN / RETRY → <see cref="NetSession.TryRematch"/>.</summary>
-        public bool RequestRematch() =>
-            throw new NotImplementedException("T-12 / R-07: rematch");
+        public bool RequestRematch() => _session.TryRematch(_localPeerId);
     }
 }

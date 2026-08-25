@@ -1,4 +1,3 @@
-using System;
 using RedHollow.Sim;
 
 namespace RedHollow.Game.UI
@@ -13,49 +12,68 @@ namespace RedHollow.Game.UI
     /// </summary>
     public sealed class TitleScreenModel
     {
-        public TitleScreenModel(IProfileStore profiles) =>
-            throw new NotImplementedException("T-12 / R-60: the title screen");
+        private readonly IProfileStore _profiles;
+
+        private string _callsign;
+
+        private AccountProfile _profile;
+
+        private string _joinCodeInput;
+
+        private string _joinError;
+
+        public TitleScreenModel(IProfileStore profiles)
+        {
+            _profiles = profiles;
+        }
 
         /// <summary>The callsign as typed. It doubles as the account id (R-44).</summary>
-        public string Callsign =>
-            throw new NotImplementedException("T-12 / R-44: the callsign input");
+        public string Callsign => _callsign;
 
         /// <summary>Whether a profile has been loaded for the current callsign.</summary>
-        public bool ProfileLoaded =>
-            throw new NotImplementedException("T-12 / R-44: profile loaded");
+        public bool ProfileLoaded => _profile != null;
 
         /// <summary>R-41 — the loaded account's lifetime level (1 for a fresh callsign).</summary>
-        public int Level =>
-            throw new NotImplementedException("T-12 / R-41: lifetime level");
+        public int Level => _profile == null ? 1 : _profile.Level;
 
         /// <summary>R-40 — the loaded account's lifetime XP (0 for a fresh callsign).</summary>
-        public double LifetimeXp =>
-            throw new NotImplementedException("T-12 / R-40: lifetime XP");
+        public double LifetimeXp => _profile == null ? 0.0 : _profile.LifetimeXp;
 
         /// <summary>The join-code input as typed.</summary>
-        public string JoinCodeInput =>
-            throw new NotImplementedException("T-12: the join-code input");
+        public string JoinCodeInput => _joinCodeInput;
 
         /// <summary>
         /// The inline error under the code input, or null. Non-null after a failed join; cleared
         /// the moment the player edits the code. Copy is presentation and is not contract.
         /// </summary>
-        public string JoinError =>
-            throw new NotImplementedException("T-12: bad-join-code inline error");
+        public string JoinError => _joinError;
 
         /// <summary>Type a callsign: loads (or freshly creates, R-44) the profile behind it.</summary>
-        public void SetCallsign(string callsign) =>
-            throw new NotImplementedException("T-12 / R-44: set the callsign");
+        public void SetCallsign(string callsign)
+        {
+            _callsign = callsign;
+
+            // R-44 — the store answers a fresh account for an unknown callsign; there is no
+            // "wrong callsign" outcome for this to error on.
+            _profile = string.IsNullOrEmpty(callsign) ? null : _profiles.Load(callsign);
+        }
 
         /// <summary>Edit the join code. Editing clears <see cref="JoinError"/>.</summary>
-        public void SetJoinCodeInput(string code) =>
-            throw new NotImplementedException("T-12: edit the join code");
+        public void SetJoinCodeInput(string code)
+        {
+            _joinCodeInput = code;
+
+            // A stale error under a corrected code blames the wrong input.
+            _joinError = null;
+        }
 
         /// <summary>
         /// The adapter reports that the attempted join failed (bad/expired code, refused by the
         /// host). The model raises <see cref="JoinError"/>; the router stays on S1.
         /// </summary>
-        public void NoteJoinFailed() =>
-            throw new NotImplementedException("T-12: join failed, stay on S1");
+        public void NoteJoinFailed()
+        {
+            _joinError = "could not join with that code";
+        }
     }
 }

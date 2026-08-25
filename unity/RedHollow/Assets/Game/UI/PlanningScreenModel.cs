@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using RedHollow.Game.Net;
 using RedHollow.Sim;
@@ -41,112 +40,247 @@ namespace RedHollow.Game.UI
     /// </summary>
     public sealed class PlanningScreenModel
     {
-        public PlanningScreenModel(HostedMatch match, string localPlayerId) =>
-            throw new NotImplementedException("T-12 / R-63: the planning screen");
+        private readonly HostedMatch _match;
+
+        private readonly string _localPlayerId;
+
+        private readonly List<HotspotReadout> _hotspots = new List<HotspotReadout>();
+
+        private readonly List<ShopItem> _shopItems = new List<ShopItem>();
+
+        private readonly List<int> _pulsingEntryTunnels = new List<int>();
+
+        private bool _ghostActive;
+
+        private string _ghostType;
+
+        private Vec2 _ghostPos;
+
+        private bool _ghostZoneValid = true;
+
+        private string _lastPurchaseRejection;
+
+        private bool _lastSellRefused;
+
+        public PlanningScreenModel(HostedMatch match, string localPlayerId)
+        {
+            _match = match;
+            _localPlayerId = localPlayerId;
+        }
 
         // ---- top bar --------------------------------------------------------------------------
 
-        public int WaveNumber =>
-            throw new NotImplementedException("T-12 / R-61: wave number");
+        public int WaveNumber => _match.State.Wave.Number;
 
-        public int TotalWaves =>
-            throw new NotImplementedException("T-12 / R-61: total waves");
+        public int TotalWaves => _match.State.Wave.TotalWaves;
 
         /// <summary>R-20 — the one shared pool.</summary>
-        public int Scrip =>
-            throw new NotImplementedException("T-12 / R-61: shared scrip");
+        public int Scrip => _match.State.Team.Scrip;
 
         /// <summary>
         /// R-03 — seconds left on the planning countdown, clamped at 0. The deadline is INCLUSIVE
         /// repo-wide: at now == deadline the sim has already opened combat.
         /// </summary>
-        public double TimerRemainingSeconds =>
-            throw new NotImplementedException("T-12 / R-03: the planning timer");
+        public double TimerRemainingSeconds
+        {
+            get
+            {
+                var deadline = _match.State.PlanningStartedAt
+                               + _match.Sim.Config.PlanningDurationSeconds;
+                var remaining = deadline - _match.Clock.ElapsedSeconds;
+                return remaining > 0.0 ? remaining : 0.0;
+            }
+        }
 
-        public IReadOnlyList<HotspotReadout> Hotspots =>
-            throw new NotImplementedException("T-12 / R-61: per-hotspot civilians");
+        public IReadOnlyList<HotspotReadout> Hotspots => _hotspots;
 
         // ---- entry preview (R-05 / DEC-018) ---------------------------------------------------
 
         /// <summary>The entry tunnels that pulse red — indices only, no composition.</summary>
-        public IReadOnlyList<int> PulsingEntryTunnels =>
-            throw new NotImplementedException("T-12 / R-05: pulsing entries");
+        public IReadOnlyList<int> PulsingEntryTunnels => _pulsingEntryTunnels;
 
         // ---- shop bar and ghost placement (R-63) ----------------------------------------------
 
         /// <summary>Every R-23 catalog row, catalog-priced, affordability derived from the pool.</summary>
-        public IReadOnlyList<ShopItem> ShopItems =>
-            throw new NotImplementedException("T-12 / R-63: the shop bar");
+        public IReadOnlyList<ShopItem> ShopItems => _shopItems;
 
-        public bool GhostActive =>
-            throw new NotImplementedException("T-12 / R-63: ghost placement");
+        public bool GhostActive => _ghostActive;
 
-        public string GhostType =>
-            throw new NotImplementedException("T-12 / R-63: ghost type");
+        public string GhostType => _ghostType;
 
-        public Vec2 GhostPos =>
-            throw new NotImplementedException("T-12 / R-63: ghost position");
+        public Vec2 GhostPos => _ghostPos;
 
         /// <summary>R-24 — invalid zone under the cursor → ghost tints red.</summary>
-        public bool GhostInvalid =>
-            throw new NotImplementedException("T-12 / R-24: invalid-zone tint");
+        public bool GhostInvalid => _ghostActive && !_ghostZoneValid;
 
         /// <summary>
         /// The reason string off the last `purchase_rejected` event, or null. The reason IS
         /// carried for purchases (unlike sales) and the UI surfaces it.
         /// </summary>
-        public string LastPurchaseRejection =>
-            throw new NotImplementedException("T-12 / R-21: purchase rejection reason");
+        public string LastPurchaseRejection => _lastPurchaseRejection;
 
         /// <summary>
         /// R-22 — a refused sale is `accepted: false` and NOTHING else: SellResult carries no
         /// reason field, so neither does the UI.
         /// </summary>
-        public bool LastSellRefused =>
-            throw new NotImplementedException("T-12 / R-22: refused sale flag");
+        public bool LastSellRefused => _lastSellRefused;
 
         /// <summary>Click a shop item: the ghost starts following the cursor.</summary>
-        public void BeginPlacement(string placeableType) =>
-            throw new NotImplementedException("T-12 / R-63: begin placement");
+        public void BeginPlacement(string placeableType)
+        {
+            _ghostActive = true;
+            _ghostType = placeableType;
+            _ghostZoneValid = true;
+        }
 
         /// <summary>The cursor moved; the shell answers whether the zone under it is valid (R-24).</summary>
-        public void MoveGhost(Vec2 pos, bool zoneValid) =>
-            throw new NotImplementedException("T-12 / R-63: move the ghost");
+        public void MoveGhost(Vec2 pos, bool zoneValid)
+        {
+            _ghostPos = pos;
+            _ghostZoneValid = zoneValid;
+        }
 
-        public void CancelPlacement() =>
-            throw new NotImplementedException("T-12 / R-63: cancel placement");
+        public void CancelPlacement()
+        {
+            _ghostActive = false;
+            _ghostType = null;
+        }
 
         /// <summary>
         /// Click to place: one <see cref="MatchSim.PurchasePlacement"/> command, catalog-priced.
         /// A rejection leaves the ghost up (the shake is presentation) and surfaces the reason.
         /// </summary>
-        public PurchaseResult ConfirmPlacement() =>
-            throw new NotImplementedException("T-12 / R-21: purchase");
+        public PurchaseResult ConfirmPlacement()
+        {
+            var catalogCost = _match.Sim.Config.Placeables.StatsFor(_ghostType).Cost;
+            var result = _match.Sim.PurchasePlacement(new PurchaseRequest
+            {
+                PlayerId = _localPlayerId,
+                PlaceableType = _ghostType,
+                Cost = catalogCost,
+                Pos = _ghostPos,
+                ZoneValid = _ghostZoneValid,
+            });
+
+            if (result.Accepted)
+            {
+                // R-63 — an accepted placement clears the ghost …
+                _ghostActive = false;
+                _ghostType = null;
+                _lastPurchaseRejection = null;
+            }
+            else
+            {
+                // … and a rejected one leaves it up for the retry, reason surfaced verbatim.
+                _lastPurchaseRejection = result.RejectionReason;
+            }
+
+            return result;
+        }
 
         // ---- sell (R-22) ----------------------------------------------------------------------
 
         /// <summary>The tooltip's refund figure: the R-22 ratio of what was paid, never a literal.</summary>
-        public int SellRefundFor(string placeableId) =>
-            throw new NotImplementedException("T-12 / R-22: the 50% tooltip");
+        public int SellRefundFor(string placeableId)
+        {
+            if (string.IsNullOrEmpty(placeableId)
+                || !_match.State.Placeables.TryGetValue(placeableId, out var placeable))
+            {
+                return 0;
+            }
 
-        public SellResult Sell(string placeableId) =>
-            throw new NotImplementedException("T-12 / R-22: sell");
+            // Floored, matching the sim's own DEC-011 rule.
+            return (int)(placeable.PurchaseCost * _match.Sim.Config.SellRefundRatio);
+        }
+
+        public SellResult Sell(string placeableId)
+        {
+            var result = _match.Sim.SellPlacement(new SellRequest
+            {
+                PlayerId = _localPlayerId,
+                PlaceableId = placeableId,
+            });
+
+            // R-22 — a refusal is a flag and nothing more; no reason exists to surface.
+            _lastSellRefused = !result.Accepted;
+
+            return result;
+        }
 
         // ---- ready panel (R-03) ---------------------------------------------------------------
 
-        public int ReadyCount =>
-            throw new NotImplementedException("T-12 / R-03: ready count");
+        public int ReadyCount
+        {
+            get
+            {
+                var count = 0;
+                foreach (var player in _match.State.Players)
+                {
+                    if (player.Connected && player.Ready)
+                    {
+                        count++;
+                    }
+                }
+
+                return count;
+            }
+        }
 
         /// <summary>The denominator = connected players, so a leaver stops being waited on.</summary>
-        public int ConnectedCount =>
-            throw new NotImplementedException("T-12 / R-03: connected count");
+        public int ConnectedCount
+        {
+            get
+            {
+                var count = 0;
+                foreach (var player in _match.State.Players)
+                {
+                    if (player.Connected)
+                    {
+                        count++;
+                    }
+                }
+
+                return count;
+            }
+        }
 
         /// <summary>READY UP — <see cref="MatchSim.SetPlayerReady"/> for the local player.</summary>
-        public ReadyResult ReadyUp() =>
-            throw new NotImplementedException("T-12 / R-03: ready up");
+        public ReadyResult ReadyUp() => _match.Sim.SetPlayerReady(_localPlayerId);
 
         /// <summary>Re-read the state and the preview.</summary>
-        public void Refresh() =>
-            throw new NotImplementedException("T-12: refresh the planning screen");
+        public void Refresh()
+        {
+            var state = _match.State;
+
+            _hotspots.Clear();
+            foreach (var hotspot in state.Hotspots.Values)
+            {
+                _hotspots.Add(new HotspotReadout
+                {
+                    HotspotId = hotspot.Id,
+                    Civilians = hotspot.Civilians,
+                    Lost = hotspot.Civilians <= 0,
+                });
+            }
+
+            _shopItems.Clear();
+            var catalog = _match.Sim.Config.Placeables;
+            foreach (var type in catalog.Types)
+            {
+                var cost = catalog.StatsFor(type).Cost;
+                _shopItems.Add(new ShopItem
+                {
+                    Type = type,
+                    Cost = cost,
+                    Affordable = cost <= state.Team.Scrip,
+                });
+            }
+
+            _pulsingEntryTunnels.Clear();
+            if (!state.IsOver && state.Phase == MatchPhase.Planning)
+            {
+                _pulsingEntryTunnels.AddRange(_match.Sim.PreviewUpcomingWave().ActiveEntryTunnels);
+            }
+        }
     }
 }

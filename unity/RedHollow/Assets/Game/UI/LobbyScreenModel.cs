@@ -31,52 +31,122 @@ namespace RedHollow.Game.UI
     /// </summary>
     public sealed class LobbyScreenModel
     {
-        public LobbyScreenModel(NetSession session, string localPeerId) =>
-            throw new NotImplementedException("T-12 / R-60: the lobby screen");
+        private readonly NetSession _session;
+
+        private readonly string _localPeerId;
+
+        /// <summary>Lobby ready flags per peer — pre-match state, so it has no home in the sim.</summary>
+        private readonly Dictionary<string, bool> _ready = new Dictionary<string, bool>();
+
+        private readonly List<LobbySeat> _seats = new List<LobbySeat>();
+
+        public LobbyScreenModel(NetSession session, string localPeerId)
+        {
+            _session = session;
+            _localPeerId = localPeerId;
+        }
 
         /// <summary>The code to share, read off the session (click-to-copy is presentation).</summary>
-        public string JoinCode =>
-            throw new NotImplementedException("T-12 / R-07: the join code");
+        public string JoinCode => _session.JoinCode;
 
         /// <summary>The player list, in join order, mirroring <see cref="NetSession.Seats"/>.</summary>
-        public IReadOnlyList<LobbySeat> Seats =>
-            throw new NotImplementedException("T-12: the player list");
+        public IReadOnlyList<LobbySeat> Seats => _seats;
 
         /// <summary>Wireframe state: waiting alone → hint text "share code".</summary>
-        public bool WaitingAlone =>
-            throw new NotImplementedException("T-12: waiting-alone hint");
+        public bool WaitingAlone => _session.Seats.Count == 1;
 
-        public int ReadyCount =>
-            throw new NotImplementedException("T-12 / R-03: ready count");
+        public int ReadyCount
+        {
+            get
+            {
+                var count = 0;
+                foreach (var peer in _session.Seats)
+                {
+                    if (IsReady(peer.PeerId))
+                    {
+                        count++;
+                    }
+                }
+
+                return count;
+            }
+        }
 
         /// <summary>The denominator: connected players, not party capacity.</summary>
-        public int ConnectedCount =>
-            throw new NotImplementedException("T-12 / R-03: connected count");
+        public int ConnectedCount => _session.Seats.Count;
 
-        public bool AllReady =>
-            throw new NotImplementedException("T-12: all connected players ready");
+        public bool AllReady => ConnectedCount > 0 && ReadyCount == ConnectedCount;
 
         /// <summary>Always true — duplicate classes are allowed, so no pick is ever blocked.</summary>
-        public bool CanPick(string heroClass) =>
-            throw new NotImplementedException("T-12 / R-31: duplicate classes allowed");
+        public bool CanPick(string heroClass) => true;
 
         /// <summary>The local player picks (or re-picks) a class.</summary>
-        public void PickClass(string heroClass) =>
-            throw new NotImplementedException("T-12 / R-31: pick a class");
+        public void PickClass(string heroClass)
+        {
+            var seat = LocalPeer();
+            if (seat != null)
+            {
+                seat.HeroClass = heroClass;
+            }
+        }
 
         /// <summary>The local player toggles READY.</summary>
-        public void SetReady(bool ready) =>
-            throw new NotImplementedException("T-12: ready up");
+        public void SetReady(bool ready)
+        {
+            _ready[_localPeerId] = ready;
+        }
 
         /// <summary>A replicated ready toggle from another seat.</summary>
-        public void NotePeerReady(string peerId, bool ready) =>
-            throw new NotImplementedException("T-12: replicated ready");
+        public void NotePeerReady(string peerId, bool ready)
+        {
+            if (!string.IsNullOrEmpty(peerId))
+            {
+                _ready[peerId] = ready;
+            }
+        }
 
         /// <summary>
         /// Re-read the session (players joining/leaving mid-lobby update the list), and — on the
         /// host's model only — start the match once every connected player is ready.
         /// </summary>
-        public void Update() =>
-            throw new NotImplementedException("T-12: lobby refresh / all-ready start");
+        public void Update()
+        {
+            _seats.Clear();
+            foreach (var peer in _session.Seats)
+            {
+                _seats.Add(new LobbySeat
+                {
+                    PeerId = peer.PeerId,
+                    AccountId = peer.AccountId,
+                    HeroClass = peer.HeroClass,
+                    Ready = IsReady(peer.PeerId),
+                });
+            }
+
+            // No host force-start: the ONLY start is everyone-connected-ready. The session refuses
+            // the call for anyone who is not the host, so only the host's model ever lands it.
+            if (_session.Phase == NetSessionPhase.Lobby && AllReady)
+            {
+                _session.TryStartMatch(_localPeerId);
+            }
+        }
+
+        // ---- helpers --------------------------------------------------------------------------
+
+        private bool IsReady(string peerId) =>
+            !string.IsNullOrEmpty(peerId) && _ready.TryGetValue(peerId, out var ready) && ready;
+
+        private NetPeer LocalPeer()
+        {
+            foreach (var peer in _session.Seats)
+            {
+                if (string.Equals(peer.PeerId, _localPeerId, StringComparison.Ordinal))
+                {
+                    return peer;
+                }
+            }
+
+            return null;
+        }
     }
 }
