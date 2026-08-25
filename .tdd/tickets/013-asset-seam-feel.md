@@ -79,8 +79,9 @@ representative files are copied in.
 - `art/textures/cavern-ground_v1_1024.png` → `unity/RedHollow/Assets/Game/Art/Textures/cavern-ground_v1_1024.png`
 - `art/characters/gunslinger-portrait_v1_512.png` → `.../Art/Characters/gunslinger-portrait_v1_512.png`
 - `art/icons/gs-revolver-shot_v1_256.png` → `.../Art/Icons/gs-revolver-shot_v1_256.png`
-- `art/ui/hp-bar-frame_v1_320x32.png` → `.../Art/UI/hp-bar-frame_v1_320x32.png` (has alpha; the
-  icon/texture/portrait sources do not — alpha is asserted on the UI class only)
+- `art/ui/button-normal_v1_320x96.png` → `.../Art/UI/button-normal_v1_320x96.png` (verified real
+  alpha, min 0 / max 255; the icon/texture/portrait sources carry none — alpha is asserted on the
+  UI class only). Originally `hp-bar-frame_v1_320x32.png`; re-targeted, see attempt log.
 
 **Ambiguities flagged:**
 - Handoff's R-64 list says `wave_complete`/`combat_started`; sim also emits `wave_spawned`,
@@ -92,6 +93,17 @@ representative files are copied in.
   icons that's an art-pipeline change, not this ticket's.
 
 ## Attempt log
+
+- 2026-08-25 (test-writer, orchestrator-directed) — re-targeted the representative UI asset from
+  `art/ui/hp-bar-frame_v1_320x32.png` to `art/ui/button-normal_v1_320x96.png`. The original is
+  defective at source: RGBA format but every alpha pixel is 255 (10 of 20 art/ui PNGs are all-opaque
+  — defeat-banner_v3, dialog-panel_v1, hp-bar-fill_v1, hp-bar-frame_v1, hud-topbar_v1, shop-bar_v1,
+  slot-frame-locked_v1, slot-frame_v2, toast-banner_v2, xp-bar-fill_v1, xp-bar-frame_v1), so Unity's
+  content-based `DoesSourceTextureHaveAlpha` honestly answers false and the locked alpha pin could
+  never pass. The test CONTRACT (alpha survives import, exact NPOT size preserved) is unchanged and
+  correct — the seam test catching a defective delivered asset is this ticket doing its job.
+  Replacement verified: 320x96 (still NPOT), alpha min 0 / max 255. Regenerating the ten flat-alpha
+  UI assets is the UI-props pipeline's job, escalated separately; 013 does not block on it.
 
 - ~~BLOCKED (environment, pre-run)~~ RESOLVED 2026-08-25 — owner installed Unity. Original note: Unity Editor is not installed on this machine and needs the owner's Unity account/licence. `unity/RedHollow/` currently holds only `Assets/GameSim` — there is no Unity project (no ProjectSettings/, no Packages/). T-01..T-09 carry the entire 30-fixture acceptance contract and need no Unity.
 

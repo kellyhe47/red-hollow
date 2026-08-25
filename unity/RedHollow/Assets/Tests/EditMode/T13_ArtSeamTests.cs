@@ -252,14 +252,21 @@ namespace RedHollow.Tests.EditMode
         //   art/characters/gunslinger-portrait_v1_512.png
         //                                            → Assets/Game/Art/Characters/gunslinger-portrait_v1_512.png
         //   art/icons/gs-revolver-shot_v1_256.png    → Assets/Game/Art/Icons/gs-revolver-shot_v1_256.png
-        //   art/ui/hp-bar-frame_v1_320x32.png        → Assets/Game/Art/UI/hp-bar-frame_v1_320x32.png
+        //   art/ui/button-normal_v1_320x96.png       → Assets/Game/Art/UI/button-normal_v1_320x96.png
         // All four are committed keepers (see art/asset-log.csv); copying is a file operation, never
         // a pipeline re-run (pinned seed makes reruns identical — CLAUDE.md §4).
+        //
+        // The UI representative was originally hp-bar-frame_v1_320x32.png, but that source PNG is
+        // defective — RGBA with every alpha pixel 255 (10 of 20 art/ui files are; escalated to the
+        // UI-props pipeline) — so Unity's content-based DoesSourceTextureHaveAlpha honestly answers
+        // false and the alpha pin could never pass. button-normal_v1 has real alpha (min 0, max
+        // 255) and stays non-power-of-two, keeping both pins meaningful. The seam test catching a
+        // defective source asset is this ticket working as designed.
 
         private const string TilePath = "Assets/Game/Art/Textures/cavern-ground_v1_1024.png";
         private const string CharacterPath = "Assets/Game/Art/Characters/gunslinger-portrait_v1_512.png";
         private const string IconPath = "Assets/Game/Art/Icons/gs-revolver-shot_v1_256.png";
-        private const string UiPath = "Assets/Game/Art/UI/hp-bar-frame_v1_320x32.png";
+        private const string UiPath = "Assets/Game/Art/UI/button-normal_v1_320x96.png";
 
         /// <summary>
         /// The environment tile imports at its full authored resolution and WRAPS — a ground tile
@@ -300,19 +307,21 @@ namespace RedHollow.Tests.EditMode
         }
 
         /// <summary>
-        /// The UI frame is the demanding one: 320x32 is not a power of two, so a default NPOT
+        /// The UI element is the demanding one: 320x96 is not a power of two, so a default NPOT
         /// rescale would silently stretch it — the exact-size assertions are what catch that — and
-        /// its transparency is the whole point of a frame, so the alpha channel must survive import.
+        /// its transparency is the point of a UI cut-out, so the alpha channel must survive import.
+        /// (Chosen over hp-bar-frame_v1, whose source alpha turned out to be defective — all-255 —
+        /// which Unity's content-based alpha probe rightly reports as "no alpha".)
         /// </summary>
         [Test]
         public void The_representative_ui_frame_keeps_its_exact_size_and_its_alpha()
         {
-            var texture = LoadedTexture(UiPath, "art/ui/hp-bar-frame_v1_320x32.png");
+            var texture = LoadedTexture(UiPath, "art/ui/button-normal_v1_320x96.png");
 
             Assert.That(texture.width, Is.EqualTo(320),
                 "320 is not a power of two — an importer left to rescale NPOT textures stretches "
-                + "every UI frame; the exact width pins that setting");
-            Assert.That(texture.height, Is.EqualTo(32), "the frame imports at its authored height");
+                + "every UI element; the exact width pins that setting");
+            Assert.That(texture.height, Is.EqualTo(96), "the element imports at its authored height");
 
             var importer = ImporterFor(UiPath);
             Assert.That(importer.DoesSourceTextureHaveAlpha(), Is.True,
