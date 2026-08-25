@@ -5,7 +5,7 @@ status: in-progress
 depends_on: [001]
 touches: [unity/RedHollow/Assets/Game/Host/, unity/RedHollow/Assets/Tests/EditMode/]
 iterations: 1
-test_files: []
+test_files: [unity/RedHollow/Assets/Tests/EditMode/T10_HostLoopTests.cs]
 branch: ""
 board_id: T-10
 owns_requirements: [R-50, R-52]
@@ -24,7 +24,7 @@ Unity project that references GameSim via asmdef (noEngineReferences on GameSim 
 
 ## Test plan
 
-_Filled in by the test-writer._
+
 
 ## Attempt log
 
@@ -70,3 +70,12 @@ starting stake.
 - SPLIT 2026-08-25: scene, camera, input and placeholder visuals moved to ticket 016 (R-30).
   This ticket keeps the host loop and the no-rules-in-a-MonoBehaviour invariant — the spine
   everything downstream depends on, and the part that is pure EditMode testable.
+- tests locked @ bc5f0f3: 26 EditMode cases, 22 red, 4 structural guards green by construction
+  (asmdef flag, zero-Unity-refs, the invariant itself, and an ANTI-VACUITY guard so the invariant
+  cannot pass by having no MonoBehaviour to scan).
+- ORCHESTRATOR-VERIFIED BITE: planted an independent violating MonoBehaviour (Scrip += 50 and
+  Monster.Hp -= 1 in Update). The invariant failed with an exact, actionable message naming both
+  the method and each field written. Reverted.
+- Invariant mechanism: Mono.Cecil IL walk over MonoBehaviour-derived types and their
+  compiler-generated nested types; world-state type set DERIVED as the transitive closure from
+  MatchState and AccountProfile, so new entity fields are covered without editing a list.
