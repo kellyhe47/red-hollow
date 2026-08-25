@@ -1,7 +1,7 @@
 ---
 id: 005
 title: Shared scrip economy, purchase and sell
-status: in-progress
+status: green
 depends_on: [001, 004]
 touches: [unity/RedHollow/Assets/GameSim/MatchSim.Economy.cs, sim/GameSim.Tests/T05_EconomyTests.cs]
 iterations: 1
@@ -18,11 +18,11 @@ purchase_placement (planning-phase only, valid zone, sufficient scrip; rejection
 
 ## Acceptance criteria
 
-- [ ] G-013, G-014, G-015, G-022 pass
-- [ ] rejections emit purchase_rejected and change no state
-- [ ] placement zone validation rejects hotspot interiors, tunnel mouths, overlaps
-- [ ] R-25: any player may spend from the shared pool - no ownership check, vote or lock rejects a purchase
-- [ ] PlaceableCatalog carries the R-23 cost table (Barricade 100, Spike Trap 75, Dynamite 150, Turret 250, Med Station 200); 006 consumes its effect numbers
+- [x] G-013, G-014, G-015, G-022 pass
+- [x] rejections emit purchase_rejected and change no state
+- [x] placement zone validation rejects hotspot interiors, tunnel mouths, overlaps
+- [x] R-25: any player may spend from the shared pool - no ownership check, vote or lock rejects a purchase
+- [x] PlaceableCatalog carries the R-23 cost table (Barricade 100, Spike Trap 75, Dynamite 150, Turret 250, Med Station 200); 006 consumes its effect numbers
 
 ## Test plan
 
@@ -38,3 +38,7 @@ not re-encoded.
   neither a fixture nor an acceptance criterion, and would have shipped unimplemented.
 - tests locked @ HEAD: 29 cases, 28 red; single labelled structural guard passes. Sequential ticket,
   main working directory, no worktree.
+- iter 1 GREEN @ d7b5d47: 3 failed / 268 passed / 271 total, exactly the target. Zero T-05 stubs.
+  Locked tests untouched. validate-spec and coverage green. Sequential — committed straight to main.
+- Zone radii chosen (config-tunable on MatchSim): hotspot building 4.0, tunnel mouth 3.0,
+  placeable footprint 1.5. Tightest valid test case clears by 6.32 vs 3.0.
