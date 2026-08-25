@@ -23,5 +23,21 @@ namespace RedHollow.Sim
             BeginCommand();
             throw NotYet("T-07", "no friendly fire — hero attacks damage monsters only");
         }
+
+        /// <summary>
+        /// R-35. Out-of-combat regen: a hero untouched for <see cref="SimConfig.RegenDelaySeconds"/>
+        /// heals <see cref="SimConfig.RegenHpPerSecond"/> per second up to MaxHp. Driven from the
+        /// host's fixed-step loop, reading elapsed time off the injected clock the way
+        /// <see cref="TickStatusEffects"/> does.
+        ///
+        /// Returns void rather than an ISimResult: no fixture grades regen, so there is no result
+        /// shape to honour, and the healing it does is replicated through LastObservation's state
+        /// changes like any other delta.
+        /// </summary>
+        public void TickHeroRegen()
+        {
+            BeginCommand();
+            throw NotYet("T-07", "out-of-combat regen at 2 HP/s after 5s untouched");
+        }
     }
 }
