@@ -459,6 +459,197 @@ namespace RedHollow.Sim.Tests
             });
         }
 
+        // ---- R-33: respawn EXECUTION (G-021 pins only the scheduling half) ------------------------
+
+        /// <summary>
+        /// The boundary the whole rule turns on. G-021 pins that a death at t=45 with a 10s delay
+        /// records respawn_at 55.0; it cannot show whether t=55 is early enough to be back.
+        ///
+        /// Pinned as inclusive — the deadline instant revives — to match how this sim already
+        /// treats deadlines: G-019 is a boundary fixture that expires a status effect at exactly
+        /// its expires_at, and its `defends_against` names strict greater-than as the bug. A
+        /// respawn deadline is the same kind of timestamp, so "after 10s" means the hero is back
+        /// at now &gt;= RespawnAt, not one tick later.
+        /// </summary>
+        [TestCase(-2.0, false)]
+        [TestCase(-0.1, false)]
+        [TestCase(0.0, true)]
+        [TestCase(0.1, true)]
+        public void Respawn_happens_at_or_after_the_deadline_and_never_before(
+            double offsetFromDeadline, bool expectedBack)
+        {
+            var clock = new SimClock(45.0);
+            var sim = SimWith(out var state, RespawnConfig(), clock);
+            var hero = AddHero(state, "hero_gun", HeroClass.Gunslinger, hp: 10, maxHp: 100);
+            hero.Pos = new Vec2(42, 42);
+
+            var death = sim.ApplyHeroDamage(Hit("m5", MonsterType.BullBehemoth, 40.0, hero.Id));
+            Assert.That(death.Downed, Is.True, "premise: the hero died and has a deadline");
+
+            clock.Advance(death.RespawnAt.Value - clock.ElapsedSeconds + offsetFromDeadline);
+            sim.TickHeroRespawns();
+
+            if (expectedBack)
+            {
+                Assert.Multiple(() =>
+                {
+                    Assert.That(hero.Alive, Is.True, "the deadline has been reached — the hero is back");
+                    Assert.That(hero.Hp, Is.EqualTo(100.0).Within(Tolerance));
+                });
+            }
+            else
+            {
+                Assert.Multiple(() =>
+                {
+                    Assert.That(hero.Alive, Is.False, "still inside the respawn delay");
+                    Assert.That(hero.Hp, Is.EqualTo(0.0).Within(Tolerance));
+                    Assert.That(hero.Pos, Is.EqualTo(new Vec2(42, 42)),
+                        "a hero that has not respawned has not moved");
+                    Assert.That(sim.LastObservation.StateChanges, Is.Empty,
+                        "an early tick replicates nothing");
+                });
+            }
+        }
+
+        /// <summary>
+        /// R-33 in full: "respawns at the team spawn at full HP after 10s". The spawn point is
+        /// deliberately not the (0,0) default, so an implementation that teleports to the origin
+        /// cannot pass. Event wording is unpinned by any fixture, so only presence and shape are
+        /// asserted — some event must name the hero that came back.
+        /// </summary>
+        [Test]
+        public void Respawn_restores_full_hp_at_the_configured_spawn_point()
+        {
+            var clock = new SimClock(45.0);
+            var sim = SimWith(out var state, RespawnConfig(), clock);
+            var hero = AddHero(state, "hero_gun", HeroClass.Gunslinger, hp: 10, maxHp: 100);
+            hero.Pos = new Vec2(42, 42);
+
+            sim.ApplyHeroDamage(Hit("m5", MonsterType.BullBehemoth, 40.0, hero.Id));
+            clock.Advance(10.0);
+            sim.TickHeroRespawns();
+
+            var changes = sim.LastObservation.StateChanges;
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(hero.Alive, Is.True);
+                Assert.That(hero.Hp, Is.EqualTo(hero.MaxHp).Within(Tolerance),
+                    "respawn restores full HP, not a partial heal");
+                Assert.That(hero.Pos, Is.EqualTo(RespawnPoint),
+                    "the hero comes back at SimConfig.RespawnPoint, not where it fell");
+
+                // Alive is the predicate R-16 targeting reads, so the revive must replicate it.
+                Assert.That(LivingHeroIds(state), Does.Contain(hero.Id),
+                    "a respawned hero is a monster target candidate again");
+
+                Assert.That(changes.Any(c => c.Entity == hero.Id && c.Field == "hp"
+                        && Convert.ToDouble(c.To) == 100.0),
+                    Is.True, "the HP restore must replicate as a delta");
+                Assert.That(changes.Any(c => c.Entity == hero.Id && c.Field == "alive"
+                        && Equals(c.To, true)),
+                    Is.True, "the alive flag must replicate as a delta");
+
+                Assert.That(sim.LastObservation.EmittedEvents, Is.Not.Empty,
+                    "coming back is worth an event; its wording is not pinned here");
+                Assert.That(
+                    sim.LastObservation.EmittedEvents.Any(
+                        e => e.Fields.Values.OfType<string>().Contains(hero.Id)),
+                    Is.True, "some emitted event must name the hero that respawned");
+            });
+        }
+
+        /// <summary>
+        /// Deadlines are per hero, not one match-wide timer. Three heroes die three seconds apart
+        /// and the tick lands on the second one's exact deadline: the first two are back, the
+        /// third — still inside its delay — is not.
+        /// </summary>
+        [Test]
+        public void Respawns_resolve_independently_per_hero()
+        {
+            var clock = new SimClock(0.0);
+            var sim = SimWith(out var state, RespawnConfig(), clock);
+
+            var early = AddHero(state, "hero_early", HeroClass.Gunslinger, hp: 10, maxHp: 100);
+            var mid = AddHero(state, "hero_mid", HeroClass.Rancher, hp: 10, maxHp: 120);
+            var late = AddHero(state, "hero_late", HeroClass.Sawbones, hp: 10, maxHp: 200);
+
+            sim.ApplyHeroDamage(Hit("m5", MonsterType.BullBehemoth, 40.0, early.Id));   // due at 10
+            clock.Advance(3.0);
+            sim.ApplyHeroDamage(Hit("m5", MonsterType.BullBehemoth, 40.0, mid.Id));     // due at 13
+            clock.Advance(5.0);
+            sim.ApplyHeroDamage(Hit("m5", MonsterType.BullBehemoth, 40.0, late.Id));    // due at 18
+
+            clock.Advance(5.0); // t = 13.0 — exactly mid's deadline
+            sim.TickHeroRespawns();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(early.Alive, Is.True, "past its deadline");
+                Assert.That(early.Hp, Is.EqualTo(100.0).Within(Tolerance));
+                Assert.That(mid.Alive, Is.True, "exactly on its deadline");
+                Assert.That(mid.Hp, Is.EqualTo(120.0).Within(Tolerance),
+                    "each hero returns at its own MaxHp");
+                Assert.That(late.Alive, Is.False, "still inside its 10s delay");
+                Assert.That(late.Hp, Is.EqualTo(0.0).Within(Tolerance));
+                Assert.That(LivingHeroIds(state), Does.Not.Contain(late.Id));
+            });
+        }
+
+        /// <summary>A hero that never died is not the respawn tick's business — it must not be healed or moved.</summary>
+        [Test]
+        public void Respawn_tick_leaves_living_heroes_alone()
+        {
+            var sim = SimWith(out var state, RespawnConfig(), new SimClock(500.0));
+            var hero = AddHero(state, "hero_saw", HeroClass.Sawbones, hp: 60, maxHp: 200);
+            hero.Pos = new Vec2(42, 42);
+
+            sim.TickHeroRespawns();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(hero.Hp, Is.EqualTo(60.0).Within(Tolerance),
+                    "respawn is not a heal for the living — that is regen's job (R-35)");
+                Assert.That(hero.Pos, Is.EqualTo(new Vec2(42, 42)),
+                    "a living hero is not teleported to the spawn point");
+                Assert.That(hero.Alive, Is.True);
+                Assert.That(sim.LastObservation.StateChanges, Is.Empty);
+            });
+        }
+
+        /// <summary>
+        /// The two ticks must not fight. A hero comes back at full HP, so regen has nothing to add
+        /// (R-35 heals only up to MaxHp), and a second respawn tick must be a no-op rather than
+        /// re-reviving an already-living hero.
+        /// </summary>
+        [Test]
+        public void Respawned_hero_is_stable_under_further_ticks()
+        {
+            var clock = new SimClock(45.0);
+            var sim = SimWith(out var state, RespawnConfig(), clock);
+            var hero = AddHero(state, "hero_gun", HeroClass.Gunslinger, hp: 10, maxHp: 100);
+
+            sim.ApplyHeroDamage(Hit("m5", MonsterType.BullBehemoth, 40.0, hero.Id));
+            clock.Advance(10.0);
+            sim.TickHeroRespawns();
+
+            clock.Advance(30.0);
+            sim.TickHeroRespawns();
+            var respawnChanges = sim.LastObservation.StateChanges.Count;
+
+            sim.TickHeroRegen();
+            var regenChanges = sim.LastObservation.StateChanges.Count;
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(hero.Hp, Is.EqualTo(100.0).Within(Tolerance),
+                    "a hero already at MaxHp cannot be healed further");
+                Assert.That(hero.Alive, Is.True);
+                Assert.That(respawnChanges, Is.Zero, "reviving a living hero replicates nothing");
+                Assert.That(regenChanges, Is.Zero, "regen has nothing to do for a full-HP hero");
+            });
+        }
+
         // ---- R-34: no mana ------------------------------------------------------------------------
 
         /// <summary>
@@ -603,6 +794,21 @@ namespace RedHollow.Sim.Tests
             }
 
             return line;
+        }
+
+        /// <summary>Deliberately not the (0,0) default, so a hardcoded origin cannot pass (R-33).</summary>
+        private static readonly Vec2 RespawnPoint = new Vec2(7, -3);
+
+        /// <summary>Respawn tuning with a spawn point that is distinguishable from the default.</summary>
+        private static SimConfig RespawnConfig()
+        {
+            return new SimConfig
+            {
+                RespawnDelaySeconds = 10.0,
+                RespawnPoint = RespawnPoint,
+                RegenHpPerSecond = 2.0,
+                RegenDelaySeconds = 5.0,
+            };
         }
 
         /// <summary>A world whose only interesting axis is regen timing (R-35).</summary>
