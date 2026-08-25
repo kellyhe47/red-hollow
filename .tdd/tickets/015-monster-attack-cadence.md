@@ -1,11 +1,11 @@
 ---
 id: 015
 title: Monster attack cadence (R-18)
-status: pending
+status: in-progress
 depends_on: [002, 003, 007]
 touches: [unity/RedHollow/Assets/GameSim/MatchSim.Combat.cs, sim/GameSim.Tests/T15_CadenceTests.cs]
-iterations: 0
-test_files: []
+iterations: 1
+test_files: [sim/GameSim.Tests/T15_CadenceTests.cs]
 branch: ""
 board_id: T-15
 owns_requirements: [R-18]
@@ -34,10 +34,19 @@ barricade carve-out is already implemented and green in ticket 002 at the target
 
 ## Test plan
 
-_Filled in by the test-writer._
+`T15_CadenceTests.cs` — 15 cases. Frame-loop lands one hit per configured second; inclusive
+boundary at -0.001/0.0/+0.001 across intervals 0.25 and 2.5; per-monster interleaving; never-attacked
+may attack immediately (the fixture-safety property); a permitted attack adds nothing observable
+(rebuilds G-006 and pins exactly 1 change / 1 event / 0 external calls); sad paths unpinned.
 
 ## Attempt log
 
 - Opened by the Phase 3 requirement walk: R-18 was owned by green ticket T-02 but cited in
   zero tests, and its config knob was read nowhere in GameSim. Sixth instance of the
   fixture-grades-a-neighbouring-behaviour pattern.
+- tests locked @ HEAD: 15 red, 30 golden fixtures still 30/30.
+- Test-writer ran a MUTATION CHECK before handing over: correct impl -> 319/319; exclusive boundary
+  -> 4 fail; hardcoded 1.0 -> 3 fail; shared timer -> per-monster fails; fail-closed first attack
+  -> 4 fail incl. both fixture-safety tests; no gate -> 4 fail. The tests provably bite.
+- KNOWN LIMIT: the gate is advisory. Nothing stops a host calling a damage op without asking.
+  The Unity combat-loop wiring (blocked ticket 010/011) MUST call it first — recorded there.
