@@ -303,3 +303,19 @@ headless. Project linked to cloud project `ac5dd937-4e73-44e8-8ac5-fb148787ce3b`
 URP 17.5.0 is the active pipeline; NGO 2.13.2, Transport 6.5.0, Lobby 1.3.0, Relay 1.2.0,
 Authentication 3.7.4, Core 1.18.0, Input System 1.20.0. `activeInputHandler: 2` (both backends).
 Tickets 010-014 are no longer environment-blocked.
+
+### DEC-RUN-10 — host disconnect has no sim status (raised by 011's test-writer, 2026-08-25)
+R-53 says the host leaving ends the match; R-02 says an emptied colony is the **only** defeat. The
+sim has no third terminal status, and inventing one — or writing `defeat` for an abandoned match —
+would corrupt the loss rule the whole fixture set defends.
+
+**Resolution:** the end-state lives on the *session* (`NetSessionPhase.Ended`), and
+`MatchState.Status` stays in-progress. An abandoned match is not a lost match. If the owner wants
+abandonment recorded in the sim, that is a PRD change and a fixture change, not an implementer's call.
+
+### DEC-RUN-11 — rematch returns to the lobby, not to a running match
+R-07 says PLAY AGAIN "returns the **whole party to the same lobby** (join code and class picks
+retained)" *and* that all match state resets fully. A lobby has no match state, so the two clauses
+resolve in sequence: `TryRematch` → lobby, and the reset is observed on the match the next
+`TryStartMatch` builds. Accepted as written. If the intended UX is that the button starts the next
+match directly, that is a wireframe question worth confirming with the owner.
