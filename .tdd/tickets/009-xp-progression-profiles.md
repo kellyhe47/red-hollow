@@ -1,12 +1,12 @@
 ---
 id: 009
 title: XP, leveling, skill points, persistent profiles
-status: pending
+status: in-progress
 depends_on: [001]
 touches: [unity/RedHollow/Assets/GameSim/MatchSim.Progression.cs, unity/RedHollow/Assets/GameSim/SqliteProfileStore.cs, sim/GameSim.Tests/T09_ProgressionTests.cs]
 iterations: 0
 test_files: []
-branch: ""
+branch: "tdd/009"
 board_id: T-09
 owns_requirements: [R-40, R-41, R-42, R-43, R-44]
 grades_fixtures: [G-023, G-024, G-025, G-026]
@@ -28,3 +28,4 @@ _Filled in by the test-writer._
 
 ## Attempt log
 
+- wave A: test-writer dispatched in worktree .tdd/worktrees/009 (branch tdd/009).

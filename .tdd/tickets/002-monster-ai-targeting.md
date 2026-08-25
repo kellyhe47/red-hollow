@@ -1,12 +1,12 @@
 ---
 id: 002
 title: Monster roster + nearest-target AI + barricade blocking
-status: pending
+status: in-progress
 depends_on: [001]
 touches: [unity/RedHollow/Assets/GameSim/MatchSim.Targeting.cs, sim/GameSim.Tests/T02_TargetingTests.cs]
 iterations: 0
 test_files: []
-branch: ""
+branch: "tdd/002"
 board_id: T-02
 owns_requirements: [R-16, R-17, R-18]
 grades_fixtures: [G-001, G-002, G-003, G-004, G-005]
@@ -28,3 +28,4 @@ _Filled in by the test-writer._
 
 ## Attempt log
 
+- wave A: test-writer dispatched in worktree .tdd/worktrees/002 (branch tdd/002).

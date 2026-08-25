@@ -1,12 +1,12 @@
 ---
 id: 007
 title: Hero damage, death/respawn, no friendly fire
-status: pending
+status: in-progress
 depends_on: [001]
 touches: [unity/RedHollow/Assets/GameSim/MatchSim.Heroes.cs, sim/GameSim.Tests/T07_HeroTests.cs]
 iterations: 0
 test_files: []
-branch: ""
+branch: "tdd/007"
 board_id: T-07
 owns_requirements: [R-26, R-33, R-34, R-35, R-36]
 grades_fixtures: [G-020, G-021, G-030]
@@ -28,3 +28,4 @@ _Filled in by the test-writer._
 
 ## Attempt log
 
+- wave A: test-writer dispatched in worktree .tdd/worktrees/007 (branch tdd/007).

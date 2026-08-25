@@ -1,12 +1,12 @@
 ---
 id: 003
 title: Colony, hotspots, civilian pool, defeat rule
-status: pending
+status: in-progress
 depends_on: [001]
 touches: [unity/RedHollow/Assets/GameSim/MatchSim.Hotspots.cs, sim/GameSim.Tests/T03_HotspotTests.cs]
 iterations: 0
 test_files: []
-branch: ""
+branch: "tdd/003"
 board_id: T-03
 owns_requirements: [R-10, R-11, R-12, R-13, R-72]
 grades_fixtures: [G-006, G-007, G-008, G-009]
@@ -28,3 +28,4 @@ _Filled in by the test-writer._
 
 ## Attempt log
 
+- wave A: test-writer dispatched in worktree .tdd/worktrees/003 (branch tdd/003).
