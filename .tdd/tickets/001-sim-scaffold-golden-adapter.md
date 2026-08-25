@@ -1,11 +1,11 @@
 ---
 id: 001
 title: GameSim assembly scaffold + golden-fixture NUnit adapter
-status: pending
+status: in-progress
 depends_on: []
 touches: [unity/RedHollow/Assets/GameSim/MatchSim.cs, unity/RedHollow/Assets/GameSim/MatchSim.*.cs (created, stubs only), sim/GameSim.Tests/]
 iterations: 0
-test_files: []
+test_files: [sim/GameSim.Tests/GoldenFixtureTests.cs, sim/GameSim.Tests/GoldenComparison.cs, sim/GameSim.Tests/GoldenComparisonTests.cs, sim/GameSim.Tests/GoldenHarnessGuards.cs, sim/GameSim.Tests/OperationDispatch.cs, sim/GameSim.Tests/ScenarioLoader.cs, sim/GameSim.Tests/FixtureLoading.cs]
 branch: ""
 board_id: T-01
 owns_requirements: [R-51, R-54]
@@ -25,7 +25,11 @@ Pure-C# GameSim assembly (netstandard2.1, zero UnityEngine) + the test-golden ad
 
 ## Test plan
 
-_Filled in by the test-writer._
+Adapter is the test set: `GoldenFixtureTests` yields one case per `eval/golden/*.json`
+(criteria 2+3), `GoldenHarnessGuards` covers no-Unity-reference / count+uniqueness /
+eval-tree-SHA-unchanged (criteria 1+4), `GoldenComparisonTests` self-tests the
+canonicalizer and deep-compare. Verified by orchestrator: 30 failed / 19 passed,
+every failure `NotImplementedException: T-0N`, counts match run/tickets.json exactly.
 
 ## Attempt log
 
