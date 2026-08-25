@@ -167,3 +167,15 @@ mid-implementation. Coverage gate re-run green.
 **Ownership note:** DEC-RUN-1 assigned `PlaceableCatalog` to 005, but R-23 belongs to 006. They are
 sequential (006 depends on 005), so there is no concurrency hazard: 005 populates the catalog
 because it needs purchase costs, and 006 consumes the effect numbers already in it.
+
+### Wave B file allocation (2026-08-25)
+004 and 008 could both plausibly need `Entities.cs`, which would make them non-parallel.
+Resolved by allocation rather than serialisation:
+- **008 owns `Entities.cs`** this wave — it genuinely needs a home for per-hero ability
+  cooldown/rank state.
+- **004 keeps per-wave data in its own `WaveTable.cs`.** Which tunnels are active for wave N is
+  wave-table *data*, not mutable match state, so this is the better design regardless of the
+  scheduling constraint.
+- New request/result types go in per-ticket files (`Commands.Waves.cs`, `Commands.Abilities.cs`)
+  so neither edits the shared `Commands.cs`. `AbilityResult`'s shape is pinned by G-018 and must
+  not change.

@@ -1,12 +1,12 @@
 ---
 id: 008
 title: Hero kits, abilities, cooldowns, status effects
-status: pending
+status: in-progress
 depends_on: [001, 007]
 touches: [unity/RedHollow/Assets/GameSim/MatchSim.Abilities.cs, sim/GameSim.Tests/T08_AbilityTests.cs]
 iterations: 0
 test_files: []
-branch: ""
+branch: "tdd/008"
 board_id: T-08
 owns_requirements: [R-31, R-32]
 grades_fixtures: [G-018, G-019]
@@ -33,3 +33,4 @@ _Filled in by the test-writer._
 
 - CRITERIA AMENDED pre-dispatch (DEC-RUN-4 audit): requirements this ticket owns that had
   neither a fixture nor an acceptance criterion, and would have shipped unimplemented.
+- wave B: test-writer dispatched in worktree .tdd/worktrees/008 (branch tdd/008).

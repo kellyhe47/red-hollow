@@ -1,12 +1,12 @@
 ---
 id: 004
 title: Match FSM, wave lifecycle, kills, bounty, victory
-status: pending
+status: in-progress
 depends_on: [001, 003]
 touches: [unity/RedHollow/Assets/GameSim/MatchSim.Waves.cs, unity/RedHollow/Assets/GameSim/WaveTable.cs, sim/GameSim.Tests/T04_WaveTests.cs]
 iterations: 0
 test_files: []
-branch: ""
+branch: "tdd/004"
 board_id: T-04
 owns_requirements: [R-01, R-02, R-03, R-04, R-05, R-14, R-19]
 grades_fixtures: [G-010, G-011, G-012, G-016, G-017]
@@ -33,3 +33,4 @@ _Filled in by the test-writer._
 
 - CRITERIA AMENDED pre-dispatch (DEC-RUN-4 audit): requirements this ticket owns that had
   neither a fixture nor an acceptance criterion, and would have shipped unimplemented.
+- wave B: test-writer dispatched in worktree .tdd/worktrees/004 (branch tdd/004).
