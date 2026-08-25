@@ -179,3 +179,31 @@ Resolved by allocation rather than serialisation:
 - New request/result types go in per-ticket files (`Commands.Waves.cs`, `Commands.Abilities.cs`)
   so neither edits the shared `Commands.cs`. `AbilityResult`'s shape is pinned by G-018 and must
   not change.
+
+### DEC-RUN-5 — `WaveState.TotalWaves` is authoritative; `SimConfig.TotalWaves` seeds it (raised by 004's test-writer, 2026-08-25)
+Both exist and nothing in the PRD or fixtures says which the rules read. All five T-04 fixtures set
+them to the same 10, so the acceptance contract cannot disambiguate — a live trap, since balance
+tuning edits `SimConfig` while a rule might read `State.Wave`.
+
+**Resolution:** `State.Wave.TotalWaves` is authoritative at runtime; `SimConfig.TotalWaves` is the
+tuning surface that seeds it at match creation. The fixture loader populates
+`given.preexisting_state.wave.total_waves`, so state is what the acceptance contract actually
+drives, and it matches the `ColonyMap` → `CreateMatchState()` pattern already established: config is
+authored, state is live.
+
+### DEC-RUN-6 — R-03's 60-second planning timer had no seam (found by 004's test-writer, 2026-08-25)
+R-03: *"Each wave begins with a 60-second planning phase; combat starts **early** when all connected
+players ready up."* "Early" presupposes a normal timeout path. Confirmed by grep: **nothing in the
+assembly reads `SimConfig.PlanningDurationSeconds`.** The only planning → combat edge in the sim's
+surface is `SetPlayerReady`, so a lobby where one player never readies — AFK, or disconnected while
+un-ready — sits in planning forever and the match cannot progress.
+
+G-017 grades only the all-ready *early* start, which is why no fixture catches it.
+
+**Resolution:** routed back to 004's test-writer for an expiry seam plus tests, including the
+inclusive boundary (G-019 convention) and a `trigger` distinguishable from G-017's `"all_ready"`.
+
+**Fourth instance of the same pattern** — after R-35 regen, R-33 respawn execution, and the
+pre-dispatch audit's nine. Every one was a requirement whose fixture graded a *neighbouring*
+behaviour, leaving the requirement itself unenforced. The tell is a requirement whose fixture pins
+an exception, an override, or an "early" path: the *ordinary* path is the one nobody grades.
