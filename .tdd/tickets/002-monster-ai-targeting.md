@@ -1,7 +1,7 @@
 ---
 id: 002
 title: Monster roster + nearest-target AI + barricade blocking
-status: in-progress
+status: awaiting-merge
 depends_on: [001]
 touches: [unity/RedHollow/Assets/GameSim/MatchSim.Targeting.cs, sim/GameSim.Tests/T02_TargetingTests.cs]
 iterations: 1
@@ -38,3 +38,6 @@ Sad paths: no-available-target, unknown-monster-id. G-001..005 not re-encoded.
   targeting rows throw NotImplementedException T-02). Orchestrator-verified.
 - DEC-RUN-1 resolved the roster-defaults conflict the test-writer raised; tests stand as written.
 - iter 1: implementer dispatched in worktree .tdd/worktrees/002.
+- iter 1 GREEN in worktree: 25 failed / 36 passed / 61 total, exactly the target. Locked tests
+  untouched. G-001..005 pass; remaining 25 fixtures keep their original owning-ticket tags.
+  Verified: oracle-based blocking (no position scan), ordinal tiebreak. Checkpoint 91d96eb.
