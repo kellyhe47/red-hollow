@@ -70,23 +70,21 @@ namespace RedHollow.Game.Host
             _sim.ApplyPlaceableDamage(request);
 
         // ---- ticket 019 (T-19): the rest of the seam a playable match needs -----------------
-        // Shape only. Every one of these is a forward onto the same _sim, exactly like the members
-        // above; they throw until ticket 019 wires them so that "nothing calls this" fails loudly
-        // rather than silently.
+        // Every one of these is a forward onto the same _sim, exactly like the members above. No
+        // rule may appear between the two sides of this seam (R-51), which is why none of them
+        // guards, clamps or reorders anything: SpawnWave already refuses a finished match and
+        // BeginPlanningPhase already throws for one, and re-deciding either here would put a
+        // second copy of a wave rule in the shell.
 
         public MonsterMovementResult TickMonsterMovement(double deltaSeconds) =>
-            throw new NotImplementedException("ticket 019: forward to MatchSim.TickMonsterMovement");
+            _sim.TickMonsterMovement(deltaSeconds);
 
-        public HeroMoveResult MoveHero(HeroMoveRequest request) =>
-            throw new NotImplementedException("ticket 019: forward to MatchSim.MoveHero");
+        public HeroMoveResult MoveHero(HeroMoveRequest request) => _sim.MoveHero(request);
 
-        public TargetSelectionResult SelectTarget(string monsterId) =>
-            throw new NotImplementedException("ticket 019: forward to MatchSim.SelectTarget");
+        public TargetSelectionResult SelectTarget(string monsterId) => _sim.SelectTarget(monsterId);
 
-        public WaveSpawnResult SpawnWave(int waveNumber) =>
-            throw new NotImplementedException("ticket 019: forward to MatchSim.SpawnWave");
+        public WaveSpawnResult SpawnWave(int waveNumber) => _sim.SpawnWave(waveNumber);
 
-        public PlanningPhaseResult BeginPlanningPhase() =>
-            throw new NotImplementedException("ticket 019: forward to MatchSim.BeginPlanningPhase");
+        public PlanningPhaseResult BeginPlanningPhase() => _sim.BeginPlanningPhase();
     }
 }

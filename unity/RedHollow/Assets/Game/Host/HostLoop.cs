@@ -23,7 +23,24 @@ namespace RedHollow.Game.Host
         /// </summary>
         private static readonly IReadOnlyList<MonsterAttackIntent> NoAttacks = new MonsterAttackIntent[0];
 
+        /// <summary>
+        /// What a step resolves when there is no hero intent source, or the source returns null.
+        /// Shared and empty for the same reason <see cref="NoAttacks"/> is.
+        /// </summary>
+        private static readonly IReadOnlyList<HeroIntentCommand> NoIntents = new HeroIntentCommand[0];
+
         private readonly ISimHost _sim;
+
+        /// <summary>
+        /// Ticket 019 — the same host, seen through the wider seam, or null when the caller bound a
+        /// bare <see cref="ISimHost"/>. Tested for rather than demanded, because widening the loop's
+        /// own dependency would break every harness that drives a planning-only or lobby host
+        /// (T-10's fake among them): the five ticks above must keep running for a host that cannot
+        /// move a monster, and a loop that refused to construct without the wider seam would make
+        /// "drive the ticks" conditional on "drive a live match".
+        /// </summary>
+        private readonly IMatchSimHost _matchSim;
+
         private readonly IMonsterAttackSource _monsterAttacks;
         private readonly IHeroIntentSource _heroIntents;
 
@@ -43,6 +60,7 @@ namespace RedHollow.Game.Host
             }
 
             _sim = sim;
+            _matchSim = sim as IMatchSimHost;
 
             // Optional on purpose: a host with no attack source (a lobby, a planning-only harness)
             // still has to drive the five ticks, so a missing source must not disable the loop.
@@ -76,30 +94,67 @@ namespace RedHollow.Game.Host
             _sim.TickHeroRespawns();    // R-33 — dead heroes come back.
             _sim.TickMedStations();     // R-23 — the purchased aura heals.
 
-            // Ticket 019 — IMatchSimHost.TickMonsterMovement(deltaSeconds) belongs here (R-17 /
-            // R-18): it takes a delta, so it fell outside T-10's parameterless-Tick* net and a
-            // wave currently stands in its breach for the whole match.
+            // R-17 / R-18 — the wave walks. Driven with the delta this step was handed and never
+            // with a tick rate of the loop's own: a host that caught up a stalled frame with a
+            // 0.5s step would otherwise advance the sim by 1/60s and run the match slower than its
+            // own clock for the rest of the session.
+            if (_matchSim != null)
+            {
+                _matchSim.TickMonsterMovement(deltaSeconds);
+            }
 
             ResolveHeroMoves(deltaSeconds);
             ResolveMonsterAttacks(deltaSeconds);
         }
 
         /// <summary>
-        /// R-30 / R-51 — ticket 019 stub. Each intent this step becomes one
-        /// <see cref="IMatchSimHost.MoveHero"/> command for the hero it names, carrying this step's
-        /// own delta. A loop with no intent source drives no hero, which is why the null case
-        /// returns rather than throws.
+        /// R-30 / R-51. Each intent this step becomes one <see cref="IMatchSimHost.MoveHero"/>
+        /// command for the hero it names, carrying this step's own delta. A loop with no intent
+        /// source drives no hero, which is why the null case returns rather than throws.
+        ///
+        /// A straight copy, the way <see cref="ApplyPermittedAttack"/> is: the direction goes over
+        /// exactly as the input map resolved it (R-30), because the only other thing the shell
+        /// could send is the aim point — and steering by the cursor is the click-to-move DEC-017
+        /// ruled out. Speed is not carried at all; the sim owns it.
+        ///
+        /// The command is addressed by <see cref="HeroIntentCommand.HeroId"/> rather than applied
+        /// to "the hero": a host drives up to four (R-50), and an intent that moved all of them
+        /// would let one player walk the whole party.
         /// </summary>
         private void ResolveHeroMoves(double deltaSeconds)
         {
-            if (_heroIntents == null)
+            if (_heroIntents == null || _matchSim == null)
             {
                 return;
             }
 
-            throw new NotImplementedException(
-                "ticket 019: a resolved HeroIntent.MoveDirection must reach MatchSim.MoveHero for "
-                + "the hero it names, with this step's delta (R-30 / R-51)");
+            var commands = _heroIntents.IntentsThisStep(_sim, deltaSeconds) ?? NoIntents;
+
+            for (var i = 0; i < commands.Count; i++)
+            {
+                var command = commands[i];
+                if (command == null || command.Intent == null || command.HeroId == null)
+                {
+                    continue;
+                }
+
+                var direction = command.Intent.MoveDirection;
+
+                // Nobody is holding a key. Skipped rather than sent as a zero command so a quiet
+                // frame costs no observation — MatchSim.MoveHero would refuse it anyway, but the
+                // refusal still resets LastObservation, which netcode replicates from (R-51).
+                if (direction.x == 0f && direction.y == 0f)
+                {
+                    continue;
+                }
+
+                _matchSim.MoveHero(new HeroMoveRequest
+                {
+                    HeroId = command.HeroId,
+                    Direction = new Vec2(direction.x, direction.y),
+                    DeltaSeconds = deltaSeconds,
+                });
+            }
         }
 
         /// <summary>
