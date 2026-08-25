@@ -231,13 +231,61 @@ namespace RedHollow.Sim
         /// shape as <see cref="TickHeroRegen"/> and <see cref="TickStatusEffects"/>. No fixture
         /// grades respawn execution, so there is no result shape to honour and the revival
         /// replicates through LastObservation's state changes like any other delta.
-        ///
-        /// Ticket 007 stub: shape only, no behaviour.
         /// </summary>
         public void TickHeroRespawns()
         {
             BeginCommand();
-            throw NotYet("T-07", "reviving heroes whose respawn deadline the clock has reached");
+
+            var now = _clock.ElapsedSeconds;
+            var spawn = _config.RespawnPoint;
+
+            foreach (var hero in State.Heroes.Values)
+            {
+                // A living hero is not this tick's business: respawn is neither a heal (R-35 owns
+                // topping the living up) nor a teleport. No deadline means nothing was ever
+                // scheduled for this hero, so there is nothing to execute — and it is also what
+                // makes the tick idempotent, since a revive spends the deadline below.
+                if (hero.Alive || !hero.RespawnAt.HasValue)
+                {
+                    continue;
+                }
+
+                // The comparison is inclusive, matching how this sim already treats deadlines:
+                // G-019 expires a status effect at exactly its expires_at and its
+                // `defends_against` names strict greater-than as the bug it guards. R-33's
+                // "after 10s" therefore means back *at* respawn_at, not one tick later — and
+                // since the host replicates this (R-51), a strict `>` here would put every
+                // client's revive frame one tick off the host's.
+                if (now < hero.RespawnAt.Value)
+                {
+                    continue;
+                }
+
+                var hpBefore = hero.Hp;
+
+                hero.Alive = true;
+                hero.Hp = hero.MaxHp;  // this hero's own cap — the three classes do not share one
+                hero.Pos = spawn;
+                hero.RespawnAt = null; // deadline spent; a later tick must not fire it again
+
+                // `alive` is the untargetable predicate R-16 reads and `hp` drives every client's
+                // health bar, so both are replicated deltas. The spawn point rides the event
+                // instead, exactly as the death deadline rides hero_died: no fixture replicates a
+                // position field, and the shell moves the transform off the event.
+                RecordChange(hero.Id, "hp", hpBefore, hero.Hp);
+                RecordChange(hero.Id, "alive", false, true);
+                Emit("hero_respawned", new Dictionary<string, object>
+                {
+                    { "hero_id", hero.Id },
+                    { "x", spawn.X },
+                    { "y", spawn.Y },
+                });
+
+                // R-35 bookkeeping deliberately untouched: a hero returns at MaxHp, so TickHeroRegen
+                // skips it outright, and the only route back below MaxHp is ApplyHeroDamage, which
+                // writes LastDamagedAt itself. The pre-death timestamp is therefore unreachable
+                // rather than stale, and resetting it would be a no-op the reader has to verify.
+            }
         }
 
         // ---- helpers ---------------------------------------------------------------------------
