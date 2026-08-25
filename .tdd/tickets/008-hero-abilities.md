@@ -1,7 +1,7 @@
 ---
 id: 008
 title: Hero kits, abilities, cooldowns, status effects
-status: awaiting-merge
+status: green
 depends_on: [001, 007]
 touches: [unity/RedHollow/Assets/GameSim/MatchSim.Abilities.cs, sim/GameSim.Tests/T08_AbilityTests.cs]
 iterations: 1
@@ -18,12 +18,12 @@ apply_ability (Rancher lasso: 50% slow for exactly 3.0s, expires_at recorded) an
 
 ## Acceptance criteria
 
-- [ ] G-018, G-019 pass
-- [ ] kit numbers config-tunable
-- [ ] heroes start a match with saved ability allocations (R-31 + R-43)
-- [ ] R-32: Q and E cooldowns (8s / 20s) are enforced - a cast while on cooldown is rejected and changes nothing
-- [ ] R-32: ability ranks cap at 3 and each rank improves the ability's numbers by ~25%
-- [ ] R-31: every class Q/E resolves through the sim - Gunslinger Fan the Hammer / Deadeye, Rancher Lasso / Stampede, Sawbones Whirl / Bulwark (60% DR for 2s) - and the class passives apply (Gunslinger every-4th-basic crit x2, Rancher basics hit up to 2 targets)
+- [x] G-018, G-019 pass
+- [x] kit numbers config-tunable
+- [x] heroes start a match with saved ability allocations (R-31 + R-43)
+- [x] R-32: Q and E cooldowns (8s / 20s) are enforced - a cast while on cooldown is rejected and changes nothing
+- [x] R-32: ability ranks cap at 3 and each rank improves the ability's numbers by ~25%
+- [x] R-31: every class Q/E resolves through the sim - Gunslinger Fan the Hammer / Deadeye, Rancher Lasso / Stampede, Sawbones Whirl / Bulwark (60% DR for 2s) - and the class passives apply (Gunslinger every-4th-basic crit x2, Rancher basics hit up to 2 targets)
 
 ## Test plan
 
@@ -45,3 +45,5 @@ fixture constants, so nothing passes against a hardcoded value. G-018/019 not re
   and IncomingDamageFor is the only seam through which it can reach incoming damage. A 5-line
   edit delegates to AfterTimedDamageReduction; the Sawbones branch is structurally intact and
   G-020 returns identity when no status effects are present. Verified: no 007 regression.
+- MERGED to main @ 26b28d9. Post-merge full suite with 004: 7 failed / 235 passed / 242 total,
+  23/30 fixtures green. Only T-05x4 T-06x3 remain. validate-spec, coverage, R-51 build all green.
