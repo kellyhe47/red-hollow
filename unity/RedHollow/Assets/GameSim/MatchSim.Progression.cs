@@ -23,5 +23,12 @@ namespace RedHollow.Sim
             BeginCommand();
             throw NotYet("T-09", "free-choice unlock or rank-up, rejected when no points are banked");
         }
+
+        /// <summary>R-43 / B-017. Persist every player's profile once the match is over.</summary>
+        public void SaveProfilesAtMatchEnd()
+        {
+            BeginCommand();
+            throw NotYet("T-09", "persist every player's profile at match end (R-43)");
+        }
     }
 }
