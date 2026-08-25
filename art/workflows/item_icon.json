@@ -10,7 +10,7 @@
   },
   "2": {
     "inputs": {
-      "value": "wooden barricade of rough stacked planks"
+      "value": "(a wooden barricade of X-crossed rough timber planks, weathered brown wood grain:1.2)"
     },
     "class_type": "PrimitiveString",
     "_meta": {
@@ -19,7 +19,7 @@
   },
   "3": {
     "inputs": {
-      "value": "game item icon, centered single object, 3/4 view, dark leather-and-brass circular badge background, subtle rim light, thick readable silhouette, warm white-gold lantern rim light, cinematic subterranean Mars colony, monochromatic burnt-sienna palette, volumetric dust haze, matte painterly semi-realism, muted matte surfaces, no text, no watermark"
+      "value": "game item icon of the named object, the object is the main subject displayed centered on top of (a dark leather-and-brass circular badge medallion:1.2), (flat pitch-black dark background surrounding the badge:1.4), 3/4 view, thick readable silhouette, warm white-gold lantern rim light, monochromatic burnt-sienna palette, matte painterly semi-realism, muted matte surfaces, no text, no watermark"
     },
     "class_type": "PrimitiveString",
     "_meta": {
