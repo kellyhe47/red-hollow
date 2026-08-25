@@ -1,7 +1,7 @@
 ---
 id: 003
 title: Colony, hotspots, civilian pool, defeat rule
-status: in-progress
+status: awaiting-merge
 depends_on: [001]
 touches: [unity/RedHollow/Assets/GameSim/MatchSim.Hotspots.cs, sim/GameSim.Tests/T03_HotspotTests.cs]
 iterations: 1
@@ -43,3 +43,6 @@ Stub added: `unity/RedHollow/Assets/GameSim/ColonyMap.cs` (shape only).
 - Test-writer's reading accepted: `hotspot_emptied` is a transition event, not a level — not
   re-emitted when an already-empty hotspot is hit. No fixture covers this; consistent with R-13.
 - iter 1: implementer dispatched in worktree .tdd/worktrees/003.
+- iter 1 GREEN in worktree: 26 failed / 47 passed / 73 total, exactly the target. Locked tests
+  untouched; both R-72 structural guards still pass. Verified it writes State.Status and records
+  field "status", never Phase.
