@@ -1,14 +1,14 @@
 ---
 id: 010
-title: Unity project shell: scene, top-down camera, input, sim host loop
+title: Sim host loop + shell architecture invariant
 status: in-progress
 depends_on: [001]
-touches: [unity/RedHollow/ProjectSettings/, unity/RedHollow/Assets/Game/, unity/RedHollow/Packages/]
+touches: [unity/RedHollow/Assets/Game/Host/, unity/RedHollow/Assets/Tests/EditMode/]
 iterations: 1
 test_files: []
 branch: ""
 board_id: T-10
-owns_requirements: [R-30, R-50, R-52]
+owns_requirements: [R-50, R-52]
 grades_fixtures: []
 ---
 
@@ -67,3 +67,6 @@ starting stake.
   packages-lock.json committed for reproducibility.
 - REMAINING for this ticket: scene, top-down camera, WASD+mouse-aim input (R-30), the host loop
   driving the sim ticks, and local prediction / remote interpolation (R-52).
+- SPLIT 2026-08-25: scene, camera, input and placeholder visuals moved to ticket 016 (R-30).
+  This ticket keeps the host loop and the no-rules-in-a-MonoBehaviour invariant — the spine
+  everything downstream depends on, and the part that is pure EditMode testable.

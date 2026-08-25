@@ -239,9 +239,8 @@
     },
     {
       "id": "T-10",
-      "title": "Unity project shell: scene, top-down camera, input, sim host loop",
+      "title": "Sim host loop + shell architecture invariant",
       "owns_requirements": [
-        "R-30",
         "R-50",
         "R-52"
       ],
@@ -249,11 +248,13 @@
       "depends_on": [
         "T-01"
       ],
-      "scope": "Unity project that references GameSim via asmdef (noEngineReferences on GameSim mechanically enforces the invariant). Top-down camera, WASD move with W movement-only, hero faces cursor, SPACE basic, Q/E abilities; own-hero local prediction with host reconciliation; remote entity interpolation. MonoBehaviours send commands and render replicated state, never hold game rules.",
+      "scope": "The host-side spine: a MatchSim owner that drives every sim tick the sim cannot schedule itself (planning timer, status effects, hero regen, respawns, med stations) and gates monster attacks through TryMonsterAttack before applying damage. Plus the architectural invariant the whole design rests on: no game rule may live in a MonoBehaviour. Scene, camera and input moved to T-16.",
       "acceptance": [
-        "a playable solo session runs with primitive placeholder art",
-        "no game rule appears in a MonoBehaviour",
-        "GameSim asmdef has noEngineReferences: true"
+        "every sim tick that the sim cannot schedule itself is driven by the host loop",
+        "monster damage is gated through TryMonsterAttack - R-18 is unenforced otherwise",
+        "no game rule appears in a MonoBehaviour, enforced by a test rather than by discipline",
+        "GameSim asmdef keeps noEngineReferences true and zero Unity references at runtime",
+        "the shell never mutates sim state directly - all mutation goes through MatchSim commands"
       ]
     },
     {
@@ -352,6 +353,25 @@
         "the boundary is inclusive, matching the G-019 convention followed repo-wide",
         "cadence is per monster - one monster's attack does not gate another's",
         "the existing 30 golden fixtures still pass unchanged"
+      ]
+    },
+    {
+      "id": "T-16",
+      "title": "Scene, top-down camera, WASD + mouse-aim input, placeholder visuals",
+      "owns_requirements": [
+        "R-30"
+      ],
+      "grades_fixtures": [],
+      "depends_on": [
+        "T-10"
+      ],
+      "scope": "The playable surface: a scene built headlessly (camera, ground, spawn, hotspot markers), top-down camera, R-30 controls (WASD move with W movement-only, hero faces cursor, SPACE basic, Q/E abilities, mouse buttons free for UI), and primitive placeholder visuals driven off replicated sim state. All visuals load through swappable references so no code path blocks on an asset existing.",
+      "acceptance": [
+        "a solo session is playable with primitive placeholder art",
+        "W is movement only; SPACE is basic attack; Q and E are abilities; mouse buttons stay free",
+        "the hero faces the mouse cursor rather than turning toward movement",
+        "no code path blocks on an asset existing - placeholders resolve when art is absent",
+        "visuals render from replicated sim state, never from locally recomputed rules"
       ]
     }
   ]
