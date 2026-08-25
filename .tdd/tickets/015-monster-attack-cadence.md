@@ -1,7 +1,7 @@
 ---
 id: 015
 title: Monster attack cadence (R-18)
-status: in-progress
+status: green
 depends_on: [002, 003, 007]
 touches: [unity/RedHollow/Assets/GameSim/MatchSim.Combat.cs, sim/GameSim.Tests/T15_CadenceTests.cs]
 iterations: 1
@@ -26,11 +26,11 @@ barricade carve-out is already implemented and green in ticket 002 at the target
 
 ## Acceptance criteria
 
-- [ ] a monster that attacked cannot land another hit before `MonsterAttackIntervalSeconds` has elapsed
-- [ ] the interval is read from config, not a constant
-- [ ] the boundary is inclusive, matching the G-019 convention followed repo-wide
-- [ ] cadence is per monster - one monster's attack does not gate another's
-- [ ] the existing 30 golden fixtures still pass unchanged
+- [x] a monster that attacked cannot land another hit before `MonsterAttackIntervalSeconds` has elapsed
+- [x] the interval is read from config, not a constant
+- [x] the boundary is inclusive, matching the G-019 convention followed repo-wide
+- [x] cadence is per monster - one monster's attack does not gate another's
+- [x] the existing 30 golden fixtures still pass unchanged
 
 ## Test plan
 
@@ -50,3 +50,5 @@ may attack immediately (the fixture-safety property); a permitted attack adds no
   -> 4 fail incl. both fixture-safety tests; no gate -> 4 fail. The tests provably bite.
 - KNOWN LIMIT: the gate is advisory. Nothing stops a host calling a damage op without asking.
   The Unity combat-loop wiring (blocked ticket 010/011) MUST call it first — recorded there.
+- iter 1 GREEN @ b9647df: FULL SUITE 319/319, 30/30 fixtures, zero NotYet calls in GameSim.
+  Sad path = refusal (false) for null/unknown/dead. Timestamp in a private dictionary, not on Monster.
