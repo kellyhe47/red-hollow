@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The simulation sources live inside the Unity project (unity/RedHollow/Assets/GameSim) so that
+    Unity and `dotnet` compile the SAME files. This project globs them, which is how `test-golden`
+    runs with no Unity editor installed. Never fork these sources.
+
+    R-51: zero UnityEngine dependencies. Enforced twice: here by having no Unity reference at all,
+    and in Unity by GameSim.asmdef's "noEngineReferences": true.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <RootNamespace>RedHollow.Sim</RootNamespace>
+    <AssemblyName>GameSim</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../../unity/RedHollow/Assets/GameSim/**/*.cs" />
+  </ItemGroup>
+
+</Project>

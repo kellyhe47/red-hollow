@@ -1,0 +1,14 @@
+# .NET build output
+[Bb]in/
+[Oo]bj/
+
+# Unity
+unity/RedHollow/[Ll]ibrary/
+unity/RedHollow/[Tt]emp/
+unity/RedHollow/[Ll]ogs/
+unity/RedHollow/[Uu]serSettings/
+unity/RedHollow/[Bb]uild/
+unity/RedHollow/[Bb]uilds/
+
+# tdd-orchestrator: ticket state is committed, worktree checkouts never are
+.tdd/worktrees/
