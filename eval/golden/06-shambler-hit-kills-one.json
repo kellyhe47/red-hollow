@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "id": "G-006",
+  "name": "shambler-hit-kills-one-civilian",
+  "why": "Hotspot HP is civilian count; a 10-damage hit kills ceil(10/10)=1 civilian.",
+  "covers": ["B-004"],
+  "case_type": "happy",
+  "traces_to": ["DEC-002", "BRIEF-4"],
+  "defends_against": "Hotspots given a separate HP bar so civilian count never actually decreases.",
+  "time_sensitive": false,
+  "given": {
+    "inputs": {
+      "attack": { "attacker_id": "m1", "attacker_type": "shambler", "damage": 10, "target_id": "hs_saloon" },
+      "hotspots": [
+        { "id": "hs_saloon", "civilians": 8 },
+        { "id": "hs_chapel", "civilians": 6 }
+      ]
+    },
+    "preexisting_state": {},
+    "configuration": { "civilians_killed_per_hit": "ceil(damage/10)" },
+    "clock": {}
+  },
+  "when": { "operation": "apply_hotspot_attack", "input_refs": ["m1"] },
+  "expect": {
+    "exact": {
+      "result": { "hotspot_id": "hs_saloon", "civilians_killed": 1, "civilians_remaining": 7, "total_civilians_remaining": 13 },
+      "state_changes": [
+        { "entity": "hs_saloon", "field": "civilians", "from": 8, "to": 7 }
+      ],
+      "emitted_events": [
+        { "type": "civilians_killed", "hotspot_id": "hs_saloon", "count": 1 }
+      ],
+      "external_calls": []
+    },
+    "properties": []
+  }
+}

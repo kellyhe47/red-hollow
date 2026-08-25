@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "id": "G-012",
+  "name": "mid-wave-kill-pays-bounty-only",
+  "why": "A kill with other monsters still alive pays its bounty into the shared pool and does nothing else.",
+  "covers": ["B-007"],
+  "case_type": "happy",
+  "traces_to": ["DEC-005", "AUD-1"],
+  "defends_against": "Bounty paid to the killing player's private wallet instead of the shared team pool, or wave-complete fired early.",
+  "time_sensitive": false,
+  "given": {
+    "inputs": {
+      "kill": { "monster_id": "m3", "monster_type": "shambler", "bounty": 10, "killer_hero_id": "hero_c" }
+    },
+    "preexisting_state": {
+      "wave": { "number": 2, "total_waves": 10, "living_monster_ids": ["m3", "m4", "m5"] },
+      "team": { "scrip": 0 }
+    },
+    "configuration": {},
+    "clock": {}
+  },
+  "when": { "operation": "record_monster_kill", "input_refs": ["m3"] },
+  "expect": {
+    "exact": {
+      "result": { "monster_id": "m3", "bounty_awarded": 10, "scrip_after": 10, "living_monsters_remaining": 2, "wave_complete": false, "map_victory": false },
+      "state_changes": [
+        { "entity": "m3", "field": "alive", "from": true, "to": false },
+        { "entity": "team", "field": "scrip", "from": 0, "to": 10 }
+      ],
+      "emitted_events": [
+        { "type": "monster_killed", "monster_id": "m3", "bounty": 10 }
+      ],
+      "external_calls": []
+    },
+    "properties": []
+  }
+}

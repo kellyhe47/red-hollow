@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "id": "G-019",
+  "name": "lasso-slow-expires-exactly",
+  "why": "At the tick where combat_elapsed reaches the recorded expiry (13.0), the slow is removed and base speed restored.",
+  "covers": [
+    "B-011"
+  ],
+  "case_type": "boundary",
+  "traces_to": [
+    "DEC-008"
+  ],
+  "defends_against": "Expiry compared with strict greater-than drift or the effect never removed, leaving permanent slows.",
+  "time_sensitive": true,
+  "given": {
+    "inputs": {
+      "monster": {
+        "id": "m4",
+        "type": "ravager",
+        "base_speed": 5.0,
+        "current_speed": 2.5
+      }
+    },
+    "preexisting_state": {
+      "status_effects": {
+        "m4": [
+          {
+            "type": "lasso_slow",
+            "expires_at": 13.0
+          }
+        ]
+      }
+    },
+    "configuration": {},
+    "clock": {
+      "as_of": "2026-08-24T00:00:00Z",
+      "sim_elapsed": 13.0
+    }
+  },
+  "when": {
+    "operation": "tick_status_effects",
+    "input_refs": [
+      "m4"
+    ]
+  },
+  "expect": {
+    "exact": {
+      "result": {
+        "expired": [
+          {
+            "target_id": "m4",
+            "status": "lasso_slow"
+          }
+        ]
+      },
+      "state_changes": [
+        {
+          "entity": "m4",
+          "field": "current_speed",
+          "from": 2.5,
+          "to": 5.0
+        },
+        {
+          "entity": "m4",
+          "field": "status_effects",
+          "from": [
+            {
+              "type": "lasso_slow",
+              "expires_at": 13.0
+            }
+          ],
+          "to": []
+        }
+      ],
+      "emitted_events": [
+        {
+          "type": "status_expired",
+          "status": "lasso_slow",
+          "target_id": "m4"
+        }
+      ],
+      "external_calls": []
+    },
+    "properties": []
+  }
+}

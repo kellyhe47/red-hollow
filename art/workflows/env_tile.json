@@ -1,0 +1,516 @@
+{
+  "1": {
+    "inputs": {
+      "value": "red-rock cavern ground, packed martian dust"
+    },
+    "class_type": "PrimitiveString",
+    "_meta": {
+      "title": "① ITEM token  (change per texture)"
+    }
+  },
+  "2": {
+    "inputs": {
+      "value": "monochromatic burnt-sienna palette, warm near-black umber shadows, pale dusty apricot highlights, warm artificial light color temperature, matte painterly semi-realism, muted matte dusty surfaces, no specular sparkle, no text, no watermark"
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "② STYLE TAIL — texture core (Lantern Deep, DEC-025)"
+    }
+  },
+  "3": {
+    "inputs": {
+      "value": "seamless tileable texture, orthographic flat-on view, flat albedo map, perfectly uniform ambient lighting, no cast shadows, no directional light, no vignette, no hotspot, no glow, no luminance gradient across the frame, even detail edge to edge"
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "③ TILE FLATNESS MODIFIER (this pipeline only)"
+    }
+  },
+  "4": {
+    "inputs": {
+      "value": "photo, photorealistic, blurry, text, watermark, signature, extra limbs, deformed, low quality, jpeg artifacts, sun, blue sky, daylight, teal, cool blue tones, oversaturated color"
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "④ NEGATIVE — contract, do not edit"
+    }
+  },
+  "5": {
+    "inputs": {
+      "value": "seam, visible tile border, frame, edge line, vignette, corner darkening, luminance gradient, hotspot, glow, bloom, baked lighting, cast shadow, directional shadow, specular highlight, perspective, horizon, sky, characters, props, depth of field, sun, moon, buildings, settlement, cityscape, human figures, haze, fog, atmospheric depth"
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "⑤ NEGATIVE — tile add-on"
+    }
+  },
+  "6": {
+    "inputs": {
+      "ckpt_name": "sd_xl_base_1.0.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {
+      "title": "Load Checkpoint"
+    }
+  },
+  "7": {
+    "inputs": {
+      "string_a": [
+        "1",
+        0
+      ],
+      "string_b": [
+        "2",
+        0
+      ],
+      "delimiter": ", "
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "item + style tail"
+    }
+  },
+  "8": {
+    "inputs": {
+      "string_a": [
+        "7",
+        0
+      ],
+      "string_b": [
+        "3",
+        0
+      ],
+      "delimiter": ", "
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "POSITIVE (assembled)"
+    }
+  },
+  "9": {
+    "inputs": {
+      "string_a": [
+        "4",
+        0
+      ],
+      "string_b": [
+        "5",
+        0
+      ],
+      "delimiter": ", "
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "NEGATIVE (assembled)"
+    }
+  },
+  "10": {
+    "inputs": {
+      "text": [
+        "8",
+        0
+      ],
+      "clip": [
+        "6",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Positive"
+    }
+  },
+  "11": {
+    "inputs": {
+      "text": [
+        "9",
+        0
+      ],
+      "clip": [
+        "6",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Negative"
+    }
+  },
+  "12": {
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 1
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "Latent 1024²"
+    }
+  },
+  "13": {
+    "inputs": {
+      "seed": [
+        "32",
+        0
+      ],
+      "steps": [
+        "33",
+        0
+      ],
+      "cfg": 7,
+      "sampler_name": "dpmpp_2m",
+      "scheduler": "karras",
+      "denoise": 1,
+      "model": [
+        "6",
+        0
+      ],
+      "positive": [
+        "10",
+        0
+      ],
+      "negative": [
+        "11",
+        0
+      ],
+      "latent_image": [
+        "12",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "PASS 1 — txt2img (denoise 1.0)"
+    }
+  },
+  "14": {
+    "inputs": {
+      "samples": [
+        "13",
+        0
+      ],
+      "vae": [
+        "6",
+        2
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "Decode pass 1"
+    }
+  },
+  "15": {
+    "inputs": {
+      "width": 2048,
+      "height": 2048,
+      "crop": true,
+      "image": [
+        "14",
+        0
+      ]
+    },
+    "class_type": "Image Repeat Tile To Size",
+    "_meta": {
+      "title": "Roll ⅓: repeat 2×2"
+    }
+  },
+  "16": {
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "x": 512,
+      "y": 512,
+      "image": [
+        "15",
+        0
+      ]
+    },
+    "class_type": "ImageCrop",
+    "_meta": {
+      "title": "Roll ⅔: crop centre = 50% offset"
+    }
+  },
+  "17": {
+    "inputs": {
+      "value": 0,
+      "width": 1024,
+      "height": 1024
+    },
+    "class_type": "SolidMask",
+    "_meta": {
+      "title": "mask base (0)"
+    }
+  },
+  "18": {
+    "inputs": {
+      "value": 1,
+      "width": 1024,
+      "height": 224
+    },
+    "class_type": "SolidMask",
+    "_meta": {
+      "title": "horizontal band"
+    }
+  },
+  "19": {
+    "inputs": {
+      "value": 1,
+      "width": 224,
+      "height": 1024
+    },
+    "class_type": "SolidMask",
+    "_meta": {
+      "title": "vertical band"
+    }
+  },
+  "20": {
+    "inputs": {
+      "x": 0,
+      "y": 400,
+      "operation": "add",
+      "destination": [
+        "17",
+        0
+      ],
+      "source": [
+        "18",
+        0
+      ]
+    },
+    "class_type": "MaskComposite",
+    "_meta": {
+      "title": "add H band"
+    }
+  },
+  "21": {
+    "inputs": {
+      "x": 400,
+      "y": 0,
+      "operation": "add",
+      "destination": [
+        "20",
+        0
+      ],
+      "source": [
+        "19",
+        0
+      ]
+    },
+    "class_type": "MaskComposite",
+    "_meta": {
+      "title": "add V band → cross"
+    }
+  },
+  "22": {
+    "inputs": {
+      "left": 48,
+      "top": 48,
+      "right": 48,
+      "bottom": 48,
+      "mask": [
+        "21",
+        0
+      ]
+    },
+    "class_type": "FeatherMask",
+    "_meta": {
+      "title": "feather seam mask"
+    }
+  },
+  "23": {
+    "inputs": {
+      "pixels": [
+        "16",
+        0
+      ],
+      "vae": [
+        "6",
+        2
+      ]
+    },
+    "class_type": "VAEEncode",
+    "_meta": {
+      "title": "encode rolled image"
+    }
+  },
+  "24": {
+    "inputs": {
+      "samples": [
+        "23",
+        0
+      ],
+      "mask": [
+        "22",
+        0
+      ]
+    },
+    "class_type": "SetLatentNoiseMask",
+    "_meta": {
+      "title": "restrict to cross"
+    }
+  },
+  "25": {
+    "inputs": {
+      "seed": [
+        "32",
+        0
+      ],
+      "steps": [
+        "33",
+        0
+      ],
+      "cfg": 7,
+      "sampler_name": "dpmpp_2m",
+      "scheduler": "karras",
+      "denoise": 0.35,
+      "model": [
+        "6",
+        0
+      ],
+      "positive": [
+        "10",
+        0
+      ],
+      "negative": [
+        "11",
+        0
+      ],
+      "latent_image": [
+        "24",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "PASS 2 — seam fix (denoise 0.35)"
+    }
+  },
+  "26": {
+    "inputs": {
+      "samples": [
+        "25",
+        0
+      ],
+      "vae": [
+        "6",
+        2
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "Decode → SEAMLESS 1024²"
+    }
+  },
+  "27": {
+    "inputs": {
+      "filename_prefix": "env_tile/1024/DnD_env_tile",
+      "images": [
+        "26",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "SAVE 1024² PNG"
+    }
+  },
+  "28": {
+    "inputs": {
+      "upscale_method": "area",
+      "width": 512,
+      "height": 512,
+      "crop": "disabled",
+      "image": [
+        "26",
+        0
+      ]
+    },
+    "class_type": "ImageScale",
+    "_meta": {
+      "title": "downscale for Unity"
+    }
+  },
+  "29": {
+    "inputs": {
+      "filename_prefix": "env_tile/512/DnD_env_tile",
+      "images": [
+        "28",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "SAVE 512² PNG (engine import)"
+    }
+  },
+  "30": {
+    "inputs": {
+      "width": 2048,
+      "height": 2048,
+      "crop": true,
+      "image": [
+        "26",
+        0
+      ]
+    },
+    "class_type": "Image Repeat Tile To Size",
+    "_meta": {
+      "title": "seam check: 2×2 repeat"
+    }
+  },
+  "31": {
+    "inputs": {
+      "images": [
+        "30",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "SEAM CHECK PREVIEW"
+    }
+  },
+  "32": {
+    "inputs": {
+      "value": 20260824
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "⑥ SEED — pin it, never randomize"
+    }
+  },
+  "33": {
+    "inputs": {
+      "value": 28
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "⑦ STEPS — 14 draft / 28 keeper"
+    }
+  },
+  "34": {
+    "inputs": {
+      "image": "0831d30011e7afe70be7678a8ea79d6c9535e679df4f745a88d99624f89791ef.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "36": {
+    "inputs": {
+      "pixels": [
+        "34",
+        0
+      ],
+      "vae": [
+        "6",
+        2
+      ]
+    },
+    "class_type": "VAEEncode",
+    "_meta": {
+      "title": "encode seed image"
+    }
+  }
+}

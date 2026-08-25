@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "id": "G-015",
+  "name": "purchase-during-combat-rejected",
+  "why": "Placement is a planning-phase-only action; a purchase attempt during combat is rejected with no side effects even with ample scrip.",
+  "covers": [
+    "B-008"
+  ],
+  "case_type": "failure",
+  "traces_to": [
+    "BRIEF-5",
+    "DEC-006",
+    "DEC-005"
+  ],
+  "defends_against": "Phase gating missing on the server, letting clients drop turrets mid-fight.",
+  "time_sensitive": false,
+  "given": {
+    "inputs": {
+      "purchase": {
+        "player_id": "hero_a",
+        "placeable_type": "spike_trap",
+        "cost": 75,
+        "pos": [
+          2,
+          7
+        ],
+        "zone": "valid"
+      }
+    },
+    "preexisting_state": {
+      "match": {
+        "phase": "combat"
+      },
+      "team": {
+        "scrip": 500
+      }
+    },
+    "configuration": {},
+    "clock": {}
+  },
+  "when": {
+    "operation": "purchase_placement",
+    "input_refs": [
+      "hero_a"
+    ]
+  },
+  "expect": {
+    "exact": {
+      "result": {
+        "accepted": false,
+        "placeable_type": "spike_trap",
+        "scrip_after": 500,
+        "rejection_reason": "wrong_phase"
+      },
+      "state_changes": [],
+      "emitted_events": [
+        {
+          "type": "purchase_rejected",
+          "reason": "wrong_phase",
+          "by": "hero_a"
+        }
+      ],
+      "external_calls": []
+    },
+    "properties": []
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "id": "G-027",
+  "name": "spike-trap-last-trigger-breaks",
+  "why": "A spike trap on its final trigger (triggers_remaining=1) deals its 30 damage to the crossing monster, then breaks and is removed.",
+  "covers": ["B-018"],
+  "case_type": "boundary",
+  "traces_to": ["DEC-023"],
+  "defends_against": "Trigger counter never decremented (infinite trap) or trap removed before dealing its final hit.",
+  "time_sensitive": false,
+  "given": {
+    "inputs": {
+      "crossing": { "monster_id": "m3", "placeable_id": "trap1" },
+      "monster": { "id": "m3", "type": "shambler", "hp": 60 },
+      "placeable": { "id": "trap1", "type": "spike_trap", "damage": 30, "triggers_remaining": 1 }
+    },
+    "preexisting_state": {},
+    "configuration": {},
+    "clock": {}
+  },
+  "when": { "operation": "trigger_placeable", "input_refs": ["trap1"] },
+  "expect": {
+    "exact": {
+      "result": { "placeable_id": "trap1", "damage_dealt": 30, "monster_hp_after": 30, "triggers_remaining": 0, "broke": true },
+      "state_changes": [
+        { "entity": "m3", "field": "hp", "from": 60, "to": 30 },
+        { "entity": "trap1", "field": "triggers_remaining", "from": 1, "to": 0 },
+        { "entity": "trap1", "field": "exists", "from": true, "to": false }
+      ],
+      "emitted_events": [
+        { "type": "placeable_triggered", "placeable_id": "trap1", "monster_id": "m3", "damage": 30 },
+        { "type": "placeable_broken", "placeable_id": "trap1" }
+      ],
+      "external_calls": []
+    },
+    "properties": []
+  }
+}

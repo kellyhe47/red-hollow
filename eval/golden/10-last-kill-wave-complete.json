@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "id": "G-010",
+  "name": "last-kill-completes-wave",
+  "why": "Killing the last living monster of wave 3 of 10 completes the wave, pays the bounty, and returns to planning; it must not declare victory.",
+  "covers": [
+    "B-006",
+    "B-007"
+  ],
+  "case_type": "happy",
+  "traces_to": [
+    "BRIEF-1",
+    "DEC-004",
+    "DEC-005",
+    "AUD-1"
+  ],
+  "defends_against": "Wave completion checked against spawned-count instead of living-count, or any wave clear declared as map victory.",
+  "time_sensitive": false,
+  "given": {
+    "inputs": {
+      "kill": {
+        "monster_id": "m7",
+        "monster_type": "ravager",
+        "bounty": 15,
+        "killer_hero_id": "hero_a"
+      }
+    },
+    "preexisting_state": {
+      "wave": {
+        "number": 3,
+        "total_waves": 10,
+        "living_monster_ids": [
+          "m7"
+        ]
+      },
+      "team": {
+        "scrip": 120
+      }
+    },
+    "configuration": {},
+    "clock": {}
+  },
+  "when": {
+    "operation": "record_monster_kill",
+    "input_refs": [
+      "m7"
+    ]
+  },
+  "expect": {
+    "exact": {
+      "result": {
+        "monster_id": "m7",
+        "bounty_awarded": 15,
+        "scrip_after": 135,
+        "living_monsters_remaining": 0,
+        "wave_complete": true,
+        "map_victory": false
+      },
+      "state_changes": [
+        {
+          "entity": "m7",
+          "field": "alive",
+          "from": true,
+          "to": false
+        },
+        {
+          "entity": "team",
+          "field": "scrip",
+          "from": 120,
+          "to": 135
+        },
+        {
+          "entity": "match",
+          "field": "phase",
+          "from": "combat",
+          "to": "planning"
+        }
+      ],
+      "emitted_events": [
+        {
+          "type": "monster_killed",
+          "monster_id": "m7",
+          "bounty": 15
+        },
+        {
+          "type": "wave_complete",
+          "wave": 3
+        }
+      ],
+      "external_calls": []
+    },
+    "properties": []
+  }
+}

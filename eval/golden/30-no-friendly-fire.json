@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "id": "G-030",
+  "name": "hero-attack-passes-allies-and-placeables",
+  "why": "A Gunslinger shot whose line crosses an ally and a barricade before a monster damages only the monster; ally and barricade take zero damage.",
+  "covers": ["B-019"],
+  "case_type": "negative_control",
+  "traces_to": ["DEC-019"],
+  "defends_against": "Generic hitscan damaging the first collider hit, letting stray shots shred friendly barricades or heroes.",
+  "time_sensitive": false,
+  "given": {
+    "inputs": {
+      "attack": { "attacker_id": "hero_gun", "attacker_class": "gunslinger", "damage": 25, "aim_line": [[0, 0], [10, 0]] },
+      "entities_on_line": [
+        { "id": "hero_saw", "kind": "hero", "pos": [3, 0], "hp": 200 },
+        { "id": "bar_1", "kind": "barricade", "pos": [5, 0], "hp": 300 },
+        { "id": "m1", "kind": "monster", "type": "shambler", "pos": [8, 0], "hp": 60, "alive": true }
+      ]
+    },
+    "preexisting_state": {},
+    "configuration": { "friendly_fire": false },
+    "clock": {}
+  },
+  "when": { "operation": "resolve_hero_attack", "input_refs": ["hero_gun"] },
+  "expect": {
+    "exact": {
+      "result": { "attacker_id": "hero_gun", "hit_id": "m1", "damage_dealt": 25, "target_hp_after": 35 },
+      "state_changes": [
+        { "entity": "m1", "field": "hp", "from": 60, "to": 35 }
+      ],
+      "emitted_events": [
+        { "type": "monster_damaged", "monster_id": "m1", "amount": 25, "by": "hero_gun" }
+      ],
+      "external_calls": []
+    },
+    "properties": []
+  }
+}

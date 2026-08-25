@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "id": "G-018",
+  "name": "lasso-slow-applied",
+  "why": "A lasso hit on a Ravager (base speed 5.0) halves its speed to 2.5 and records expiry 3.0s out.",
+  "covers": [
+    "B-011"
+  ],
+  "case_type": "happy",
+  "traces_to": [
+    "DEC-008"
+  ],
+  "defends_against": "Slow applied as a flat subtraction or to the wrong stat, or stacking on the base of an already-slowed monster.",
+  "time_sensitive": true,
+  "given": {
+    "inputs": {
+      "ability": {
+        "caster_id": "hero_rancher",
+        "ability": "lasso",
+        "target_id": "m4"
+      },
+      "monster": {
+        "id": "m4",
+        "type": "ravager",
+        "base_speed": 5.0,
+        "current_speed": 5.0
+      }
+    },
+    "preexisting_state": {},
+    "configuration": {
+      "lasso_slow_multiplier": 0.5,
+      "lasso_duration_seconds": 3.0
+    },
+    "clock": {
+      "as_of": "2026-08-24T00:00:00Z",
+      "sim_elapsed": 10.0
+    }
+  },
+  "when": {
+    "operation": "apply_ability",
+    "input_refs": [
+      "m4"
+    ]
+  },
+  "expect": {
+    "exact": {
+      "result": {
+        "target_id": "m4",
+        "speed_after": 2.5,
+        "slow_expires_at": 13.0
+      },
+      "state_changes": [
+        {
+          "entity": "m4",
+          "field": "current_speed",
+          "from": 5.0,
+          "to": 2.5
+        },
+        {
+          "entity": "m4",
+          "field": "status_effects",
+          "from": [],
+          "to": [
+            {
+              "type": "lasso_slow",
+              "expires_at": 13.0
+            }
+          ]
+        }
+      ],
+      "emitted_events": [
+        {
+          "type": "status_applied",
+          "status": "lasso_slow",
+          "target_id": "m4"
+        }
+      ],
+      "external_calls": []
+    },
+    "properties": []
+  }
+}

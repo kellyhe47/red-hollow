@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "id": "G-009",
+  "name": "survivors-elsewhere-no-defeat",
+  "why": "Emptying one hotspot must NOT end the match while civilians survive in another.",
+  "covers": ["B-005"],
+  "case_type": "negative_control",
+  "traces_to": ["BRIEF-2", "DEC-002"],
+  "defends_against": "Losing any single hotspot is wired to game over.",
+  "time_sensitive": false,
+  "given": {
+    "inputs": {
+      "attack": { "attacker_id": "m2", "attacker_type": "shambler", "damage": 10, "target_id": "hs_chapel" },
+      "hotspots": [
+        { "id": "hs_saloon", "civilians": 4 },
+        { "id": "hs_chapel", "civilians": 1 }
+      ]
+    },
+    "preexisting_state": {},
+    "configuration": { "civilians_killed_per_hit": "ceil(damage/10)" },
+    "clock": {}
+  },
+  "when": { "operation": "apply_hotspot_attack", "input_refs": ["m2"] },
+  "expect": {
+    "exact": {
+      "result": { "hotspot_id": "hs_chapel", "civilians_killed": 1, "civilians_remaining": 0, "total_civilians_remaining": 4 },
+      "state_changes": [
+        { "entity": "hs_chapel", "field": "civilians", "from": 1, "to": 0 }
+      ],
+      "emitted_events": [
+        { "type": "civilians_killed", "hotspot_id": "hs_chapel", "count": 1 },
+        { "type": "hotspot_emptied", "hotspot_id": "hs_chapel" }
+      ],
+      "external_calls": []
+    },
+    "properties": []
+  }
+}

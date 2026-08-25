@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "id": "G-003",
+  "name": "equidistant-tiebreak-lowest-id",
+  "why": "Deterministic multiplayer simulation requires an exact tiebreak; lowest entity id (lexicographic) wins.",
+  "covers": [
+    "B-001"
+  ],
+  "case_type": "boundary",
+  "traces_to": [
+    "DEC-003",
+    "BRIEF-6"
+  ],
+  "defends_against": "Tiebreak depends on iteration order or floating-point noise, desyncing clients.",
+  "time_sensitive": false,
+  "given": {
+    "inputs": {
+      "monster": {
+        "id": "m1",
+        "type": "ravager",
+        "pos": [
+          0,
+          0
+        ]
+      },
+      "candidates": [
+        {
+          "id": "hero_b",
+          "kind": "hero",
+          "pos": [
+            5,
+            0
+          ],
+          "alive": true
+        },
+        {
+          "id": "hero_a",
+          "kind": "hero",
+          "pos": [
+            0,
+            5
+          ],
+          "alive": true
+        }
+      ]
+    },
+    "preexisting_state": {},
+    "configuration": {},
+    "clock": {}
+  },
+  "when": {
+    "operation": "select_target",
+    "input_refs": [
+      "m1"
+    ]
+  },
+  "expect": {
+    "exact": {
+      "result": {
+        "monster_id": "m1",
+        "target_id": "hero_a",
+        "distance": 5.0
+      },
+      "state_changes": [
+        {
+          "entity": "m1",
+          "field": "target_id",
+          "from": null,
+          "to": "hero_a"
+        }
+      ],
+      "emitted_events": [],
+      "external_calls": []
+    },
+    "properties": []
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "id": "G-028",
+  "name": "turret-hits-nearest-in-range",
+  "why": "A turret (range 8) damages the nearest living monster within range on its damage tick; a nearer dead monster and a closer-but-out-of-range monster are both ignored.",
+  "covers": ["B-018"],
+  "case_type": "happy",
+  "traces_to": ["DEC-023"],
+  "defends_against": "Turret targets dead monsters, ignores range, or reuses hero-targeting rules that include hotspots.",
+  "time_sensitive": false,
+  "given": {
+    "inputs": {
+      "turret": { "id": "t1", "type": "turret", "pos": [0, 0], "damage_per_tick": 20, "range": 8.0 },
+      "monsters": [
+        { "id": "m1", "type": "shambler", "pos": [2, 0], "hp": 0, "alive": false },
+        { "id": "m2", "type": "ravager", "pos": [3, 4], "hp": 40, "alive": true },
+        { "id": "m3", "type": "shambler", "pos": [9, 0], "hp": 60, "alive": true }
+      ]
+    },
+    "preexisting_state": {},
+    "configuration": {},
+    "clock": {}
+  },
+  "when": { "operation": "turret_tick", "input_refs": ["t1"] },
+  "expect": {
+    "exact": {
+      "result": { "turret_id": "t1", "target_id": "m2", "distance": 5.0, "damage_dealt": 20, "target_hp_after": 20 },
+      "state_changes": [
+        { "entity": "m2", "field": "hp", "from": 40, "to": 20 }
+      ],
+      "emitted_events": [
+        { "type": "turret_fired", "turret_id": "t1", "target_id": "m2", "damage": 20 }
+      ],
+      "external_calls": []
+    },
+    "properties": []
+  }
+}

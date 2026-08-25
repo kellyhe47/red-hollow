@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "id": "G-008",
+  "name": "last-civilian-dies-defeat",
+  "why": "The lose condition fires exactly when total civilians across all hotspots reaches 0.",
+  "covers": ["B-005"],
+  "case_type": "happy",
+  "traces_to": ["BRIEF-2", "DEC-002"],
+  "defends_against": "Defeat checked per-hotspot instead of colony-wide, ending the game while civilians still live elsewhere.",
+  "time_sensitive": false,
+  "given": {
+    "inputs": {
+      "attack": { "attacker_id": "m2", "attacker_type": "shambler", "damage": 10, "target_id": "hs_homestead" },
+      "hotspots": [
+        { "id": "hs_saloon", "civilians": 0 },
+        { "id": "hs_chapel", "civilians": 0 },
+        { "id": "hs_homestead", "civilians": 1 }
+      ]
+    },
+    "preexisting_state": {},
+    "configuration": { "civilians_killed_per_hit": "ceil(damage/10)" },
+    "clock": {}
+  },
+  "when": { "operation": "apply_hotspot_attack", "input_refs": ["m2"] },
+  "expect": {
+    "exact": {
+      "result": { "hotspot_id": "hs_homestead", "civilians_killed": 1, "civilians_remaining": 0, "total_civilians_remaining": 0 },
+      "state_changes": [
+        { "entity": "hs_homestead", "field": "civilians", "from": 1, "to": 0 },
+        { "entity": "match", "field": "status", "from": "combat", "to": "defeat" }
+      ],
+      "emitted_events": [
+        { "type": "civilians_killed", "hotspot_id": "hs_homestead", "count": 1 },
+        { "type": "hotspot_emptied", "hotspot_id": "hs_homestead" },
+        { "type": "match_defeat", "reason": "all_civilians_dead" }
+      ],
+      "external_calls": []
+    },
+    "properties": []
+  }
+}

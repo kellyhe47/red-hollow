@@ -1,0 +1,29 @@
+# Agent 4 — UI & props pipeline (Comfy Cloud)
+
+## Mission
+Build and commit a ComfyUI (cloud.comfy.org) pipeline producing **UI chrome and world prop art** for The Red Hollow. Read `docs/comfy-prompts/00-shared-style.md` first; obey its style tail ("Lantern Deep", DEC-025), sampler locks, and process rules. UI chrome reads as lantern-lit weathered wood/brass/riveted plate inside the burnt-sienna monochrome — matte, dusty, no specular sparkle, no clean metal; props (string lights, lantern post, antenna) are the in-world light sources that carry the style in Unity. Screens and HUD layout this art must serve: `docs/ui-wireframes.html` (S1–S7) and `docs/PRD.md` §10.
+
+## Failure mode you own (from the art plan)
+This is the **hardest class to get clean**: it needs **real transparency and exact pixel sizes**. Diffusion models fake alpha with checkerboards and halos. Your mandatory alpha workflow:
+- **Alpha-recover technique:** render every transparent asset twice with the same fixed seed — once on pure white, once on pure black — and subtract to recover a true alpha matte (soft edges survive). Build this as a two-branch workflow, not a manual step.
+- Deliver at the exact target pixel sizes below; UI cannot be "roughly" sized.
+
+## Pipeline to build
+1. Comfy Cloud txt2img → lock seed → first image.
+2. Two-branch white/black background workflow + alpha subtraction (Comfy Cloud image-math nodes) → RGBA PNG out.
+3. `{item}` token; UI framing prompt baked into workflow: `game UI element, weathered wood and brass western frame, riveted plate, clean edges, flat front-on view` + style tail.
+4. Export Save (API Format) → `art/workflows/ui_props.json` (+ `ui_alpha.json`); commit; log per asset.
+
+## Items list — UI chrome (RGBA, exact sizes)
+1. HUD top-bar frame 1920×120 · 2. shop-bar panel 1200×160 · 3. ability slot frame 96×96 (+ locked-padlock variant) · 4. HP bar frame + fill 320×32 · 5. XP bar frame + fill 480×24 · 6. wooden button (normal/hover/pressed) 320×96 · 7. level-up choice card 360×480 · 8. dialog/panel background 800×600 (9-sliceable: keep detail in a 64px border, flat center) · 9. toast banner 640×96 · 10. wave banner scroll 800×200 (empty center — Unity renders "WAVE N") · 11. victory laurel banner frame 1000×400 (empty center — Unity renders "THE COLONY STANDS") · 12. defeat banner frame 1000×400 (empty center — Unity renders "THE COLONY HAS FALLEN") · 13. cursor + crosshair 64×64 · 14. team spawn banner/flag marker 256×256
+
+## Items list — world props (RGBA where free-standing)
+15. water tower · 16. string lights strand · 17. hay bale · 18. barrel cluster · 19. cactus-in-pot (terraform garden) · 20. hitching post · 21. colony antenna mast · 22. lantern post · 23. saloon sign blank (no text — Unity overlays text) · 24. tumbleweed · 25. SALOON facade (hotspot building front, weathered grandeur) · 26. CHAPEL facade (steeple, stained tin windows) · 27. HOMESTEAD facade (ranch house + porch) — facades are texture/reference art for the Unity greybox hotspot meshes (PRD R-15); deliver front-on, flat-lit, 1024²
+
+## Verification (mandatory, per asset)
+- Alpha check: composite over magenta AND over dark blue; no halos, no checkerboard remnants, no white fringe.
+- Size check: delivered PNG dimensions exactly match the table; scripted, not eyeballed.
+- Text rule: NO baked text anywhere (style tail already forbids it) — all labels are rendered by Unity.
+
+## Control rung
+Fixed seed + the dual-render alpha branch (rung 2 + technique). img2img off an approved frame to keep chrome consistent across the set. No LoRA.

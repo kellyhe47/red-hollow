@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "id": "G-026",
+  "name": "spend-without-point-rejected",
+  "why": "Spending with 0 skill points is rejected server-side with no state change and no persistence call.",
+  "covers": ["B-016"],
+  "case_type": "failure",
+  "traces_to": ["DEC-014"],
+  "defends_against": "Client-trusted spend requests letting players rank everything at level 1.",
+  "time_sensitive": false,
+  "given": {
+    "inputs": {
+      "spend": { "account_id": "acct_tex", "hero_id": "hero_b", "choice": "unlock_Q" },
+      "profile": { "account_id": "acct_tex", "skill_points": 0, "abilities": { "Q": 0, "E": 0 } }
+    },
+    "preexisting_state": {},
+    "configuration": { "max_ability_rank": 3 },
+    "clock": {}
+  },
+  "when": { "operation": "spend_skill_point", "input_refs": ["acct_tex"] },
+  "expect": {
+    "exact": {
+      "result": { "accepted": false, "choice": "unlock_Q", "skill_points_after": 0, "rejection_reason": "no_skill_points" },
+      "state_changes": [],
+      "emitted_events": [
+        { "type": "spend_rejected", "reason": "no_skill_points", "account_id": "acct_tex" }
+      ],
+      "external_calls": []
+    },
+    "properties": []
+  }
+}

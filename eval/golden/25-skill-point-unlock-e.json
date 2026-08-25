@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "id": "G-025",
+  "name": "skill-point-unlocks-chosen-ability",
+  "why": "A player with 1 skill point chooses to unlock E; the point is consumed, E becomes rank 1, and the allocation is persisted.",
+  "covers": ["B-016", "B-017"],
+  "case_type": "happy",
+  "traces_to": ["DEC-014", "DEC-015"],
+  "defends_against": "Unlock order hardcoded Q-first, or the point not consumed, allowing infinite unlocks.",
+  "time_sensitive": false,
+  "given": {
+    "inputs": {
+      "spend": { "account_id": "acct_kelly", "hero_id": "hero_a", "choice": "unlock_E" },
+      "profile": { "account_id": "acct_kelly", "skill_points": 1, "abilities": { "Q": 0, "E": 0 } }
+    },
+    "preexisting_state": {},
+    "configuration": { "max_ability_rank": 3 },
+    "clock": {}
+  },
+  "when": { "operation": "spend_skill_point", "input_refs": ["acct_kelly"] },
+  "expect": {
+    "exact": {
+      "result": { "accepted": true, "choice": "unlock_E", "skill_points_after": 0, "abilities": { "Q": 0, "E": 1 } },
+      "state_changes": [
+        { "entity": "acct_kelly", "field": "abilities.E", "from": 0, "to": 1 },
+        { "entity": "acct_kelly", "field": "skill_points", "from": 1, "to": 0 }
+      ],
+      "emitted_events": [
+        { "type": "ability_unlocked", "hero_id": "hero_a", "ability": "E", "rank": 1 }
+      ],
+      "external_calls": [
+        { "service": "profile_store", "op": "save", "account_id": "acct_kelly" }
+      ]
+    },
+    "properties": []
+  }
+}

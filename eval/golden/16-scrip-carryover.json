@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "id": "G-016",
+  "name": "unspent-scrip-carries-over",
+  "why": "Transitioning from wave-complete into the next planning phase must preserve the pool exactly; no reset, no interest.",
+  "covers": ["B-009"],
+  "case_type": "happy",
+  "traces_to": ["DEC-005", "AUD-1"],
+  "defends_against": "Pool reset to the starting stake each wave, destroying the save-vs-spend decision.",
+  "time_sensitive": false,
+  "given": {
+    "inputs": {
+      "transition": { "from_wave": 4, "to_wave": 5 }
+    },
+    "preexisting_state": {
+      "match": { "phase": "planning" },
+      "wave": { "number": 4, "total_waves": 10 },
+      "team": { "scrip": 185 }
+    },
+    "configuration": { "planning_duration_seconds": 60 },
+    "clock": {}
+  },
+  "when": { "operation": "begin_planning_phase", "input_refs": [] },
+  "expect": {
+    "exact": {
+      "result": { "wave": 5, "scrip": 185, "planning_seconds": 60 },
+      "state_changes": [
+        { "entity": "wave", "field": "number", "from": 4, "to": 5 }
+      ],
+      "emitted_events": [
+        { "type": "planning_started", "wave": 5, "duration_seconds": 60 }
+      ],
+      "external_calls": []
+    },
+    "properties": []
+  }
+}

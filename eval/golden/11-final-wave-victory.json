@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "id": "G-011",
+  "name": "final-wave-clear-is-victory",
+  "why": "Clearing wave 10 of 10 is map victory, not another planning phase.",
+  "covers": ["B-006"],
+  "case_type": "boundary",
+  "traces_to": ["BRIEF-1", "DEC-004"],
+  "defends_against": "Off-by-one on the final wave sends players into planning for a wave 11 that never spawns.",
+  "time_sensitive": false,
+  "given": {
+    "inputs": {
+      "kill": { "monster_id": "m99", "monster_type": "bull_behemoth", "bounty": 50, "killer_hero_id": "hero_b" }
+    },
+    "preexisting_state": {
+      "wave": { "number": 10, "total_waves": 10, "living_monster_ids": ["m99"] },
+      "team": { "scrip": 40 }
+    },
+    "configuration": {},
+    "clock": {}
+  },
+  "when": { "operation": "record_monster_kill", "input_refs": ["m99"] },
+  "expect": {
+    "exact": {
+      "result": { "monster_id": "m99", "bounty_awarded": 50, "scrip_after": 90, "living_monsters_remaining": 0, "wave_complete": true, "map_victory": true },
+      "state_changes": [
+        { "entity": "m99", "field": "alive", "from": true, "to": false },
+        { "entity": "team", "field": "scrip", "from": 40, "to": 90 },
+        { "entity": "match", "field": "status", "from": "combat", "to": "victory" }
+      ],
+      "emitted_events": [
+        { "type": "monster_killed", "monster_id": "m99", "bounty": 50 },
+        { "type": "wave_complete", "wave": 10 },
+        { "type": "match_victory" }
+      ],
+      "external_calls": []
+    },
+    "properties": []
+  }
+}

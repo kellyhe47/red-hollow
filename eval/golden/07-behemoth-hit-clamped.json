@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "id": "G-007",
+  "name": "behemoth-hit-clamped-at-zero",
+  "why": "A 40-damage Behemoth hit would kill ceil(40/10)=4, but only 3 civilians remain; the kill count clamps to 3 and the hotspot lands exactly at 0.",
+  "covers": [
+    "B-004"
+  ],
+  "case_type": "boundary",
+  "traces_to": [
+    "DEC-002",
+    "BRIEF-4"
+  ],
+  "defends_against": "Unclamped subtraction drives civilians negative, corrupting the lose-condition check.",
+  "time_sensitive": false,
+  "given": {
+    "inputs": {
+      "attack": {
+        "attacker_id": "m5",
+        "attacker_type": "bull_behemoth",
+        "damage": 40,
+        "target_id": "hs_chapel"
+      },
+      "hotspots": [
+        {
+          "id": "hs_saloon",
+          "civilians": 8
+        },
+        {
+          "id": "hs_chapel",
+          "civilians": 3
+        }
+      ]
+    },
+    "preexisting_state": {},
+    "configuration": {
+      "civilians_killed_per_hit": "ceil(damage/10)"
+    },
+    "clock": {}
+  },
+  "when": {
+    "operation": "apply_hotspot_attack",
+    "input_refs": [
+      "m5"
+    ]
+  },
+  "expect": {
+    "exact": {
+      "result": {
+        "hotspot_id": "hs_chapel",
+        "civilians_killed": 3,
+        "civilians_remaining": 0,
+        "total_civilians_remaining": 8
+      },
+      "state_changes": [
+        {
+          "entity": "hs_chapel",
+          "field": "civilians",
+          "from": 3,
+          "to": 0
+        }
+      ],
+      "emitted_events": [
+        {
+          "type": "civilians_killed",
+          "hotspot_id": "hs_chapel",
+          "count": 3
+        },
+        {
+          "type": "hotspot_emptied",
+          "hotspot_id": "hs_chapel"
+        }
+      ],
+      "external_calls": []
+    },
+    "properties": []
+  }
+}

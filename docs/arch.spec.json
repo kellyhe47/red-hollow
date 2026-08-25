@@ -1,0 +1,181 @@
+{
+  "groups": [
+    {
+      "id": "client",
+      "label": "Unity Client (x1-4 players)"
+    },
+    {
+      "id": "net",
+      "label": "Unity Gaming Services"
+    },
+    {
+      "id": "host",
+      "label": "Host-Authoritative Simulation (server side of Netcode)"
+    },
+    {
+      "id": "data",
+      "label": "Data & Tests"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "input",
+      "label": "Input + Top-Down Camera",
+      "layer": 0,
+      "group": "client"
+    },
+    {
+      "id": "hud",
+      "label": "HUD / Planning UI\n(scrip, timer, shop, wave banner)",
+      "layer": 0,
+      "group": "client"
+    },
+    {
+      "id": "render",
+      "label": "Rendering + VFX\n(low-poly western Mars)",
+      "layer": 0,
+      "group": "client"
+    },
+    {
+      "id": "lobby",
+      "label": "Lobby Service\n(join codes)",
+      "layer": 1,
+      "group": "net"
+    },
+    {
+      "id": "relay",
+      "label": "Relay\n(NAT traversal)",
+      "layer": 1,
+      "group": "net"
+    },
+    {
+      "id": "netcode",
+      "label": "Netcode for GameObjects\n(NetworkVariables + RPCs)",
+      "layer": 1,
+      "group": "host",
+      "accent": true
+    },
+    {
+      "id": "fsm",
+      "label": "Match FSM\nlobby > planning > combat > victory/defeat",
+      "layer": 2,
+      "group": "host",
+      "accent": true
+    },
+    {
+      "id": "sim",
+      "label": "GameSim Core (pure C#)\ntargeting, combat, economy,\nXP/leveling, status effects, phase rules",
+      "layer": 2,
+      "group": "host",
+      "accent": true
+    },
+    {
+      "id": "director",
+      "label": "Wave Director\nspawn schedules per entry point",
+      "layer": 2,
+      "group": "host"
+    },
+    {
+      "id": "nav",
+      "label": "NavMesh Pathfinding\n(Unity AI Navigation)",
+      "layer": 2,
+      "group": "host"
+    },
+    {
+      "id": "configs",
+      "label": "ScriptableObject Configs\nmonsters, heroes, placeables, waves",
+      "layer": 3,
+      "group": "data"
+    },
+    {
+      "id": "golden",
+      "label": "Golden Fixture Adapter\neval/golden/*.json via NUnit",
+      "layer": 3,
+      "group": "data"
+    },
+    {
+      "id": "profiles",
+      "label": "Profile Store (SQLite/JSON)\nlifetime XP, level, skill allocations\nkeyed by callsign",
+      "layer": 3,
+      "group": "data",
+      "accent": true
+    }
+  ],
+  "edges": [
+    {
+      "from": "input",
+      "to": "netcode",
+      "label": "player commands (RPC)"
+    },
+    {
+      "from": "netcode",
+      "to": "hud",
+      "label": "replicated state"
+    },
+    {
+      "from": "netcode",
+      "to": "render",
+      "label": "entity transforms"
+    },
+    {
+      "from": "lobby",
+      "to": "netcode",
+      "label": "session join"
+    },
+    {
+      "from": "relay",
+      "to": "netcode",
+      "label": "transport"
+    },
+    {
+      "from": "netcode",
+      "to": "fsm",
+      "label": "validated commands"
+    },
+    {
+      "from": "fsm",
+      "to": "sim",
+      "label": "phase-gated ops"
+    },
+    {
+      "from": "fsm",
+      "to": "director",
+      "label": "start wave N"
+    },
+    {
+      "from": "director",
+      "to": "sim",
+      "label": "spawn monsters"
+    },
+    {
+      "from": "sim",
+      "to": "nav",
+      "label": "move-to-target queries"
+    },
+    {
+      "from": "configs",
+      "to": "sim",
+      "label": "stats/costs"
+    },
+    {
+      "from": "configs",
+      "to": "director",
+      "label": "wave tables"
+    },
+    {
+      "from": "golden",
+      "to": "sim",
+      "label": "drives operations"
+    },
+    {
+      "from": "sim",
+      "to": "profiles",
+      "label": "save on level-up & match end"
+    },
+    {
+      "from": "profiles",
+      "to": "fsm",
+      "label": "load profiles at lobby join"
+    }
+  ]
+}

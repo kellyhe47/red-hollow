@@ -1,0 +1,3 @@
+date,pipeline,item,model,seed,steps,cfg,sampler,positive_tail,negative,output,status
+2026-08-24,env_tile,"red-rock cavern ground, packed martian dust",sd_xl_base_1.0,20260824,28,7,dpmpp_2m/karras,texture-core (DEC-025),contract+tile-addon,art/textures/cavern-ground_v1_{1024,512}.png,keeper-pending-scripted-seam-check
+2026-08-24,env_tile,"dusty main-street dirt with wagon ruts",sd_xl_base_1.0,20260824,28,7,dpmpp_2m/karras,texture-core (DEC-025),contract+tile-addon,art/textures/street-dirt_v1_{1024,512}.png,keeper-pending-scripted-seam-check

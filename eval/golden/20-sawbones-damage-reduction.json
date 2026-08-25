@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "id": "G-020",
+  "name": "sawbones-flat-damage-reduction",
+  "why": "Sawbones (tank identity) takes floor(damage * 0.7): a 15-damage Burrower hit deals floor(10.5)=10, dropping HP 200 -> 190.",
+  "covers": ["B-012"],
+  "case_type": "happy",
+  "traces_to": ["DEC-009"],
+  "defends_against": "Reduction applied to the wrong class, applied after death checks, or fractional HP left unfloored causing state desync.",
+  "time_sensitive": false,
+  "given": {
+    "inputs": {
+      "attack": { "attacker_id": "m9", "attacker_type": "burrower", "damage": 15, "target_id": "hero_saw" },
+      "hero": { "id": "hero_saw", "class": "sawbones", "hp": 200, "max_hp": 200 }
+    },
+    "preexisting_state": {},
+    "configuration": { "sawbones_damage_reduction": 0.3 },
+    "clock": {}
+  },
+  "when": { "operation": "apply_hero_damage", "input_refs": ["hero_saw"] },
+  "expect": {
+    "exact": {
+      "result": { "hero_id": "hero_saw", "damage_taken": 10, "hp_after": 190, "downed": false },
+      "state_changes": [
+        { "entity": "hero_saw", "field": "hp", "from": 200, "to": 190 }
+      ],
+      "emitted_events": [
+        { "type": "hero_damaged", "hero_id": "hero_saw", "amount": 10 }
+      ],
+      "external_calls": []
+    },
+    "properties": []
+  }
+}

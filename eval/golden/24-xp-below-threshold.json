@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "id": "G-024",
+  "name": "kill-xp-below-threshold-no-level",
+  "why": "A shambler kill taking lifetime XP from 50 to 60 stays below the level-2 threshold (100): no level, no skill point, no profile save (saves happen on level-up and match end only).",
+  "covers": ["B-015"],
+  "case_type": "negative_control",
+  "traces_to": ["DEC-012", "DEC-013", "DEC-015"],
+  "defends_against": "Every kill triggering a level-up event or a profile write, hammering the store mid-combat.",
+  "time_sensitive": false,
+  "given": {
+    "inputs": {
+      "kill": { "monster_id": "m2", "monster_type": "shambler", "bounty": 10, "killer_hero_id": "hero_b" },
+      "profile": { "account_id": "acct_tex", "hero_id": "hero_b", "lifetime_xp": 50, "level": 1, "skill_points": 0 }
+    },
+    "preexisting_state": {},
+    "configuration": { "xp_per_kill": "bounty", "level_threshold": "100*L*(L-1)/2" },
+    "clock": {}
+  },
+  "when": { "operation": "award_kill_xp", "input_refs": ["hero_b"] },
+  "expect": {
+    "exact": {
+      "result": { "hero_id": "hero_b", "xp_awarded": 10, "lifetime_xp": 60, "level": 1, "leveled_up": false, "skill_points": 0, "xp_into_level": 60, "xp_for_next_level": 100 },
+      "state_changes": [
+        { "entity": "acct_tex", "field": "lifetime_xp", "from": 50, "to": 60 }
+      ],
+      "emitted_events": [
+        { "type": "xp_awarded", "hero_id": "hero_b", "amount": 10 }
+      ],
+      "external_calls": []
+    },
+    "properties": []
+  }
+}

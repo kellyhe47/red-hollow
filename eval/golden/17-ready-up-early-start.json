@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "id": "G-017",
+  "name": "all-ready-starts-combat-early",
+  "why": "When the last unready player readies up at t=22s of a 60s planning phase, combat starts immediately.",
+  "covers": [
+    "B-010"
+  ],
+  "case_type": "happy",
+  "traces_to": [
+    "DEC-006"
+  ],
+  "defends_against": "Ready state tracked but the timer still runs to 60s regardless.",
+  "time_sensitive": true,
+  "given": {
+    "inputs": {
+      "ready": {
+        "player_id": "hero_c"
+      }
+    },
+    "preexisting_state": {
+      "match": {
+        "phase": "planning"
+      },
+      "wave": {
+        "number": 2,
+        "total_waves": 10
+      },
+      "players": [
+        {
+          "id": "hero_a",
+          "ready": true
+        },
+        {
+          "id": "hero_b",
+          "ready": true
+        },
+        {
+          "id": "hero_c",
+          "ready": false
+        }
+      ]
+    },
+    "configuration": {
+      "planning_duration_seconds": 60
+    },
+    "clock": {
+      "as_of": "2026-08-24T00:00:00Z",
+      "sim_elapsed": 22.0
+    }
+  },
+  "when": {
+    "operation": "set_player_ready",
+    "input_refs": [
+      "hero_c"
+    ]
+  },
+  "expect": {
+    "exact": {
+      "result": {
+        "all_ready": true,
+        "combat_started": true,
+        "planning_elapsed": 22.0
+      },
+      "state_changes": [
+        {
+          "entity": "hero_c",
+          "field": "ready",
+          "from": false,
+          "to": true
+        },
+        {
+          "entity": "match",
+          "field": "phase",
+          "from": "planning",
+          "to": "combat"
+        }
+      ],
+      "emitted_events": [
+        {
+          "type": "combat_started",
+          "wave": 2,
+          "trigger": "all_ready"
+        }
+      ],
+      "external_calls": []
+    },
+    "properties": []
+  }
+}

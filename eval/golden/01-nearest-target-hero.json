@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "id": "G-001",
+  "name": "nearest-target-hero",
+  "why": "The core v1 monster AI is nearest-target; a hero closer than any hotspot must be chosen.",
+  "covers": ["B-001"],
+  "case_type": "happy",
+  "traces_to": ["BRIEF-6", "DEC-003"],
+  "defends_against": "AI hardcodes hotspots as the only target class and ignores heroes.",
+  "time_sensitive": false,
+  "given": {
+    "inputs": {
+      "monster": { "id": "m1", "type": "shambler", "pos": [0, 0] },
+      "candidates": [
+        { "id": "hero_a", "kind": "hero", "pos": [3, 4], "alive": true },
+        { "id": "hs_saloon", "kind": "hotspot", "pos": [10, 0], "civilians": 8 }
+      ]
+    },
+    "preexisting_state": {},
+    "configuration": {},
+    "clock": {}
+  },
+  "when": { "operation": "select_target", "input_refs": ["m1"] },
+  "expect": {
+    "exact": {
+      "result": { "monster_id": "m1", "target_id": "hero_a", "distance": 5.0 },
+      "state_changes": [
+        { "entity": "m1", "field": "target_id", "from": null, "to": "hero_a" }
+      ],
+      "emitted_events": [],
+      "external_calls": []
+    },
+    "properties": []
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "id": "G-004",
+  "name": "barricade-blocks-path",
+  "why": "Barricades only matter if monsters must chew through them; a blocking barricade becomes the attack target.",
+  "covers": ["B-002"],
+  "case_type": "happy",
+  "traces_to": ["BRIEF-5", "AUD-1"],
+  "defends_against": "Monsters path around or through barricades, making the defensive economy useless.",
+  "time_sensitive": false,
+  "given": {
+    "inputs": {
+      "monster": { "id": "m1", "type": "shambler", "pos": [0, 0] },
+      "candidates": [
+        { "id": "hs_saloon", "kind": "hotspot", "pos": [10, 0], "civilians": 8 }
+      ],
+      "blockers": [
+        { "id": "bar_1", "kind": "barricade", "pos": [5, 0], "hp": 300, "blocks_path_between": ["m1", "hs_saloon"] }
+      ]
+    },
+    "preexisting_state": {},
+    "configuration": {},
+    "clock": {}
+  },
+  "when": { "operation": "select_target", "input_refs": ["m1"] },
+  "expect": {
+    "exact": {
+      "result": { "monster_id": "m1", "target_id": "bar_1", "distance": 5.0 },
+      "state_changes": [
+        { "entity": "m1", "field": "target_id", "from": null, "to": "bar_1" }
+      ],
+      "emitted_events": [],
+      "external_calls": []
+    },
+    "properties": []
+  }
+}

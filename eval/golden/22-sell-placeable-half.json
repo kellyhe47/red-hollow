@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "id": "G-022",
+  "name": "sell-placeable-refunds-half",
+  "why": "Selling a 250-scrip turret during planning removes it and refunds floor(250*0.5)=125 to the shared pool.",
+  "covers": ["B-014"],
+  "case_type": "happy",
+  "traces_to": ["DEC-011"],
+  "defends_against": "Full refund enabling free repositioning every wave, or refund paid without removing the entity.",
+  "time_sensitive": false,
+  "given": {
+    "inputs": {
+      "sell": { "player_id": "hero_b", "placeable_id": "t1" },
+      "placeable": { "id": "t1", "type": "turret", "purchase_cost": 250 }
+    },
+    "preexisting_state": {
+      "match": { "phase": "planning" },
+      "team": { "scrip": 40 }
+    },
+    "configuration": { "sell_refund_ratio": 0.5 },
+    "clock": {}
+  },
+  "when": { "operation": "sell_placement", "input_refs": ["t1"] },
+  "expect": {
+    "exact": {
+      "result": { "accepted": true, "refund": 125, "scrip_after": 165 },
+      "state_changes": [
+        { "entity": "team", "field": "scrip", "from": 40, "to": 165 },
+        { "entity": "t1", "field": "exists", "from": true, "to": false }
+      ],
+      "emitted_events": [
+        { "type": "placeable_sold", "placeable_id": "t1", "refund": 125, "by": "hero_b" }
+      ],
+      "external_calls": []
+    },
+    "properties": []
+  }
+}

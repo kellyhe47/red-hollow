@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "id": "G-014",
+  "name": "purchase-insufficient-scrip-rejected",
+  "why": "A 100-scrip barricade with only 90 in the pool must be rejected with no side effects.",
+  "covers": [
+    "B-008"
+  ],
+  "case_type": "failure",
+  "traces_to": [
+    "DEC-005",
+    "BRIEF-5"
+  ],
+  "defends_against": "Scrip allowed to go negative, or the entity placed anyway.",
+  "time_sensitive": false,
+  "given": {
+    "inputs": {
+      "purchase": {
+        "player_id": "hero_b",
+        "placeable_type": "barricade",
+        "cost": 100,
+        "pos": [
+          4,
+          4
+        ],
+        "zone": "valid"
+      }
+    },
+    "preexisting_state": {
+      "match": {
+        "phase": "planning"
+      },
+      "team": {
+        "scrip": 90
+      }
+    },
+    "configuration": {},
+    "clock": {}
+  },
+  "when": {
+    "operation": "purchase_placement",
+    "input_refs": [
+      "hero_b"
+    ]
+  },
+  "expect": {
+    "exact": {
+      "result": {
+        "accepted": false,
+        "placeable_type": "barricade",
+        "scrip_after": 90,
+        "rejection_reason": "insufficient_scrip"
+      },
+      "state_changes": [],
+      "emitted_events": [
+        {
+          "type": "purchase_rejected",
+          "reason": "insufficient_scrip",
+          "by": "hero_b"
+        }
+      ],
+      "external_calls": []
+    },
+    "properties": []
+  }
+}

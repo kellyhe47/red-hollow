@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "id": "G-029",
+  "name": "dynamite-aoe-single-use",
+  "why": "A triggered dynamite trap deals 150 damage to every monster in its blast radius (killing those it drops to 0) and is removed after exactly one use.",
+  "covers": ["B-018"],
+  "case_type": "happy",
+  "traces_to": ["DEC-023"],
+  "defends_against": "AoE hitting only the triggering monster, or the trap surviving to detonate twice.",
+  "time_sensitive": false,
+  "given": {
+    "inputs": {
+      "crossing": { "monster_id": "m5", "placeable_id": "dyn1" },
+      "placeable": { "id": "dyn1", "type": "dynamite_trap", "damage": 150, "blast_radius": 3.0, "pos": [0, 0] },
+      "monsters": [
+        { "id": "m5", "type": "shambler", "pos": [0, 0], "hp": 60, "alive": true },
+        { "id": "m6", "type": "bull_behemoth", "pos": [2, 0], "hp": 400, "alive": true },
+        { "id": "m7", "type": "shambler", "pos": [5, 0], "hp": 60, "alive": true }
+      ]
+    },
+    "preexisting_state": {},
+    "configuration": {},
+    "clock": {}
+  },
+  "when": { "operation": "trigger_placeable", "input_refs": ["dyn1"] },
+  "expect": {
+    "exact": {
+      "result": { "placeable_id": "dyn1", "monsters_hit": ["m5", "m6"], "damage_each": 150 },
+      "state_changes": [
+        { "entity": "dyn1", "field": "exists", "from": true, "to": false },
+        { "entity": "m5", "field": "alive", "from": true, "to": false },
+        { "entity": "m5", "field": "hp", "from": 60, "to": 0 },
+        { "entity": "m6", "field": "hp", "from": 400, "to": 250 }
+      ],
+      "emitted_events": [
+        { "type": "placeable_triggered", "placeable_id": "dyn1", "monster_id": "m5", "damage": 150 },
+        { "type": "placeable_broken", "placeable_id": "dyn1" }
+      ],
+      "external_calls": []
+    },
+    "properties": []
+  }
+}

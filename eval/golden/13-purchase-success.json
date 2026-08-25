@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "id": "G-013",
+  "name": "planning-purchase-success",
+  "why": "A turret purchase during planning with sufficient scrip places the entity and decrements the shared pool.",
+  "covers": ["B-008"],
+  "case_type": "happy",
+  "traces_to": ["BRIEF-5", "DEC-005"],
+  "defends_against": "Placement succeeds without charging, or charges without placing.",
+  "time_sensitive": false,
+  "given": {
+    "inputs": {
+      "purchase": { "player_id": "hero_a", "placeable_type": "turret", "cost": 250, "pos": [6, 3], "zone": "valid" }
+    },
+    "preexisting_state": {
+      "match": { "phase": "planning" },
+      "team": { "scrip": 300 }
+    },
+    "configuration": {},
+    "clock": {}
+  },
+  "when": { "operation": "purchase_placement", "input_refs": ["hero_a"] },
+  "expect": {
+    "exact": {
+      "result": { "accepted": true, "placeable_type": "turret", "scrip_after": 50, "rejection_reason": null },
+      "state_changes": [
+        { "entity": "team", "field": "scrip", "from": 300, "to": 50 },
+        { "entity": "placeables", "field": "count", "from": 0, "to": 1 }
+      ],
+      "emitted_events": [
+        { "type": "placeable_created", "placeable_type": "turret", "pos": [6, 3], "by": "hero_a" }
+      ],
+      "external_calls": []
+    },
+    "properties": []
+  }
+}

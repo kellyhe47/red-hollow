@@ -1,0 +1,71 @@
+<title>The Red Hollow — UI Wireframes (low-fi)</title>
+<style>
+  body{font-family:monospace;max-width:960px;margin:2rem auto;background:#fff;color:#111}
+  .screen{border:3px solid #111;margin:2rem 0;padding:1rem}
+  .screen h2{margin-top:0}
+  .box{border:1px dashed #666;padding:.5rem;margin:.5rem 0}
+  .row{display:flex;gap:.5rem}.row .box{flex:1}
+  .btn{border:2px solid #111;display:inline-block;padding:.2rem .6rem;margin:.2rem}
+  .note{color:#a33;font-style:italic}
+</style>
+
+<h1>UI Wireframes — low-fi skeleton (structure only, no visual design)</h1>
+
+<div class="screen"><h2>S1 · Title / Join</h2>
+  <div class="box">GAME LOGO — "THE RED HOLLOW" (working title)</div>
+  <div class="box">Account: callsign input [ player name ] — server-side profile keyed to this callsign (v1, no password); shows lifetime level + XP once loaded</div>
+  <div class="row">
+    <div class="box"><span class="btn">HOST GAME</span> → creates lobby, shows join code</div>
+    <div class="box">Join code input: [ ABC123 ] <span class="btn">JOIN</span></div>
+  </div>
+  <div class="box note">State: join failed (bad/expired code) → inline error under code input, stay on screen</div>
+</div>
+
+<div class="screen"><h2>S2 · Lobby</h2>
+  <div class="box">Join code: ABC123 (click to copy) — share with friends</div>
+  <div class="row">
+    <div class="box">GUNSLINGER<br>single-target DPS<br><span class="btn">PICK</span></div>
+    <div class="box">RANCHER<br>shotgun + lasso slow<br><span class="btn">PICK</span></div>
+    <div class="box">SAWBONES<br>melee tank, 30% DR<br><span class="btn">PICK</span></div>
+  </div>
+  <div class="box">Player list (1–4): name · class picked · ready ✓/✗. Duplicate classes ALLOWED.</div>
+  <div class="box"><span class="btn">READY</span> — match starts when ALL connected players ready (a solo lobby needs only your ready — no host force-start)</div>
+  <div class="box note">States: waiting alone (hint text "share code"); player joins/leaves mid-lobby → list updates</div>
+</div>
+
+<div class="screen"><h2>S3 · Planning Phase (top-down map view)</h2>
+  <div class="box">TOP BAR: Wave 3/10 · ⏱ 0:47 · SCRIP 265 (shared) · civilians: Saloon 8 | Chapel 4 | Homestead 6</div>
+  <div class="box">MAP: colony cavern, 3 hotspots (buildings), entry tunnels, TEAM SPAWN marker (center — heroes enter & respawn here). ACTIVE entry points for next wave pulse red (partial preview — types/counts hidden). Existing placeables shown; click one → SELL (50%) tooltip.</div>
+  <div class="row">
+    <div class="box">SHOP BAR (bottom):<br>Barricade 100 · Spike Trap 75 · Dynamite Trap 150 · Turret 250 · Med Station 200<br>click → ghost follows cursor → click valid zone to place (invalid zones tint red)</div>
+    <div class="box">READY panel: 2/4 ready (denominator = connected players)<br><span class="btn">READY UP</span> (starts combat early if all ready)</div>
+  </div>
+  <div class="box note">States: scrip too low → shop item greyed with cost in red; placement in invalid zone → rejected ghost shake; timer hits 0 → auto-transition to combat</div>
+</div>
+
+<div class="screen"><h2>S4 · Combat Phase (top-down action)</h2>
+  <div class="box">TOP BAR: Wave 3/10 · monsters left: 14 · civilians: 8|4|6 · SCRIP 265 (+ticks on kills)</div>
+  <div class="box">WORLD: WASD move (W reserved for movement only) · hero faces mouse cursor · SPACE = basic attack toward cursor · Q = ability 1 · E = ability 2/ultimate (both locked until unlocked with skill points). Hotspots show civilian count over building. Barricades show HP bars when damaged.</div>
+  <div class="box">SELF (bottom bar): HP · class icon · SPACE/Q/E slots with cooldown sweeps (locked slots show padlock) · XP bar + account level · skill-point badge when unspent</div>
+  <div class="box note">Level up → toast + badge; opening picker (hotkey L or click badge) shows choice cards: Unlock Q · Unlock E · Rank up unlocked ability (max rank 3). Non-blocking overlay, sim keeps running.</div>
+  <div class="box note">States: hero dead → grey overlay "Respawning in 7s", camera follows a living ally; civilians_killed → red flash + toast "Civilians lost at the Chapel!"; hotspot emptied → building marked dark/lost; monster spawn → entry point flare</div>
+</div>
+
+<div class="screen"><h2>S5 · Wave Complete (interstitial, ~3s, then back to S3)</h2>
+  <div class="box">Banner: "WAVE 3 CLEARED" · bounty earned this wave: +180 scrip · civilians remaining: 18/20</div>
+</div>
+
+<div class="screen"><h2>S6 · Victory</h2>
+  <div class="box">"THE COLONY STANDS" · civilians saved X/20 · kills per player table · scrip spent</div>
+  <div class="box"><span class="btn">PLAY AGAIN (same lobby)</span> host-only; resets match state, party returns to S2 with same code &amp; classes; profiles persist <span class="btn">MAIN MENU</span></div>
+</div>
+
+<div class="screen"><h2>S7 · Defeat</h2>
+  <div class="box">"THE COLONY HAS FALLEN" · reached wave N · same stats table</div>
+  <div class="box"><span class="btn">RETRY (same lobby)</span> host-only; same semantics as PLAY AGAIN <span class="btn">MAIN MENU</span></div>
+</div>
+
+<div class="screen"><h2>Cross-cutting states</h2>
+  <div class="box">Player disconnects mid-match → their hero despawns; monsters retarget; match continues; toast shown. Host disconnects → match ends for all → S1 with error message (v1: no host migration).</div>
+  <div class="box">Pause: none in multiplayer. ESC opens overlay menu (leave match, volume) without pausing sim.</div>
+</div>

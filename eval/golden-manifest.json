@@ -1,0 +1,231 @@
+{
+  "schema_version": 1,
+  "comparison": "deep_equal_after_canonicalization",
+  "canonicalization": [
+    {
+      "path": "result.state_changes",
+      "sort_by": [
+        "entity",
+        "field"
+      ]
+    },
+    {
+      "path": "emitted_events",
+      "sort_by": [
+        "type"
+      ]
+    }
+  ],
+  "behaviors": [
+    {
+      "id": "B-001",
+      "statement": "A non-Burrower monster targets the nearest available target (living hero or hotspot with >=1 civilian), by straight-line distance; ties break to lowest entity id (Burrower exception: B-003)",
+      "traces_to": [
+        "BRIEF-6",
+        "DEC-003"
+      ],
+      "required_case_types": [
+        "happy",
+        "negative_control",
+        "boundary"
+      ]
+    },
+    {
+      "id": "B-002",
+      "statement": "A barricade blocking a non-Burrower monster's path to its target becomes the monster's attack target until destroyed",
+      "traces_to": [
+        "BRIEF-5",
+        "AUD-1"
+      ],
+      "required_case_types": [
+        "happy"
+      ]
+    },
+    {
+      "id": "B-003",
+      "statement": "Burrowers always target the nearest hotspot with civilians and ignore barricades and heroes",
+      "traces_to": [
+        "DEC-007",
+        "AUD-5"
+      ],
+      "required_case_types": [
+        "happy"
+      ]
+    },
+    {
+      "id": "B-004",
+      "statement": "A monster hit on a hotspot kills ceil(damage/10) civilians, clamped so the hotspot never goes below 0",
+      "traces_to": [
+        "DEC-002",
+        "BRIEF-4"
+      ],
+      "required_case_types": [
+        "happy",
+        "boundary"
+      ]
+    },
+    {
+      "id": "B-005",
+      "statement": "The team loses exactly when total civilians across all hotspots reaches 0",
+      "traces_to": [
+        "BRIEF-2",
+        "DEC-002"
+      ],
+      "required_case_types": [
+        "happy",
+        "negative_control"
+      ]
+    },
+    {
+      "id": "B-006",
+      "statement": "Killing the last living monster of a wave completes the wave; completing the final wave wins the map",
+      "traces_to": [
+        "BRIEF-1",
+        "DEC-004"
+      ],
+      "required_case_types": [
+        "happy",
+        "boundary"
+      ]
+    },
+    {
+      "id": "B-007",
+      "statement": "Each monster kill adds its bounty to the single shared team scrip pool",
+      "traces_to": [
+        "DEC-005",
+        "AUD-1"
+      ],
+      "required_case_types": [
+        "happy"
+      ]
+    },
+    {
+      "id": "B-008",
+      "statement": "A placement purchase succeeds only during the planning phase, in a valid zone, with sufficient scrip; scrip is decremented on success",
+      "traces_to": [
+        "BRIEF-5",
+        "DEC-005"
+      ],
+      "required_case_types": [
+        "happy",
+        "failure"
+      ]
+    },
+    {
+      "id": "B-009",
+      "statement": "Unspent scrip carries over unchanged into the next wave's planning phase",
+      "traces_to": [
+        "DEC-005",
+        "AUD-1"
+      ],
+      "required_case_types": [
+        "happy"
+      ]
+    },
+    {
+      "id": "B-010",
+      "statement": "The combat phase starts early when all connected players are ready, otherwise when the 60s planning timer expires",
+      "traces_to": [
+        "DEC-006"
+      ],
+      "required_case_types": [
+        "happy"
+      ]
+    },
+    {
+      "id": "B-011",
+      "statement": "Rancher's lasso slows the struck monster's move speed by 50% for exactly 3.0 seconds, after which speed restores",
+      "traces_to": [
+        "DEC-008"
+      ],
+      "required_case_types": [
+        "happy",
+        "boundary"
+      ]
+    },
+    {
+      "id": "B-012",
+      "statement": "Sawbones takes incoming damage reduced by a flat 30% (floor of reduced value applied)",
+      "traces_to": [
+        "DEC-009"
+      ],
+      "required_case_types": [
+        "happy"
+      ]
+    },
+    {
+      "id": "B-013",
+      "statement": "A hero at 0 HP dies immediately and respawns at the team spawn point at full HP after exactly 10 seconds; dead heroes are not valid monster targets",
+      "traces_to": [
+        "DEC-010"
+      ],
+      "required_case_types": [
+        "happy"
+      ]
+    },
+    {
+      "id": "B-014",
+      "statement": "During planning a placeable can be sold for floor(purchase_cost * 0.5) refunded to the shared pool, removing the entity",
+      "traces_to": [
+        "DEC-011"
+      ],
+      "required_case_types": [
+        "happy"
+      ]
+    },
+    {
+      "id": "B-015",
+      "statement": "Kills grant the credited player (the killer; turret kills credit the placer) XP equal to the monster's bounty; lifetime XP never decreases; level L requires cumulative XP of 100*L*(L-1)/2, and crossing a threshold grants exactly one skill point per level gained",
+      "traces_to": [
+        "DEC-012",
+        "DEC-013"
+      ],
+      "required_case_types": [
+        "happy",
+        "negative_control"
+      ]
+    },
+    {
+      "id": "B-016",
+      "statement": "A skill point can be spent to unlock Q, unlock E, or rank up an unlocked ability (max rank 3), player's free choice; spending without a point is rejected",
+      "traces_to": [
+        "DEC-014"
+      ],
+      "required_case_types": [
+        "happy",
+        "failure"
+      ]
+    },
+    {
+      "id": "B-017",
+      "statement": "Profile changes (XP, level, skill allocations) are persisted server-side keyed by account id at each level-up and match end",
+      "traces_to": [
+        "DEC-015"
+      ],
+      "required_case_types": [
+        "happy"
+      ]
+    },
+    {
+      "id": "B-018",
+      "statement": "Placeable combat effects: a spike trap deals 30 damage per monster crossing and breaks after 10 triggers; a dynamite trap deals 150 AoE damage exactly once then is removed; a turret damages the nearest living monster in range 8",
+      "traces_to": [
+        "DEC-023"
+      ],
+      "required_case_types": [
+        "happy",
+        "boundary"
+      ]
+    },
+    {
+      "id": "B-019",
+      "statement": "Hero attacks never damage heroes or placeables (no friendly fire)",
+      "traces_to": [
+        "DEC-019"
+      ],
+      "required_case_types": [
+        "negative_control"
+      ]
+    }
+  ]
+}

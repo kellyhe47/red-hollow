@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "id": "G-023",
+  "name": "kill-xp-crosses-level-threshold",
+  "why": "At 90 lifetime XP (level 1), a ravager kill (+15 XP) reaches 105, crossing the level-2 threshold (100*2*1/2=100). Lifetime XP keeps its total (never resets); one skill point is granted; the visible bar shows 5 into the next 200-wide level.",
+  "covers": ["B-015"],
+  "case_type": "happy",
+  "traces_to": ["DEC-012", "DEC-013"],
+  "defends_against": "XP bar reset implemented by zeroing lifetime XP, or level recomputed from per-level XP instead of the cumulative curve.",
+  "time_sensitive": false,
+  "given": {
+    "inputs": {
+      "kill": { "monster_id": "m4", "monster_type": "ravager", "bounty": 15, "killer_hero_id": "hero_a" },
+      "profile": { "account_id": "acct_kelly", "hero_id": "hero_a", "lifetime_xp": 90, "level": 1, "skill_points": 0 }
+    },
+    "preexisting_state": {},
+    "configuration": { "xp_per_kill": "bounty", "level_threshold": "100*L*(L-1)/2" },
+    "clock": {}
+  },
+  "when": { "operation": "award_kill_xp", "input_refs": ["hero_a"] },
+  "expect": {
+    "exact": {
+      "result": { "hero_id": "hero_a", "xp_awarded": 15, "lifetime_xp": 105, "level": 2, "leveled_up": true, "skill_points": 1, "xp_into_level": 5, "xp_for_next_level": 200 },
+      "state_changes": [
+        { "entity": "acct_kelly", "field": "lifetime_xp", "from": 90, "to": 105 },
+        { "entity": "acct_kelly", "field": "level", "from": 1, "to": 2 },
+        { "entity": "acct_kelly", "field": "skill_points", "from": 0, "to": 1 }
+      ],
+      "emitted_events": [
+        { "type": "xp_awarded", "hero_id": "hero_a", "amount": 15 },
+        { "type": "level_up", "hero_id": "hero_a", "new_level": 2 }
+      ],
+      "external_calls": [
+        { "service": "profile_store", "op": "save", "account_id": "acct_kelly" }
+      ]
+    },
+    "properties": []
+  }
+}

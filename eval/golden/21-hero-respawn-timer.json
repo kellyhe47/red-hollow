@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "id": "G-021",
+  "name": "hero-death-schedules-respawn",
+  "why": "A hero reaching 0 HP dies and is scheduled to respawn at the team spawn point exactly 10s later at full HP; dead heroes are not monster targets.",
+  "covers": ["B-013"],
+  "case_type": "happy",
+  "traces_to": ["DEC-010"],
+  "defends_against": "Death leaves the hero targetable, or respawn restores partial HP / wrong location.",
+  "time_sensitive": true,
+  "given": {
+    "inputs": {
+      "attack": { "attacker_id": "m5", "attacker_type": "bull_behemoth", "damage": 40, "target_id": "hero_gun" },
+      "hero": { "id": "hero_gun", "class": "gunslinger", "hp": 25, "max_hp": 100 }
+    },
+    "preexisting_state": {},
+    "configuration": { "respawn_delay_seconds": 10.0, "respawn_point": [0, 0] },
+    "clock": { "as_of": "2026-08-24T00:00:00Z", "sim_elapsed": 45.0 }
+  },
+  "when": { "operation": "apply_hero_damage", "input_refs": ["hero_gun"] },
+  "expect": {
+    "exact": {
+      "result": { "hero_id": "hero_gun", "damage_taken": 40, "hp_after": 0, "downed": true, "respawn_at": 55.0 },
+      "state_changes": [
+        { "entity": "hero_gun", "field": "hp", "from": 25, "to": 0 },
+        { "entity": "hero_gun", "field": "alive", "from": true, "to": false }
+      ],
+      "emitted_events": [
+        { "type": "hero_damaged", "hero_id": "hero_gun", "amount": 40 },
+        { "type": "hero_died", "hero_id": "hero_gun", "respawn_at": 55.0 }
+      ],
+      "external_calls": []
+    },
+    "properties": []
+  }
+}
