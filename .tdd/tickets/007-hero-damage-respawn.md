@@ -1,11 +1,11 @@
 ---
 id: 007
 title: Hero damage, death/respawn, no friendly fire
-status: in-progress
+status: tests-written
 depends_on: [001]
-touches: [unity/RedHollow/Assets/GameSim/MatchSim.Heroes.cs, sim/GameSim.Tests/T07_HeroTests.cs]
+touches: [unity/RedHollow/Assets/GameSim/MatchSim.Heroes.cs, unity/RedHollow/Assets/GameSim/Entities.cs, sim/GameSim.Tests/T07_HeroTests.cs]
 iterations: 0
-test_files: []
+test_files: [sim/GameSim.Tests/T07_HeroTests.cs]
 branch: "tdd/007"
 board_id: T-07
 owns_requirements: [R-26, R-33, R-34, R-35, R-36]
@@ -24,8 +24,24 @@ apply_hero_damage (Sawbones flat 30% DR, floor applied; 0 HP -> dies instantly, 
 
 ## Test plan
 
-_Filled in by the test-writer._
+`T07_HeroTests.cs` — 29 cases. R-33 all-heroes-dead-is-not-defeat (party of 1 and last-of-3);
+dead-hero candidate exclusion (state side only — SelectTarget belongs to 002); DEC-009
+class-conditional reduction + flooring rule; clock-derived respawn at values other than
+G-021's so 55.0 cannot be hardcoded; overkill ordering; no-friendly-fire parametrized over
+ally/barricade/placeable orderings + the no-monster boundary; R-34 no-mana structural guard;
+R-35 regen (delay, rate-is-read, MaxHp cap, damage resets clock, dead heroes excluded).
+G-020/021/030 not re-encoded.
 
 ## Attempt log
 
 - wave A: test-writer dispatched in worktree .tdd/worktrees/007 (branch tdd/007).
+- tests locked on tdd/007 @ d8bda71: 29 cases, 28 red. The single passer is the labelled R-34
+  structural guard. Orchestrator-verified in-worktree: 78 total = 30 golden + 19 harness + 29 T07.
+- R-35 was initially skipped by the test-writer as untestable (no seam). Sent back and covered:
+  absence of a seam specifies the seam, it does not excuse the requirement. Shape stubs added:
+  `Hero.LastDamagedAt` (Entities.cs) and `MatchSim.TickHeroRegen()` (MatchSim.Heroes.cs).
+  Entities.cs is touched by no other wave-A ticket, so this is safe.
+- `TickHeroRegen()` returns void, not an ISimResult: no fixture grades regen, and keeping it void
+  avoids editing the shared Commands.cs. Accepted.
+- DEC-RUN-2 binds this ticket's implementer: reduced damage is
+  `Math.Floor(damage * (1.0 - reduction) + 1e-9)`.
