@@ -277,3 +277,29 @@ either sets `Team.Scrip` explicitly afterwards or never asserts an absolute pool
   accumulates permanent dead zones over ten waves.
 - **`SellResult` has no `RejectionReason`** (asymmetric with `PurchaseResult`). Noted; no requirement
   demands it, R-21 names rejection reasons for purchases only.
+
+## Unity commands (smoke-tested 2026-08-25)
+
+| Name | Command |
+|---|---|
+| unity-tests (EditMode) | `Unity -batchmode -nographics -projectPath unity/RedHollow -runTests -testPlatform EditMode -testResults <out.xml> -logFile <log>` |
+| unity-verify | `Unity -batchmode -nographics -quit -projectPath unity/RedHollow -executeMethod RedHollow.EditorTools.ProjectVerify.Run` |
+| unity-packages | `... -executeMethod RedHollow.EditorTools.PackageBootstrap.AddMultiplayerStack` |
+
+Editor binary: `/Applications/Unity/Hub/Editor/6000.5.9f1/Unity.app/Contents/MacOS/Unity`
+
+Verified by probe: the runner discovers `[Test]` and `[TestCase]` rows, executes them, resolves the
+`GameSim` assembly across the asmdef boundary, and reports a deliberately-failing case as Failed.
+Results are NUnit3 XML; parse `total`/`passed`/`failed` off the root element. Probe deleted.
+
+**⚠️ Unity takes an EXCLUSIVE project lock.** A headless run cannot start while the Editor GUI has
+the project open — it stalls silently right after "Successfully changed project path" and writes no
+results XML. Check `pgrep -f "Unity.app/Contents/MacOS/Unity"` before blaming the command, and never
+delete `Temp/UnityLockfile` without confirming no Unity process is alive: two instances writing
+`Library/` will corrupt it.
+
+**Environment status (2026-08-25):** Unity 6000.5.9f1 + Mac Standalone + WebGL, licence working
+headless. Project linked to cloud project `ac5dd937-4e73-44e8-8ac5-fb148787ce3b` (org `kellyqhe47`).
+URP 17.5.0 is the active pipeline; NGO 2.13.2, Transport 6.5.0, Lobby 1.3.0, Relay 1.2.0,
+Authentication 3.7.4, Core 1.18.0, Input System 1.20.0. `activeInputHandler: 2` (both backends).
+Tickets 010-014 are no longer environment-blocked.
