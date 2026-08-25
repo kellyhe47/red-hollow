@@ -242,3 +242,38 @@ DEC-RUN-1 keeps it per-instance overridable either way.
 - **008 may edit `MatchSim.Heroes.cs`** (ticket 007's green file) for the two passives, which hook
   `ResolveHeroAttack`. No other wave-B ticket touches it, so there is no concurrency hazard — but the
   implementer must re-run the golden suite after, since G-030 lives in that path.
+
+### DEC-RUN-9 — R-20's starting stake was never wired (found by 005's test-writer, 2026-08-25)
+`SimConfig.StartingScrip = 500` is **declared and never read anywhere in `GameSim`** — confirmed by
+grep — and `ColonyMap.CreateMatchState()` never touches `Team.Scrip`, leaving it 0. A real match
+starts with an empty pool and R-20's "starting stake 500" is unimplemented.
+
+G-016 grades scrip *carryover* between waves; nothing grades the *initial credit*. Fifth instance of
+the same pattern.
+
+**Resolution:** `ColonyMap.CreateMatchState(SimConfig config = null)` seeds the pool, treating null
+as `new SimConfig()`. It is already the config→state bridge (where hotspot civilian counts become
+live state), so the stake belongs there rather than in a new seam nobody remembers to call.
+Verified safe before ruling: every existing caller (`T03:103`, `T04:50/521/559/921`, `T05:639`)
+either sets `Team.Scrip` explicitly afterwards or never asserts an absolute pool value.
+
+### Accepted from 005's test-writer without change
+- **`PurchaseRequest.ZoneValid` is non-evidence.** The sim validates R-24 itself; the tests set the
+  flag `true` while placing on illegal tiles, so a flag-trusting implementation passes all four
+  goldens and fails every zone case. Whether the sim also honours a client's *negative* verdict is
+  left open — the field may legitimately end up dead.
+- **Request `cost` vs catalog cost is deliberately unpinned.** All four fixtures supply a cost equal
+  to the catalog value, so they cannot arbitrate. Instead of picking a side, the test pins the
+  invariant that holds either way and whose absence is an infinite-money exploit: scrip taken must
+  equal the `PurchaseCost` recorded on the entity, since R-22 refunds half of that field (charge 10,
+  record 100, net +40 per buy-sell cycle).
+- **No footprint/radius seam.** R-24 gives no footprint sizes, so invalid positions in the tests are
+  exactly coincident with what makes them invalid and valid ones are >13 units clear. Any positive
+  radius passes; a degenerate radius-0 implementation would too. Documented rather than papered over
+  — worth the implementer adding config-tunable radii.
+- **`ColonyMap` defaults lazily to `V1()`** on `MatchSim`, matching 004's `WaveTable` precedent.
+  G-013/014/015 declare no map and their positions are ≥7.8 units from V1's nearest hotspot.
+- **Overlap respects `Placeable.Exists`** — a sold turret is not an obstacle; the alternative
+  accumulates permanent dead zones over ten waves.
+- **`SellResult` has no `RejectionReason`** (asymmetric with `PurchaseResult`). Noted; no requirement
+  demands it, R-21 names rejection reasons for purchases only.

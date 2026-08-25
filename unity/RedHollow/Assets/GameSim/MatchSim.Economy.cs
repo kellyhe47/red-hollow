@@ -9,6 +9,26 @@ namespace RedHollow.Sim
     /// </summary>
     public sealed partial class MatchSim
     {
+        /// <summary>
+        /// R-24 — the colony layout this match is played on, and the seam the sim-side placement
+        /// checker needs.
+        ///
+        /// R-24 excludes three things: hotspot building interiors, entry tunnel mouths, and
+        /// overlaps with other placeables. Two of the three are already answerable from
+        /// <see cref="MatchState"/> (<see cref="MatchState.Hotspots"/> and
+        /// <see cref="MatchState.Placeables"/> both carry positions); the tunnel mouths exist
+        /// nowhere except <see cref="RedHollow.Sim.ColonyMap.EntryTunnels"/>, so without this the
+        /// sim cannot enforce R-24 at all and is left trusting the client's own
+        /// <see cref="PurchaseRequest.ZoneValid"/> verdict.
+        ///
+        /// A settable seam rather than a constructor argument, mirroring <see cref="WaveTable"/>:
+        /// the golden adapter builds a <see cref="MatchSim"/> from a fixture's `given`, which names
+        /// no map, so the sim must stay constructible without one.
+        ///
+        /// Shape only — ticket 005 decides the default and the footprint geometry.
+        /// </summary>
+        public ColonyMap ColonyMap { get; set; }
+
         /// <summary>R-21 / B-008. Buy and place a defence.</summary>
         public PurchaseResult PurchasePlacement(PurchaseRequest request)
         {
