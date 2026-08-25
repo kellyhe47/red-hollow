@@ -1,7 +1,7 @@
 ---
 id: 014
 title: Wave-table playtest tuning and non-goal guard
-status: blocked
+status: pending
 depends_on: [004, 011, 012]
 touches: [unity/RedHollow/Assets/GameSim/WaveTable.cs, unity/RedHollow/Assets/Game/Config/]
 iterations: 0
@@ -27,7 +27,7 @@ _Filled in by the test-writer._
 
 ## Attempt log
 
-- BLOCKED (environment, pre-run): Unity Editor is not installed on this machine and needs the owner's Unity account/licence. `unity/RedHollow/` currently holds only `Assets/GameSim` — there is no Unity project (no ProjectSettings/, no Packages/). T-01..T-09 carry the entire 30-fixture acceptance contract and need no Unity.
+- ~~BLOCKED (environment, pre-run)~~ RESOLVED 2026-08-25 — owner installed Unity. Original note: Unity Editor is not installed on this machine and needs the owner's Unity account/licence. `unity/RedHollow/` currently holds only `Assets/GameSim` — there is no Unity project (no ProjectSettings/, no Packages/). T-01..T-09 carry the entire 30-fixture acceptance contract and need no Unity.
 
 ## Handoff notes from the sim run (read before starting)
 
@@ -40,3 +40,4 @@ breaches), wave 10 is 30 mixed from all four.
 It is per-instance config: retune without touching rule code. Numbers most likely to need it are
 listed in the final report — the ability damage values and the R-24 placement radii are guesses the
 PRD never specified.
+- UNBLOCKED: Unity installed. Gated on 011/012 for a playable session to tune against.

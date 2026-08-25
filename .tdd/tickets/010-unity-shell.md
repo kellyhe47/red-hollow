@@ -1,10 +1,10 @@
 ---
 id: 010
 title: Unity project shell: scene, top-down camera, input, sim host loop
-status: blocked
+status: in-progress
 depends_on: [001]
 touches: [unity/RedHollow/ProjectSettings/, unity/RedHollow/Assets/Game/, unity/RedHollow/Packages/]
-iterations: 0
+iterations: 1
 test_files: []
 branch: ""
 board_id: T-10
@@ -28,7 +28,7 @@ _Filled in by the test-writer._
 
 ## Attempt log
 
-- BLOCKED (environment, pre-run): Unity Editor is not installed on this machine and needs the owner's Unity account/licence. `unity/RedHollow/` currently holds only `Assets/GameSim` — there is no Unity project (no ProjectSettings/, no Packages/). T-01..T-09 carry the entire 30-fixture acceptance contract and need no Unity.
+- ~~BLOCKED (environment, pre-run)~~ RESOLVED 2026-08-25 — owner installed Unity. Original note: Unity Editor is not installed on this machine and needs the owner's Unity account/licence. `unity/RedHollow/` currently holds only `Assets/GameSim` — there is no Unity project (no ProjectSettings/, no Packages/). T-01..T-09 carry the entire 30-fixture acceptance contract and need no Unity.
 
 ## Handoff notes from the sim run (read before starting)
 
@@ -57,3 +57,13 @@ netcode replicates from.
 
 Build a match with `ColonyMap.V1().CreateMatchState(config)` — it seeds hotspots and the R-20
 starting stake.
+
+- UNBLOCKED: Unity 6000.5.9f1 installed with Mac Standalone + WebGL; licence verified working via
+  headless batchmode. Project initialised in place — ProjectSettings, Packages, 27 .meta files.
+- VERIFIED: Unity compiled GameSim into its own assembly with `noEngineReferences: true` honoured
+  and an empty reference list. R-51 now proven under the engine compiler, not just dotnet.
+- Transport stack resolved by Package Manager API (not hand-pinned): NGO 2.13.2, Transport 6.5.0,
+  Lobby 1.3.0, Relay 1.2.0, Authentication 3.7.4, Core 1.18.0, Input System 1.20.0.
+  packages-lock.json committed for reproducibility.
+- REMAINING for this ticket: scene, top-down camera, WASD+mouse-aim input (R-30), the host loop
+  driving the sim ticks, and local prediction / remote interpolation (R-52).

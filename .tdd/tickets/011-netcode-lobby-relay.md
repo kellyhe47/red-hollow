@@ -1,7 +1,7 @@
 ---
 id: 011
 title: Netcode: Lobby, Relay, loopback, disconnects, rematch
-status: blocked
+status: pending
 depends_on: [010]
 touches: [unity/RedHollow/Assets/Game/Net/]
 iterations: 0
@@ -28,7 +28,7 @@ _Filled in by the test-writer._
 
 ## Attempt log
 
-- BLOCKED (environment, pre-run): Unity Editor is not installed on this machine and needs the owner's Unity account/licence. `unity/RedHollow/` currently holds only `Assets/GameSim` — there is no Unity project (no ProjectSettings/, no Packages/). T-01..T-09 carry the entire 30-fixture acceptance contract and need no Unity.
+- ~~BLOCKED (environment, pre-run)~~ RESOLVED 2026-08-25 — owner installed Unity. Original note: Unity Editor is not installed on this machine and needs the owner's Unity account/licence. `unity/RedHollow/` currently holds only `Assets/GameSim` — there is no Unity project (no ProjectSettings/, no Packages/). T-01..T-09 carry the entire 30-fixture acceptance contract and need no Unity.
 
 ## Handoff notes from the sim run (read before starting)
 
@@ -42,3 +42,7 @@ _Filled in by the test-writer._
   `ColonyMap.V1().CreateMatchState(config)` to reset scrip, waves, placeables and civilians. Profiles
   persist separately through `IProfileStore`, so `SaveProfilesAtMatchEnd()` must run before the reset.
 - UGS project id is still needed from the owner for Relay; local loopback needs none.
+- UNBLOCKED for the loopback path: Unity + NGO 2.13.2 installed and verified. Relay/Lobby still
+  need a UGS project id, which is written into ProjectSettings.asset by linking the project from
+  the Editor (Project Settings > Services) — it does NOT need a dashboard toggle. Local-loopback
+  2-player must work without it, so the ticket is not gated on the owner.
