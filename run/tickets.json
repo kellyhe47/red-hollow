@@ -414,6 +414,27 @@
         "direction comes from an injected seam, so NavMesh pathing stays in the shell (R-18)",
         "the existing 30 golden fixtures still pass unchanged"
       ]
+    },
+    {
+      "id": "T-19",
+      "title": "Wire the shell to a running match \u2014 the playable bootstrap",
+      "owns_requirements": [],
+      "grades_fixtures": [],
+      "depends_on": [
+        "T-10",
+        "T-16",
+        "T-17",
+        "T-18"
+      ],
+      "scope": "Every piece of a playable session now exists and nothing connects them. HostLoop does not call TickMonsterMovement or MoveHero (T-10's tick test derives its set from PARAMETERLESS Tick* methods, so both fell outside it), no component spawns a wave, and no view is bound to a live entity. Adds the runtime bootstrap: start a match, spawn each wave, pump the loop, route input to the hero, and keep views in step with sim state as entities appear and die.",
+      "acceptance": [
+        "the host loop advances monster movement every step",
+        "a resolved move intent reaches the hero through MoveHero",
+        "starting a match spawns wave 1 and each cleared wave spawns the next",
+        "views appear for spawned entities and are released when they die",
+        "a driven session reaches defeat when monsters are left to reach the shelters",
+        "no game rule enters a MonoBehaviour - ticket 010's Cecil invariant stays green"
+      ]
     }
   ]
 }
