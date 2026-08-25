@@ -21,6 +21,8 @@ purchase_placement (planning-phase only, valid zone, sufficient scrip; rejection
 - [ ] G-013, G-014, G-015, G-022 pass
 - [ ] rejections emit purchase_rejected and change no state
 - [ ] placement zone validation rejects hotspot interiors, tunnel mouths, overlaps
+- [ ] R-25: any player may spend from the shared pool - no ownership check, vote or lock rejects a purchase
+- [ ] PlaceableCatalog carries the R-23 cost table (Barricade 100, Spike Trap 75, Dynamite 150, Turret 250, Med Station 200); 006 consumes its effect numbers
 
 ## Test plan
 
@@ -28,3 +30,5 @@ _Filled in by the test-writer._
 
 ## Attempt log
 
+- CRITERIA AMENDED pre-dispatch (DEC-RUN-4 audit): requirements this ticket owns that had
+  neither a fixture nor an acceptance criterion, and would have shipped unimplemented.

@@ -21,6 +21,8 @@ trigger_placeable (spike trap 30 dmg, 10 triggers then breaks; dynamite 150 AoE 
 - [ ] G-027, G-028, G-029 pass
 - [ ] dynamite hits every living monster inside blast radius
 - [ ] turret ignores dead monsters and out-of-range monsters
+- [ ] R-23/R-16: a barricade takes damage and is destroyed at 0 HP, releasing the path block - today NOTHING damages a placeable, so a targeted barricade is immortal and blocks forever
+- [ ] R-23: Med Station heals heroes 5 HP/s within radius 5 - today only the string constant exists
 
 ## Test plan
 
@@ -28,3 +30,5 @@ _Filled in by the test-writer._
 
 ## Attempt log
 
+- CRITERIA AMENDED pre-dispatch (DEC-RUN-4 audit): requirements this ticket owns that had
+  neither a fixture nor an acceptance criterion, and would have shipped unimplemented.

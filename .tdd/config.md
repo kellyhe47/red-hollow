@@ -142,3 +142,28 @@ then re-locked and implemented. Same handling as the R-35 regen gap.
 no fixture *and* no acceptance criterion, and was therefore about to ship unimplemented. Fixture
 coverage is not requirement coverage. When dispatching 004/005/006/008, check each ticket's
 `owns_requirements` against what its criteria actually exercise, not just against its fixtures.
+
+### Pre-dispatch requirement audit (2026-08-25, after DEC-RUN-4)
+Applying the DEC-RUN-4 lesson to every not-yet-dispatched ticket: checked each owned requirement
+against what its criteria actually exercise, not just against its fixture list. Found three more
+requirements that would have shipped unimplemented, all invisible to the golden suite:
+
+| Ticket | Requirement | Why it would have been missed |
+|---|---|---|
+| 004 | **R-04** wave interstitial | no fixture, no criterion — sim must expose bounty-this-wave + civilians remaining and auto-advance |
+| 004 | **R-05** partial wave preview | no fixture, no criterion — and it is a *negative* requirement: replicated state must expose active entry points WITHOUT leaking monster types or counts |
+| 004 | **R-14** per-wave tunnel subset | folded into "wave table is config" but never stated |
+| 005 | **R-25** any player may spend | trivially true today, but nothing pinned it against a future ownership check |
+| 006 | **R-23 barricade destruction** | **no operation damages a placeable at all.** B-002 makes a blocking barricade the monster's target "until destroyed", and 002 already honours `Exists` — but nothing can ever clear it. A targeted barricade is immortal and blocks its lane for the whole match. |
+| 006 | **R-23 Med Station** | only the `PlaceableType.MedStation` string constant exists; the 5 HP/s heal in radius 5 is entirely absent |
+| 008 | **R-32 cooldowns** | G-018 grades the lasso's *effect*; nothing grades that Q/E are gated at 8s/20s at all |
+| 008 | **R-32 rank scaling** | max rank 3 and ~+25%/rank unpinned |
+| 008 | **R-31 the other five abilities** | only Lasso is fixtured; Fan the Hammer, Deadeye, Stampede, Whirl, Bulwark and the two class passives are real sim rules with no coverage |
+
+All added as explicit acceptance criteria in **both** `run/tickets.json` and `.tdd/tickets/*.md`
+before dispatch, so the decomposition is amended while it is still editable rather than discovered
+mid-implementation. Coverage gate re-run green.
+
+**Ownership note:** DEC-RUN-1 assigned `PlaceableCatalog` to 005, but R-23 belongs to 006. They are
+sequential (006 depends on 005), so there is no concurrency hazard: 005 populates the catalog
+because it needs purchase costs, and 006 consumes the effect numbers already in it.

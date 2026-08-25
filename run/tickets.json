@@ -7,88 +7,331 @@
     "coverage": "python3 run/coverage_check.py"
   },
   "tickets": [
-    { "id": "T-01", "title": "GameSim assembly scaffold + golden-fixture NUnit adapter",
-      "owns_requirements": ["R-51", "R-54"], "grades_fixtures": [],
+    {
+      "id": "T-01",
+      "title": "GameSim assembly scaffold + golden-fixture NUnit adapter",
+      "owns_requirements": [
+        "R-51",
+        "R-54"
+      ],
+      "grades_fixtures": [],
       "depends_on": [],
       "scope": "Pure-C# GameSim assembly (netstandard2.1, zero UnityEngine) + the test-golden adapter: maps each fixture when.operation to a real sim entry point, loads given through production boundaries, captures the four observation surfaces, canonicalizes per eval/golden-manifest.json, deep-compares to expect.exact.",
-      "acceptance": ["dotnet test runs with no Unity editor installed", "all 30 fixtures are discovered as individual NUnit cases", "every fixture fails for its intended reason (NotImplemented) before behavior lands", "adapter never mutates eval/golden"] },
-
-    { "id": "T-02", "title": "Monster roster + nearest-target AI + barricade blocking",
-      "owns_requirements": ["R-16", "R-17", "R-18"], "grades_fixtures": ["G-001", "G-002", "G-003", "G-004", "G-005"],
-      "depends_on": ["T-01"],
+      "acceptance": [
+        "dotnet test runs with no Unity editor installed",
+        "all 30 fixtures are discovered as individual NUnit cases",
+        "every fixture fails for its intended reason (NotImplemented) before behavior lands",
+        "adapter never mutates eval/golden"
+      ]
+    },
+    {
+      "id": "T-02",
+      "title": "Monster roster + nearest-target AI + barricade blocking",
+      "owns_requirements": [
+        "R-16",
+        "R-17",
+        "R-18"
+      ],
+      "grades_fixtures": [
+        "G-001",
+        "G-002",
+        "G-003",
+        "G-004",
+        "G-005"
+      ],
+      "depends_on": [
+        "T-01"
+      ],
       "scope": "select_target: nearest of {living hero, hotspot with >=1 civilian} by straight-line distance, lowest-entity-id tiebreak; barricade on the path becomes the target; Burrower ignores barricades and heroes. Roster stats data-configured.",
-      "acceptance": ["G-001..G-005 pass", "monster stats live in config, not code", "B-003 Burrower carve-out beats B-001/B-002 per PRD precedence"] },
-
-    { "id": "T-03", "title": "Colony, hotspots, civilian pool, defeat rule",
-      "owns_requirements": ["R-10", "R-11", "R-12", "R-13", "R-72"], "grades_fixtures": ["G-006", "G-007", "G-008", "G-009"],
-      "depends_on": ["T-01"],
+      "acceptance": [
+        "G-001..G-005 pass",
+        "monster stats live in config, not code",
+        "B-003 Burrower carve-out beats B-001/B-002 per PRD precedence"
+      ]
+    },
+    {
+      "id": "T-03",
+      "title": "Colony, hotspots, civilian pool, defeat rule",
+      "owns_requirements": [
+        "R-10",
+        "R-11",
+        "R-12",
+        "R-13",
+        "R-72"
+      ],
+      "grades_fixtures": [
+        "G-006",
+        "G-007",
+        "G-008",
+        "G-009"
+      ],
+      "depends_on": [
+        "T-01"
+      ],
       "scope": "apply_hotspot_attack: ceil(damage/10) civilians killed, clamped at 0; hotspot_emptied event; defeat exactly when total civilians across all hotspots reaches 0; emptied hotspots stay lost and stop being valid targets.",
-      "acceptance": ["G-006..G-009 pass", "3 hotspots 8/6/6 = 20 civilians in map config", "no civilian agent simulation"] },
-
-    { "id": "T-04", "title": "Match FSM, wave lifecycle, kills, bounty, victory",
-      "owns_requirements": ["R-01", "R-02", "R-03", "R-04", "R-05", "R-14", "R-19"], "grades_fixtures": ["G-010", "G-011", "G-012", "G-016", "G-017"],
-      "depends_on": ["T-01", "T-03"],
+      "acceptance": [
+        "G-006..G-009 pass",
+        "3 hotspots 8/6/6 = 20 civilians in map config",
+        "no civilian agent simulation"
+      ]
+    },
+    {
+      "id": "T-04",
+      "title": "Match FSM, wave lifecycle, kills, bounty, victory",
+      "owns_requirements": [
+        "R-01",
+        "R-02",
+        "R-03",
+        "R-04",
+        "R-05",
+        "R-14",
+        "R-19"
+      ],
+      "grades_fixtures": [
+        "G-010",
+        "G-011",
+        "G-012",
+        "G-016",
+        "G-017"
+      ],
+      "depends_on": [
+        "T-01",
+        "T-03"
+      ],
       "scope": "record_monster_kill (bounty to shared pool, wave complete on last kill, victory on wave 10), begin_planning_phase (scrip carryover, 60s), set_player_ready (all connected ready -> combat early). First-pass wave table config (R-19 deliberately unfixtured).",
-      "acceptance": ["G-010, G-011, G-012, G-016, G-017 pass", "lobby -> (planning -> combat) x10 -> victory with combat -> defeat edge in every wave", "wave table is config, tunable without code change"] },
-
-    { "id": "T-05", "title": "Shared scrip economy, purchase and sell",
-      "owns_requirements": ["R-20", "R-21", "R-22", "R-24", "R-25"], "grades_fixtures": ["G-013", "G-014", "G-015", "G-022"],
-      "depends_on": ["T-01", "T-04"],
+      "acceptance": [
+        "G-010, G-011, G-012, G-016, G-017 pass",
+        "lobby -> (planning -> combat) x10 -> victory with combat -> defeat edge in every wave",
+        "wave table is config, tunable without code change",
+        "R-04: the sim exposes wave-complete interstitial data (bounty earned this wave, civilians remaining) and planning auto-advances after it",
+        "R-05: the sim exposes which entry points activate next wave WITHOUT exposing monster types or counts",
+        "R-14: which subset of the 4 fixed entry tunnels is active varies per wave via the wave table"
+      ]
+    },
+    {
+      "id": "T-05",
+      "title": "Shared scrip economy, purchase and sell",
+      "owns_requirements": [
+        "R-20",
+        "R-21",
+        "R-22",
+        "R-24",
+        "R-25"
+      ],
+      "grades_fixtures": [
+        "G-013",
+        "G-014",
+        "G-015",
+        "G-022"
+      ],
+      "depends_on": [
+        "T-01",
+        "T-04"
+      ],
       "scope": "purchase_placement (planning-phase only, valid zone, sufficient scrip; rejection reasons wrong_phase / insufficient_scrip; never negative), sell_placement (floor(cost*0.5) refund during planning). Starting stake 500, shared pool, any player may spend.",
-      "acceptance": ["G-013, G-014, G-015, G-022 pass", "rejections emit purchase_rejected and change no state", "placement zone validation rejects hotspot interiors, tunnel mouths, overlaps"] },
-
-    { "id": "T-06", "title": "Placeable combat effects",
-      "owns_requirements": ["R-23"], "grades_fixtures": ["G-027", "G-028", "G-029"],
-      "depends_on": ["T-01", "T-05"],
+      "acceptance": [
+        "G-013, G-014, G-015, G-022 pass",
+        "rejections emit purchase_rejected and change no state",
+        "placement zone validation rejects hotspot interiors, tunnel mouths, overlaps",
+        "R-25: any player may spend from the shared pool - no ownership check, vote or lock rejects a purchase",
+        "PlaceableCatalog carries the R-23 cost table (Barricade 100, Spike Trap 75, Dynamite 150, Turret 250, Med Station 200); 006 consumes its effect numbers"
+      ]
+    },
+    {
+      "id": "T-06",
+      "title": "Placeable combat effects",
+      "owns_requirements": [
+        "R-23"
+      ],
+      "grades_fixtures": [
+        "G-027",
+        "G-028",
+        "G-029"
+      ],
+      "depends_on": [
+        "T-01",
+        "T-05"
+      ],
       "scope": "trigger_placeable (spike trap 30 dmg, 10 triggers then breaks; dynamite 150 AoE once then removed) and turret_tick (nearest living monster within range 8). Catalog numbers config-tunable, mechanics fixture-locked.",
-      "acceptance": ["G-027, G-028, G-029 pass", "dynamite hits every living monster inside blast radius", "turret ignores dead monsters and out-of-range monsters"] },
-
-    { "id": "T-07", "title": "Hero damage, death/respawn, no friendly fire",
-      "owns_requirements": ["R-26", "R-33", "R-34", "R-35", "R-36"], "grades_fixtures": ["G-020", "G-021", "G-030"],
-      "depends_on": ["T-01"],
+      "acceptance": [
+        "G-027, G-028, G-029 pass",
+        "dynamite hits every living monster inside blast radius",
+        "turret ignores dead monsters and out-of-range monsters",
+        "R-23/R-16: a barricade takes damage and is destroyed at 0 HP, releasing the path block - today NOTHING damages a placeable, so a targeted barricade is immortal and blocks forever",
+        "R-23: Med Station heals heroes 5 HP/s within radius 5 - today only the string constant exists"
+      ]
+    },
+    {
+      "id": "T-07",
+      "title": "Hero damage, death/respawn, no friendly fire",
+      "owns_requirements": [
+        "R-26",
+        "R-33",
+        "R-34",
+        "R-35",
+        "R-36"
+      ],
+      "grades_fixtures": [
+        "G-020",
+        "G-021",
+        "G-030"
+      ],
+      "depends_on": [
+        "T-01"
+      ],
       "scope": "apply_hero_damage (Sawbones flat 30% DR, floor applied; 0 HP -> dies instantly, respawn_at = now + 10s, untargetable while dead), resolve_hero_attack (hero attacks pass through heroes and placeables, damage monsters only). No mana; out-of-combat regen 2 HP/s after 5s.",
-      "acceptance": ["G-020, G-021, G-030 pass", "all heroes dead is not defeat", "dead heroes excluded from monster target candidates (feeds T-02)"] },
-
-    { "id": "T-08", "title": "Hero kits, abilities, cooldowns, status effects",
-      "owns_requirements": ["R-31", "R-32"], "grades_fixtures": ["G-018", "G-019"],
-      "depends_on": ["T-01", "T-07"],
+      "acceptance": [
+        "G-020, G-021, G-030 pass",
+        "all heroes dead is not defeat",
+        "dead heroes excluded from monster target candidates (feeds T-02)"
+      ]
+    },
+    {
+      "id": "T-08",
+      "title": "Hero kits, abilities, cooldowns, status effects",
+      "owns_requirements": [
+        "R-31",
+        "R-32"
+      ],
+      "grades_fixtures": [
+        "G-018",
+        "G-019"
+      ],
+      "depends_on": [
+        "T-01",
+        "T-07"
+      ],
       "scope": "apply_ability (Rancher lasso: 50% slow for exactly 3.0s, expires_at recorded) and tick_status_effects (expiry at >= expires_at restores base speed). Three class kits with Q 8s / E 20s cooldowns, ranks 1-3 at ~+25%/rank, Q/E gated on unlocks from the account profile.",
-      "acceptance": ["G-018, G-019 pass", "kit numbers config-tunable", "heroes start a match with saved ability allocations (R-31 + R-43)"] },
-
-    { "id": "T-09", "title": "XP, leveling, skill points, persistent profiles",
-      "owns_requirements": ["R-40", "R-41", "R-42", "R-43", "R-44"], "grades_fixtures": ["G-023", "G-024", "G-025", "G-026"],
-      "depends_on": ["T-01"],
+      "acceptance": [
+        "G-018, G-019 pass",
+        "kit numbers config-tunable",
+        "heroes start a match with saved ability allocations (R-31 + R-43)",
+        "R-32: Q and E cooldowns (8s / 20s) are enforced - a cast while on cooldown is rejected and changes nothing",
+        "R-32: ability ranks cap at 3 and each rank improves the ability's numbers by ~25%",
+        "R-31: every class Q/E resolves through the sim - Gunslinger Fan the Hammer / Deadeye, Rancher Lasso / Stampede, Sawbones Whirl / Bulwark (60% DR for 2s) - and the class passives apply (Gunslinger every-4th-basic crit x2, Rancher basics hit up to 2 targets)"
+      ]
+    },
+    {
+      "id": "T-09",
+      "title": "XP, leveling, skill points, persistent profiles",
+      "owns_requirements": [
+        "R-40",
+        "R-41",
+        "R-42",
+        "R-43",
+        "R-44"
+      ],
+      "grades_fixtures": [
+        "G-023",
+        "G-024",
+        "G-025",
+        "G-026"
+      ],
+      "depends_on": [
+        "T-01"
+      ],
       "scope": "award_kill_xp (XP = bounty to the credited player; turret kills credit the placer; lifetime XP never decreases; level L threshold 100*L*(L-1)/2; one skill point per level gained) and spend_skill_point (unlock Q / unlock E / rank up, max rank 3; reject with no_skill_points). Injected IProfileStore; saves at each level-up and match end.",
-      "acceptance": ["G-023, G-024, G-025, G-026 pass", "profile_store.save external call fires exactly where fixtures pin it", "fixture tests use a fixture-backed fake store; production uses server-local SQLite/JSON keyed by callsign"] },
-
-    { "id": "T-10", "title": "Unity project shell: scene, top-down camera, input, sim host loop",
-      "owns_requirements": ["R-30", "R-50", "R-52"], "grades_fixtures": [],
-      "depends_on": ["T-01"],
+      "acceptance": [
+        "G-023, G-024, G-025, G-026 pass",
+        "profile_store.save external call fires exactly where fixtures pin it",
+        "fixture tests use a fixture-backed fake store; production uses server-local SQLite/JSON keyed by callsign"
+      ]
+    },
+    {
+      "id": "T-10",
+      "title": "Unity project shell: scene, top-down camera, input, sim host loop",
+      "owns_requirements": [
+        "R-30",
+        "R-50",
+        "R-52"
+      ],
+      "grades_fixtures": [],
+      "depends_on": [
+        "T-01"
+      ],
       "scope": "Unity project that references GameSim via asmdef (noEngineReferences on GameSim mechanically enforces the invariant). Top-down camera, WASD move with W movement-only, hero faces cursor, SPACE basic, Q/E abilities; own-hero local prediction with host reconciliation; remote entity interpolation. MonoBehaviours send commands and render replicated state, never hold game rules.",
-      "acceptance": ["a playable solo session runs with primitive placeholder art", "no game rule appears in a MonoBehaviour", "GameSim asmdef has noEngineReferences: true"] },
-
-    { "id": "T-11", "title": "Netcode: Lobby, Relay, loopback, disconnects, rematch",
-      "owns_requirements": ["R-07", "R-53", "R-55"], "grades_fixtures": [],
-      "depends_on": ["T-10"],
+      "acceptance": [
+        "a playable solo session runs with primitive placeholder art",
+        "no game rule appears in a MonoBehaviour",
+        "GameSim asmdef has noEngineReferences: true"
+      ]
+    },
+    {
+      "id": "T-11",
+      "title": "Netcode: Lobby, Relay, loopback, disconnects, rematch",
+      "owns_requirements": [
+        "R-07",
+        "R-53",
+        "R-55"
+      ],
+      "grades_fixtures": [],
+      "depends_on": [
+        "T-10"
+      ],
       "scope": "Netcode for GameObjects host-authoritative; Unity Lobby join codes + Relay with the UGS project id injected via config; local-loopback multiplayer must work with no UGS id. Mid-match disconnect despawns the hero and retargets monsters; host disconnect ends the match; no mid-match joins. ESC is a non-pausing overlay. Rematch returns the party to the same lobby with join code and class picks retained, full match-state reset, profiles persisted.",
-      "acceptance": ["2-player loopback session completes a 10-wave match", "victory, defeat and rematch paths all exercised", "no UGS id required for loopback"] },
-
-    { "id": "T-12", "title": "UI screens S1-S7 and cross-cutting states",
-      "owns_requirements": ["R-60", "R-61", "R-62", "R-63"], "grades_fixtures": [],
-      "depends_on": ["T-10"],
+      "acceptance": [
+        "2-player loopback session completes a 10-wave match",
+        "victory, defeat and rematch paths all exercised",
+        "no UGS id required for loopback"
+      ]
+    },
+    {
+      "id": "T-12",
+      "title": "UI screens S1-S7 and cross-cutting states",
+      "owns_requirements": [
+        "R-60",
+        "R-61",
+        "R-62",
+        "R-63"
+      ],
+      "grades_fixtures": [],
+      "depends_on": [
+        "T-10"
+      ],
       "scope": "Every screen and state in docs/ui-wireframes.html: Title/Join, Lobby, Planning, Combat, Wave interstitial, Victory, Defeat, plus bad join code error, greyed unaffordable shop items, dead-hero spectate overlay, civilians-lost toast and red flash, lost-hotspot marking. Persistent combat HUD; non-blocking level-up overlay (hotkey L / badge click); planning shop bar with ghost preview, sell tooltip, pulsing entry points, ready N/4 and timer.",
-      "acceptance": ["every wireframe screen and state is present and reachable", "the sim never pauses for the level-up overlay"] },
-
-    { "id": "T-13", "title": "Asset seam validation and feel pass",
-      "owns_requirements": ["R-15", "R-64"], "grades_fixtures": [],
-      "depends_on": ["T-10"],
+      "acceptance": [
+        "every wireframe screen and state is present and reachable",
+        "the sim never pauses for the level-up overlay"
+      ]
+    },
+    {
+      "id": "T-13",
+      "title": "Asset seam validation and feel pass",
+      "owns_requirements": [
+        "R-15",
+        "R-64"
+      ],
+      "grades_fixtures": [],
+      "depends_on": [
+        "T-10"
+      ],
       "scope": "Swappable asset references throughout; wire one representative asset per class (tile, icon, UI frame, character) early to validate Unity import settings, exact pixel sizes, alpha handling and detail at real camera height. Report contract violations back to the owner. Lantern Deep scene lighting (dark warm ambient, amber point lights, fog, rock-dome sky). Hit flash, knockback nudge, wave stingers, western-twang UI audio.",
-      "acceptance": ["placeholder-art build is shippable", "no code path blocks on an asset existing", "generated art drops in as a pure asset swap"] },
-
-    { "id": "T-14", "title": "Wave-table playtest tuning and non-goal guard",
-      "owns_requirements": ["R-06", "R-70", "R-71", "R-73"], "grades_fixtures": [],
-      "depends_on": ["T-04", "T-11", "T-12"],
+      "acceptance": [
+        "placeholder-art build is shippable",
+        "no code path blocks on an asset existing",
+        "generated art drops in as a pure asset swap"
+      ]
+    },
+    {
+      "id": "T-14",
+      "title": "Wave-table playtest tuning and non-goal guard",
+      "owns_requirements": [
+        "R-06",
+        "R-70",
+        "R-71",
+        "R-73"
+      ],
+      "grades_fixtures": [],
+      "depends_on": [
+        "T-04",
+        "T-11",
+        "T-12"
+      ],
       "scope": "Playtest the wave table to a 25-35 minute session (R-19 is deliberately unfixtured config). Confirm the v1 non-goals hold: no PvP, no host migration, no mid-match join, no spectator beyond dead-hero cam, no cross-match meta-economy, no second map, no boss, no difficulty settings.",
-      "acceptance": ["a full match lands in the 25-35 minute window", "no non-goal feature shipped"] }
+      "acceptance": [
+        "a full match lands in the 25-35 minute window",
+        "no non-goal feature shipped"
+      ]
+    }
   ]
 }
