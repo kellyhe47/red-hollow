@@ -31,9 +31,10 @@ State file for the run. Update statuses as work lands. Resume procedure at botto
 | 25–27 facades (opaque, no alpha branch) | 1024² | 1024² |
 
 ## Status
-- [ ] Workflow built in Comfy Cloud + first draft image
-- [ ] Alpha branch verified (magenta/blue composite check on a draft)
-- [ ] ui_props.json exported + committed
+- [x] Workflow built in Comfy Cloud + first draft image
+- [x] Alpha branch verified — NOTE: diff-matte alone unusable (branch divergence); primary matte = BiRefNetRMBG node (`ui/rgba2` output), diff branch kept as cross-check. LayerMask BiRefNet nodes broken on cloud. See 04 doc overrides.
+- [x] ui_props.json exported + committed (c900f1f)
+- [x] All 32 keeper runs queued 2026-08-25 (19 chrome + 10 props + 3 facades), steps 28, order: hud-topbar, shop-bar, slot-frame, slot-frame-locked, hp-bar-frame, hp-bar-fill, xp-bar-frame, xp-bar-fill, button-normal/hover/pressed, levelup-card, dialog-panel, toast-banner, wave-banner, victory-banner, defeat-banner, cursor, crosshair, spawn-banner, water-tower, string-lights, hay-bale, barrel-cluster, cactus-pot, hitching-post, antenna-mast, lantern-post, saloon-sign, tumbleweed, saloon-facade, chapel-facade, homestead-facade. Cloud filenames are hashes — map history entries to slugs BY THIS ORDER (draft run t=1787689782228 precedes them).
 - [ ] Items 1–14 UI chrome (draft→keeper→download→verify→commit `art/ui/`)
 - [ ] Items 15–24 props (`art/ui/props/` … actually `art/props/`? use `art/ui/` for chrome, `art/props/` for world props)
 - [ ] Items 25–27 facades (opaque branch, `art/props/`)

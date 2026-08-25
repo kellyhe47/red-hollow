@@ -373,6 +373,25 @@
         "no code path blocks on an asset existing - placeholders resolve when art is absent",
         "visuals render from replicated sim state, never from locally recomputed rules"
       ]
+    },
+    {
+      "id": "T-17",
+      "title": "Wave spawning \u2014 turn the wave table into live monsters",
+      "owns_requirements": [],
+      "grades_fixtures": [],
+      "depends_on": [
+        "T-04",
+        "T-02"
+      ],
+      "scope": "Nothing in the sim creates a Monster. WaveTable has the composition, MonsterCatalog the stats and ColonyMap.EntryTunnels the positions, but nothing assembles them, so a match can never contain a monster. Adds the sim-side spawn command that reads all three and populates MatchState.Monsters and WaveState.LivingMonsterIds. Belongs in the sim, not the shell: how many monsters of what type exist is a game rule, and ticket 010's invariant forbids the shell authoring sim entities.",
+      "acceptance": [
+        "spawning wave N creates exactly the monsters its WaveSpec describes",
+        "each spawned monster carries its R-17 catalog stats - hp, speed, damage - not invented numbers",
+        "monsters are placed at the entry tunnels the wave table marks active for that wave (R-14)",
+        "spawned ids are unique and land in WaveState.LivingMonsterIds so wave completion works",
+        "spawning is deterministic - same wave and seed yields the same result (R-54)",
+        "the existing 30 golden fixtures still pass unchanged"
+      ]
     }
   ]
 }
