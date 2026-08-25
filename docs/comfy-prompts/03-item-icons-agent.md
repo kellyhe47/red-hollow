@@ -23,3 +23,15 @@ Set-consistency pass: contact-sheet all icons in one grid; identical background 
 
 ## Control rung
 Fixed seed (rung 2) is the design center for this class. img2img off the badge template if the background drifts. No ControlNet/LoRA.
+
+## Pipeline-specific overrides (locked 2026-08-25, after 5 drafts)
+
+The doc's original framing line ("centered single object … circular badge background") **fails on SDXL**: the item either tiles the whole frame (no badge) or the badge wins and the item is lost. The locked contract uses prompt weighting and lives in the workflow's ② FRAMING node (canonical copy: `art/workflows/item_icon.json` node 3):
+
+> `game item icon of the named object, the object is the main subject displayed centered on top of (a dark leather-and-brass circular badge medallion:1.2), (flat pitch-black dark background surrounding the badge:1.4), 3/4 view, thick readable silhouette, warm white-gold lantern rim light, monochromatic burnt-sienna palette, matte painterly semi-realism, muted matte surfaces, no text, no watermark`
+
+- ITEM token format: `(<visual description of object>:1.2)` — describe what it *looks like*, not its game function; keep weight at 1.2 (1.35 kills the badge, 1.0 loses the item).
+- Scene terms (cavern vista, volumetric haze, settlement) are stripped per 00-shared-style's icons/UI exemption; palette/matte/no-cool-tones rules kept.
+- Full scene tail in the shared doc is NOT used here (vista terms leak architecture into the badge).
+- Workflow: Comfy Cloud "Item Icons Pipeline". Runs queue reliably via `app.queuePrompt(0,1)` from the console; the Run button click sometimes doesn't register.
+- Delivery: SaveImage ×3 (1024/256/128, `area` downscale). Draft prefix `icons/<sz>/<slug>_draft`, keeper prefix `icons/<sz>/<slug>_v<N>`.
