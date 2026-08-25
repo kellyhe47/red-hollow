@@ -392,6 +392,28 @@
         "spawning is deterministic - same wave and seed yields the same result (R-54)",
         "the existing 30 golden fixtures still pass unchanged"
       ]
+    },
+    {
+      "id": "T-18",
+      "title": "Movement \u2014 advance hero and monster positions over time",
+      "owns_requirements": [],
+      "grades_fixtures": [],
+      "depends_on": [
+        "T-17",
+        "T-02",
+        "T-08"
+      ],
+      "scope": "Nothing in the sim advances a position over time; positions are only set at spawn, respawn, knockback and placement. So monsters never reach a hotspot, defeat is unreachable in a live match, and CurrentSpeed - which the lasso multiplies and TickStatusEffects restores - is read by nothing that moves anything. Adds the sim-side movement tick. The sim owns HOW FAR (speed x delta, honouring slows); the shell owns WHICH WAY, injected the way IPathOracle already lets the shell answer a geometry question while the sim keeps the rule.",
+      "acceptance": [
+        "a monster with a target closes distance to it at its CurrentSpeed",
+        "a lassoed monster covers exactly half the ground of an unslowed one over the same interval (DEC-008)",
+        "when the slow expires the monster returns to full pace (G-019 restores CurrentSpeed)",
+        "a monster that reaches its target stops rather than overshooting or orbiting",
+        "heroes move on a commanded direction at their configured speed (R-30)",
+        "dead heroes and dead monsters do not move",
+        "direction comes from an injected seam, so NavMesh pathing stays in the shell (R-18)",
+        "the existing 30 golden fixtures still pass unchanged"
+      ]
     }
   ]
 }
