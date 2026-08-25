@@ -1,11 +1,11 @@
 ---
 id: 018
 title: Movement — advance hero and monster positions over time
-status: pending
+status: green
 depends_on: [017, 002, 008]
 touches: [unity/RedHollow/Assets/GameSim/MatchSim.Movement.cs, sim/GameSim.Tests/T18_MovementTests.cs]
-iterations: 0
-test_files: []
+iterations: 1
+test_files: [sim/GameSim.Tests/T18_MovementTests.cs]
 branch: ""
 board_id: T-18
 owns_requirements: []
@@ -33,17 +33,24 @@ keeps movement out of the shell, where ticket 010's Cecil invariant forbids it.
 
 ## Acceptance criteria
 
-- [ ] a monster with a target closes distance to it at its `CurrentSpeed`
-- [ ] a lassoed monster covers exactly half the ground of an unslowed one over the same interval (DEC-008)
-- [ ] when the slow expires the monster returns to full pace (G-019 restores `CurrentSpeed`)
-- [ ] a monster that reaches its target stops rather than overshooting or orbiting
-- [ ] heroes move on a commanded direction at their configured speed (R-30)
-- [ ] dead heroes and dead monsters do not move
-- [ ] direction comes from an injected seam, so NavMesh pathing stays in the shell (R-18)
-- [ ] the existing 30 golden fixtures still pass unchanged
+- [x] a monster with a target closes distance to it at its `CurrentSpeed`
+- [x] a lassoed monster covers exactly half the ground of an unslowed one over the same interval (DEC-008)
+- [x] when the slow expires the monster returns to full pace (G-019 restores `CurrentSpeed`)
+- [x] a monster that reaches its target stops rather than overshooting or orbiting
+- [x] heroes move on a commanded direction at their configured speed (R-30)
+- [x] dead heroes and dead monsters do not move
+- [x] direction comes from an injected seam, so NavMesh pathing stays in the shell (R-18)
+- [x] the existing 30 golden fixtures still pass unchanged
 
 ## Test plan
 
-_Filled in by the test-writer._
+`T18_MovementTests.cs` — 18 cases: closing distance at CurrentSpeed across three target kinds,
+the DEC-008 half-ground lasso test plus recovery through a real TickStatusEffects, arrival without
+overshoot and stable under repeat ticks, hero direction/speed incl. normalised diagonals, the dead
+not moving, oracle magnitude ignored, zero-direction holding ground.
 
 ## Attempt log
+- iter 1 GREEN @ 0b11d25: full suite 356/356, fixtures 30/30, zero NotYet call sites.
+- Arrival clamps (no invented melee reach). Monster tick replicates a count; hero step replicates pos.
+- OPEN: nothing calls TickMonsterMovement/MoveHero yet — the host loop needs wiring (shell ticket).
+  Note T10 derives required ticks from PARAMETERLESS Tick* methods, so these two are not auto-required.
