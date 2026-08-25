@@ -9,6 +9,12 @@ unity/RedHollow/[Ll]ogs/
 unity/RedHollow/[Uu]serSettings/
 unity/RedHollow/[Bb]uild/
 unity/RedHollow/[Bb]uilds/
+unity/RedHollow/[Mm]emoryCaptures/
+unity/RedHollow/[Rr]ecordings/
+# Unity regenerates IDE project files on every Editor open
+unity/RedHollow/*.csproj
+unity/RedHollow/*.sln
+unity/RedHollow/*.user
 
 # tdd-orchestrator: ticket state is committed, worktree checkouts never are
 .tdd/worktrees/
