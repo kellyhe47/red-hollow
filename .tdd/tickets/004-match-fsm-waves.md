@@ -1,7 +1,7 @@
 ---
 id: 004
 title: Match FSM, wave lifecycle, kills, bounty, victory
-status: in-progress
+status: awaiting-merge
 depends_on: [001, 003]
 touches: [unity/RedHollow/Assets/GameSim/MatchSim.Waves.cs, unity/RedHollow/Assets/GameSim/WaveTable.cs, sim/GameSim.Tests/T04_WaveTests.cs]
 iterations: 1
@@ -42,3 +42,5 @@ G-010/011/012/016/017 not re-encoded.
 - wave B: test-writer dispatched in worktree .tdd/worktrees/004 (branch tdd/004).
 - tests locked on tdd/004 @ 9f92c54: 50 cases, all red; 132 passing tests unchanged.
 - iter 1: implementer dispatched.
+- iter 1 GREEN in worktree: 9 failed / 187 passed / 196 total, exactly the target. Zero T-04 stubs.
+  Locked tests untouched.
