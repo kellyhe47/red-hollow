@@ -55,6 +55,24 @@ namespace RedHollow.Sim
         public double MonsterAttackIntervalSeconds = 1.0;
 
         /// <summary>
+        /// R-17 roster stats, bounty included (R-40). Empty by default: R-16 requires the roster be
+        /// data the shell supplies, so an unpopulated archetype throws instead of defaulting.
+        /// </summary>
+        public MonsterCatalog Monsters = new MonsterCatalog();
+
+        /// <summary>
+        /// R-23 placeable catalog — cost and effect numbers. Empty by default; the mechanics are
+        /// fixture-locked but these numbers are tuned in config, never in code.
+        /// </summary>
+        public PlaceableCatalog Placeables = new PlaceableCatalog();
+
+        /// <summary>
+        /// R-31 hero kits and their R-32 cooldowns. Empty by default; an unconfigured class throws
+        /// rather than spawning a hero with no HP.
+        /// </summary>
+        public HeroKitCatalog HeroKits = new HeroKitCatalog();
+
+        /// <summary>
         /// Cumulative lifetime XP required to have reached <paramref name="level"/> (R-41).
         /// Level 1 = 0, level 2 = 100, level 3 = 300, level 4 = 600 ...
         /// </summary>
