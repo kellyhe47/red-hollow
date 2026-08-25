@@ -81,11 +81,13 @@ namespace RedHollow.Sim
         /// than a match that starts broke.
         /// </summary>
         /// <param name="config">
-        /// The match's tunables; null means the shipped defaults. Seeding is ticket 005's — this
-        /// signature is the seam, not the behaviour.
+        /// The match's tunables; null means the shipped defaults, so a caller that has authored no
+        /// config still opens on a playable pool rather than on an unaffordable first wave.
         /// </param>
         public MatchState CreateMatchState(SimConfig config = null)
         {
+            var tunables = config ?? new SimConfig();
+
             var state = new MatchState();
             foreach (var spec in Hotspots)
             {
@@ -96,6 +98,11 @@ namespace RedHollow.Sim
                     Civilians = spec.Civilians,
                 };
             }
+
+            // R-20 — the opening stake, read from config rather than written as a literal here: a
+            // number hardcoded into the bridge is the same "declared but never read" bug relocated,
+            // and a tuned config would silently get 500 anyway.
+            state.Team.Scrip = tunables.StartingScrip;
 
             return state;
         }
