@@ -1,7 +1,7 @@
 ---
 id: 009
 title: XP, leveling, skill points, persistent profiles
-status: awaiting-merge
+status: green
 depends_on: [001]
 touches: [unity/RedHollow/Assets/GameSim/MatchSim.Progression.cs, unity/RedHollow/Assets/GameSim/SqliteProfileStore.cs, sim/GameSim.Tests/T09_ProgressionTests.cs]
 iterations: 1
@@ -18,9 +18,9 @@ award_kill_xp (XP = bounty to the credited player; turret kills credit the place
 
 ## Acceptance criteria
 
-- [ ] G-023, G-024, G-025, G-026 pass
-- [ ] profile_store.save external call fires exactly where fixtures pin it
-- [ ] fixture tests use a fixture-backed fake store; production uses server-local SQLite/JSON keyed by callsign
+- [x] G-023, G-024, G-025, G-026 pass
+- [x] profile_store.save external call fires exactly where fixtures pin it
+- [x] fixture tests use a fixture-backed fake store; production uses server-local SQLite/JSON keyed by callsign
 
 ## Test plan
 
@@ -44,3 +44,5 @@ Stubs added: `JsonProfileStore.cs`, `MatchSim.SaveProfilesAtMatchEnd()`.
 - iter 1: implementer dispatched in worktree .tdd/worktrees/009.
 - iter 1 GREEN in worktree: 26 failed / 47 passed / 73 total, exactly the target. Locked tests
   untouched. No csproj change (no NuGet package); JSON hand-rolled per the netstandard2.1 constraint.
+- MERGED to main @ 9adbcc8. Post-merge full suite with 002+003: 17 failed / 92 passed / 109 total,
+  13/30 fixtures green. T-09 tag gone; remaining tags unchanged. validate-spec and coverage green.
