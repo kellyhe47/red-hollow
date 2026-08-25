@@ -1,10 +1,10 @@
 ---
 id: 007
 title: Hero damage, death/respawn, no friendly fire
-status: in-progress
+status: awaiting-merge
 depends_on: [001]
 touches: [unity/RedHollow/Assets/GameSim/MatchSim.Heroes.cs, unity/RedHollow/Assets/GameSim/Entities.cs, sim/GameSim.Tests/T07_HeroTests.cs]
-iterations: 1
+iterations: 2
 test_files: [sim/GameSim.Tests/T07_HeroTests.cs]
 branch: "tdd/007"
 board_id: T-07
@@ -46,3 +46,7 @@ G-020/021/030 not re-encoded.
 - DEC-RUN-2 binds this ticket's implementer: reduced damage is
   `Math.Floor(damage * (1.0 - reduction) + 1e-9)`.
 - iter 1: implementer dispatched in worktree .tdd/worktrees/007.
+- iter 2: R-33 respawn execution (DEC-RUN-4). Test-writer added TickHeroRespawns() seam + 8 cases
+  incl. the inclusive-deadline boundary grounded in G-019 precedent; implementer closed it.
+- GREEN in worktree: 27 failed / 59 passed / 86 total. 37/37 T07 pass, zero T-07 stubs remain,
+  locked tests untouched.
