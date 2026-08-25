@@ -84,3 +84,23 @@ date,pipeline,item,model,seed,steps,cfg,sampler,positive_tail,negative,output,st
 2026-08-25,item_icon,"(a simple round clock face with two bold clock hands:1.2)",sd_xl_base_1.0,20260824,28,7,dpmpp_2m/karras,icon-framing-contract,contract+addon,"art/icons/state-cooldown_v1_{1024,256,128}.png",keeper
 2026-08-25,item_icon,"(a leather cowboy boot wrapped tightly in rope:1.2)",sd_xl_base_1.0,20260824,28,7,dpmpp_2m/karras,icon-framing-contract,contract+addon,"art/icons/state-slow_v1_{1024,256,128}.png",keeper
 2026-08-25,item_icon,"(a brass hourglass with flowing sand:1.2)",sd_xl_base_1.0,20260824,28,7,dpmpp_2m/karras,icon-framing-contract,contract+addon,"art/icons/state-respawn_v1_{1024,256,128}.png",keeper
+2026-08-25,ui_props,hud-topbar,sd_xl_base_1.0,20260824,28,7,dpmpp_2m/karras,ui-framing contract (04 doc) + opaque from black raw,contract+alpha-addon,art/ui/hud-topbar_v1_1920x120.png,keeper-verified
+2026-08-25,ui_props,shop-bar,sd_xl_base_1.0,20260824,28,7,dpmpp_2m/karras,ui-framing contract (04 doc) + opaque from black raw,contract+alpha-addon,art/ui/shop-bar_v1_1200x160.png,keeper-verified
+2026-08-25,ui_props,slot-frame-locked,sd_xl_base_1.0,20260824,28,7,dpmpp_2m/karras,ui-framing contract (04 doc) + opaque from black raw,contract+alpha-addon,art/ui/slot-frame-locked_v1_96x96.png,keeper-verified
+2026-08-25,ui_props,dialog-panel,sd_xl_base_1.0,20260824,28,7,dpmpp_2m/karras,ui-framing contract (04 doc) + opaque from black raw,contract+alpha-addon,art/ui/dialog-panel_v1_800x600.png,keeper-verified
+2026-08-25,ui_props,levelup-card,sd_xl_base_1.0,20260824,28,7,dpmpp_2m/karras,ui-framing contract (04 doc) + rgba birefnet,contract+alpha-addon,art/ui/levelup-card_v1_360x480.png,keeper-verified
+2026-08-25,ui_props,victory-banner,sd_xl_base_1.0,20260824,28,7,dpmpp_2m/karras,ui-framing contract (04 doc) + rgba birefnet,contract+alpha-addon,art/ui/victory-banner_v1_1000x400.png,keeper-verified
+2026-08-25,ui_props,button-normal,sd_xl_base_1.0,20260824,28,7,dpmpp_2m/karras,ui-framing contract (04 doc) + rgba birefnet,contract+alpha-addon,art/ui/button-normal_v1_320x96.png,keeper-verified
+2026-08-25,ui_props,button-hover,sd_xl_base_1.0,20260824,28,7,dpmpp_2m/karras,ui-framing contract (04 doc) + rgba birefnet,contract+alpha-addon,art/ui/button-hover_v1_320x96.png,keeper-verified
+2026-08-25,ui_props,button-pressed,sd_xl_base_1.0,20260824,28,7,dpmpp_2m/karras,ui-framing contract (04 doc) + rgba birefnet,contract+alpha-addon,art/ui/button-pressed_v1_320x96.png,keeper-verified
+2026-08-25,ui_props,cursor,sd_xl_base_1.0,20260824,28,7,dpmpp_2m/karras,ui-framing contract (04 doc) + rgba birefnet,contract+alpha-addon,art/ui/cursor_v1_64x64.png,keeper-verified
+2026-08-25,ui_props,crosshair,sd_xl_base_1.0,20260824,28,7,dpmpp_2m/karras,ui-framing contract (04 doc) + rgba birefnet,contract+alpha-addon,art/ui/crosshair_v1_64x64.png,keeper-verified
+2026-08-25,ui_props,water-tower,sd_xl_base_1.0,20260824,28,7,dpmpp_2m/karras,"props/facade framing (04 doc), rgba birefnet",contract+alpha-addon,art/props/water-tower_v1_1024.png,keeper-verified
+2026-08-25,ui_props,hay-bale,sd_xl_base_1.0,20260824,28,7,dpmpp_2m/karras,"props/facade framing (04 doc), rgba birefnet",contract+alpha-addon,art/props/hay-bale_v1_1024.png,keeper-verified
+2026-08-25,ui_props,barrel-cluster,sd_xl_base_1.0,20260824,28,7,dpmpp_2m/karras,"props/facade framing (04 doc), rgba birefnet",contract+alpha-addon,art/props/barrel-cluster_v1_1024.png,keeper-verified
+2026-08-25,ui_props,cactus-pot,sd_xl_base_1.0,20260824,28,7,dpmpp_2m/karras,"props/facade framing (04 doc), rgba birefnet",contract+alpha-addon,art/props/cactus-pot_v1_1024.png,keeper-verified
+2026-08-25,ui_props,saloon-sign,sd_xl_base_1.0,20260824,28,7,dpmpp_2m/karras,"props/facade framing (04 doc), rgba birefnet",contract+alpha-addon,art/props/saloon-sign_v1_1024.png,keeper-verified
+2026-08-25,ui_props,tumbleweed,sd_xl_base_1.0,20260824,28,7,dpmpp_2m/karras,"props/facade framing (04 doc), rgba birefnet",contract+alpha-addon,art/props/tumbleweed_v1_1024.png,keeper-verified
+2026-08-25,ui_props,saloon-facade,sd_xl_base_1.0,20260824,28,7,dpmpp_2m/karras,"props/facade framing (04 doc), rgba birefnet",contract+alpha-addon,art/props/saloon-facade_v1_1024.png,keeper-verified
+2026-08-25,ui_props,chapel-facade,sd_xl_base_1.0,20260824,28,7,dpmpp_2m/karras,"props/facade framing (04 doc), rgba birefnet",contract+alpha-addon,art/props/chapel-facade_v1_1024.png,keeper-verified
+2026-08-25,ui_props,homestead-facade,sd_xl_base_1.0,20260824,28,7,dpmpp_2m/karras,"props/facade framing (04 doc), rgba birefnet",contract+alpha-addon,art/props/homestead-facade_v1_1024.png,keeper-verified
