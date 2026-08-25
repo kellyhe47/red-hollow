@@ -53,8 +53,9 @@ Most of Lantern Deep is a **scene-lighting** achievement, deliberately kept out 
 1. Start from a Comfy Cloud text-to-image template; get one image out before building anything.
 2. One workflow file per asset class; the subject slot is an `{item}` token — the workflow owns the style, an items list owns the subjects. Fork per asset with the seed pinned.
 3. Export **Save (API Format)** — the plain Save is only an editor file. Commit workflow JSON to `art/workflows/` in the game repo; roll back when a change makes things worse.
-4. Log model + seed + steps + cfg + both prompts per delivered asset (filename or `art/asset-log.csv`).
+4. Log model + seed + steps + cfg + both prompts per delivered asset in `art/asset-log.csv`.
 5. Draft at low steps and small sizes; spend credits only on keepers.
+5b. **"Deliver" means committed to the repo.** Comfy Cloud storage is scratch space, not delivery. Every keeper gets downloaded (asset "..." menu → Download) and committed under `art/<class>/` (textures / characters / icons / ui) named `<subject-slug>_v<N>_<size|variant>.png` — e.g. `art/textures/street-dirt_v1_512.png`. Bump `_v<N+1>` on regeneration; never overwrite a committed version; never re-run a pipeline just to rename. An asset that exists only in Comfy Cloud is not done.
 6. **Style-change rule:** any asset generated under the pre-DEC-025 tail must be regenerated before ship; never mix the two styles in one delivered set.
 
 Game: **The Red Hollow** — 1–4 player co-op wave defense, top-down Unity. Full spec in `docs/PRD.md`; wireframes in `docs/ui-wireframes.html`.
