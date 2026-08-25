@@ -25,8 +25,17 @@ namespace RedHollow.Game.Host
 
         private readonly ISimHost _sim;
         private readonly IMonsterAttackSource _monsterAttacks;
+        private readonly IHeroIntentSource _heroIntents;
 
-        public HostLoop(ISimHost sim, IMonsterAttackSource monsterAttacks = null)
+        /// <param name="heroIntents">
+        /// Ticket 019 / R-30 — where this step's resolved hero intents come from. Optional for the
+        /// same reason <paramref name="monsterAttacks"/> is: a host driving no player-controlled
+        /// hero (a headless harness, a lobby) still has to drive every tick.
+        /// </param>
+        public HostLoop(
+            ISimHost sim,
+            IMonsterAttackSource monsterAttacks = null,
+            IHeroIntentSource heroIntents = null)
         {
             if (sim == null)
             {
@@ -38,6 +47,8 @@ namespace RedHollow.Game.Host
             // Optional on purpose: a host with no attack source (a lobby, a planning-only harness)
             // still has to drive the five ticks, so a missing source must not disable the loop.
             _monsterAttacks = monsterAttacks;
+
+            _heroIntents = heroIntents;
         }
 
         /// <summary>
@@ -65,7 +76,30 @@ namespace RedHollow.Game.Host
             _sim.TickHeroRespawns();    // R-33 — dead heroes come back.
             _sim.TickMedStations();     // R-23 — the purchased aura heals.
 
+            // Ticket 019 — IMatchSimHost.TickMonsterMovement(deltaSeconds) belongs here (R-17 /
+            // R-18): it takes a delta, so it fell outside T-10's parameterless-Tick* net and a
+            // wave currently stands in its breach for the whole match.
+
+            ResolveHeroMoves(deltaSeconds);
             ResolveMonsterAttacks(deltaSeconds);
+        }
+
+        /// <summary>
+        /// R-30 / R-51 — ticket 019 stub. Each intent this step becomes one
+        /// <see cref="IMatchSimHost.MoveHero"/> command for the hero it names, carrying this step's
+        /// own delta. A loop with no intent source drives no hero, which is why the null case
+        /// returns rather than throws.
+        /// </summary>
+        private void ResolveHeroMoves(double deltaSeconds)
+        {
+            if (_heroIntents == null)
+            {
+                return;
+            }
+
+            throw new NotImplementedException(
+                "ticket 019: a resolved HeroIntent.MoveDirection must reach MatchSim.MoveHero for "
+                + "the hero it names, with this step's delta (R-30 / R-51)");
         }
 
         /// <summary>

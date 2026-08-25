@@ -11,7 +11,7 @@ namespace RedHollow.Game.Host
     /// than settable — there is no rule here and there must never be one. Every member is a
     /// forward.
     /// </summary>
-    public sealed class MatchSimHost : ISimHost
+    public sealed class MatchSimHost : IMatchSimHost
     {
         private readonly MatchSim _sim;
         private readonly SimClock _clock;
@@ -68,5 +68,25 @@ namespace RedHollow.Game.Host
 
         public PlaceableDamageResult ApplyPlaceableDamage(PlaceableDamageRequest request) =>
             _sim.ApplyPlaceableDamage(request);
+
+        // ---- ticket 019 (T-19): the rest of the seam a playable match needs -----------------
+        // Shape only. Every one of these is a forward onto the same _sim, exactly like the members
+        // above; they throw until ticket 019 wires them so that "nothing calls this" fails loudly
+        // rather than silently.
+
+        public MonsterMovementResult TickMonsterMovement(double deltaSeconds) =>
+            throw new NotImplementedException("ticket 019: forward to MatchSim.TickMonsterMovement");
+
+        public HeroMoveResult MoveHero(HeroMoveRequest request) =>
+            throw new NotImplementedException("ticket 019: forward to MatchSim.MoveHero");
+
+        public TargetSelectionResult SelectTarget(string monsterId) =>
+            throw new NotImplementedException("ticket 019: forward to MatchSim.SelectTarget");
+
+        public WaveSpawnResult SpawnWave(int waveNumber) =>
+            throw new NotImplementedException("ticket 019: forward to MatchSim.SpawnWave");
+
+        public PlanningPhaseResult BeginPlanningPhase() =>
+            throw new NotImplementedException("ticket 019: forward to MatchSim.BeginPlanningPhase");
     }
 }
