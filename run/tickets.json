@@ -332,6 +332,27 @@
         "a full match lands in the 25-35 minute window",
         "no non-goal feature shipped"
       ]
+    },
+    {
+      "id": "T-15",
+      "title": "Monster attack cadence (R-18)",
+      "owns_requirements": [
+        "R-18"
+      ],
+      "grades_fixtures": [],
+      "depends_on": [
+        "T-02",
+        "T-03",
+        "T-07"
+      ],
+      "scope": "R-18's once-per-second attack cadence. SimConfig.MonsterAttackIntervalSeconds is declared and read nowhere in GameSim, so nothing rate-limits how often a monster lands a hit on a hotspot, hero or barricade. NavMesh pathing (R-18's other half) is shell work and stays with the blocked Unity tickets.",
+      "acceptance": [
+        "a monster that attacked cannot land another hit before MonsterAttackIntervalSeconds has elapsed",
+        "the interval is read from config, not a constant",
+        "the boundary is inclusive, matching the G-019 convention followed repo-wide",
+        "cadence is per monster - one monster's attack does not gate another's",
+        "the existing 30 golden fixtures still pass unchanged"
+      ]
     }
   ]
 }
