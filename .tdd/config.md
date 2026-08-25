@@ -88,3 +88,37 @@ and replicated (R-51), so an off-by-one in reduced damage propagates to every cl
 Applies wherever a fractional multiplier is floored — today Sawbones' 30% DR (R-31), and the same
 guard belongs on the lasso slow (R-31/008) and the sell refund (R-22/005) if either ever floors.
 `floor(cost * 0.5)` is exact in binary and needs no guard.
+
+### DEC-RUN-3 — profile save timing: the fixture is broader than the PRD prose (raised by 009's test-writer, 2026-08-25)
+R-43 states profiles persist *"at each level-up and match end"*. But **G-025 pins a
+`profile_store.save` external call on an accepted skill-point spend**, which is neither of those.
+G-026 (rejected spend) and G-024 (kill below threshold) both pin **no** save, so the fixtures are
+internally consistent — the PRD sentence is simply narrower than the behaviour the fixtures require.
+
+`eval/golden/*.json` outranks `docs/PRD.md` in this repo's precedence order, so the fixture wins.
+
+**Resolution:** the operative rule is *"persist on any profile mutation that must survive"* —
+level-up, accepted spend, and match end. Rejections and non-levelling kills write nothing, which is
+what G-024/G-026 defend against (R-43's stated intent was to avoid hammering the store mid-combat,
+and that intent is preserved).
+
+This is a **PRD wording gap, not a spec violation** — no fixture, manifest or requirement changes,
+and nothing was edited under `eval/`. Worth a one-line PRD amendment at the owner's convenience;
+not a blocker and not an implementer's call.
+
+### Noted, deliberately not acted on
+- **R-40 turret credit is resolved by the shell, not the sim.** `AwardKillXp(kill, accountId)`
+  receives the account as an argument, so "turret kills credit the placer" is the caller's mapping
+  (placer → hero → account). Making the sim *enforce* it would need `MonsterKillRequest` to carry
+  the placeable id so the sim could read `Placeable.OwnerPlayerId` — a seam change, not an
+  implementation detail. 009's tests pin only that XP lands on the credited account and never on
+  another player, which is all the current API can guarantee.
+- **`IProfileStore.Load` reference semantics are unspecified** — mutate-in-place (what
+  `InMemoryProfileStore` does) versus detached-copy-written-back. Both satisfy every fixture;
+  009's tests deliberately never depend on which.
+- **`Hero` has no `IsValidTarget` predicate** where `Hotspot` does (`Civilians >= 1`). A real
+  asymmetry in the entity contract, but `Alive` serves, and closing it means editing shared
+  `Entities.cs` mid-wave. Candidate tidy once wave A merges.
+- **`LineEntity.Kind` has no closed vocabulary.** The fixture loader understands
+  hero/hotspot/monster/barricade and throws otherwise, but the production field is a free string.
+  007's tests assume an allowlist (`== "monster"` damages) rather than a denylist.
