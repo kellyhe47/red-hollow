@@ -68,3 +68,23 @@ Each owning ticket populates only its own catalog and fixes only its own `Config
 "Ships empty" comment is 002's to correct.
 
 002's tests as written (`new SimConfig().Monsters.StatsFor(...)`) are **correct and stay**.
+
+### DEC-RUN-2 — damage-reduction arithmetic must not inherit the IEEE straddle (raised by 007's test-writer, 2026-08-25)
+`90 * 0.7 == 62.99999999999999` in IEEE double, so a naive `Math.Floor(damage * 0.7)` yields **62**
+where R-31/DEC-009's `floor(damage * 0.7)` means **63**. Verified: 16 integer damage values below
+1000 disagree — 90, 170, 180, 330, 340, 350, 360, 650, 660, 670, 680, 690, 700, 710, 720, 730.
+
+No fixture catches this (G-020 pins 15 → 10, which is stable either way), and 007's test-writer
+deliberately steered its parametrized values clear of every straddling value rather than ossifying
+the artifact into the suite. That was the right call — but it means the suite will not catch a
+wrong choice here, so the decision is recorded rather than left to the implementer's taste.
+
+**Resolution:** reduced damage is `Math.Floor(damage * (1.0 - reduction) + 1e-9)`. The epsilon
+guard restores exact-arithmetic agreement on all 16 straddling values while leaving genuinely
+fractional results alone (`15 * 0.7 = 10.5` still floors to 10, matching G-020; even divides are
+untouched). This is a real correctness matter, not a style preference: the sim is host-authoritative
+and replicated (R-51), so an off-by-one in reduced damage propagates to every client's HP bar.
+
+Applies wherever a fractional multiplier is floored — today Sawbones' 30% DR (R-31), and the same
+guard belongs on the lasso slow (R-31/008) and the sell refund (R-22/005) if either ever floors.
+`floor(cost * 0.5)` is exact in binary and needs no guard.
