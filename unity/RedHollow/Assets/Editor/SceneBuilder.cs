@@ -1,5 +1,10 @@
 #if UNITY_EDITOR
-using System;
+using System.IO;
+using RedHollow.Game.View;
+using RedHollow.Sim;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
 
 namespace RedHollow.EditorTools
 {
@@ -21,10 +26,40 @@ namespace RedHollow.EditorTools
         /// <summary>
         /// The <c>-executeMethod</c> entry point: static, public, parameterless and void, which is
         /// the only signature the batch-mode invoker accepts.
+        ///
+        /// Deliberately thin. Everything about *what* the scene contains lives in
+        /// <see cref="MatchSceneBuilder.Build"/>, in the runtime assembly, where the EditMode tests
+        /// can reach it with a strongly-typed reference — this wrapper only supplies the empty scene
+        /// to compose into and the path to save it at. An editor-only scene description would be one
+        /// no test could grade.
         /// </summary>
         public static void Build()
         {
-            throw new NotImplementedException("ticket 016 — headless scene build");
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+            var built = MatchSceneBuilder.Build(ColonyMap.V1(), new PlaceholderVisualResolver());
+
+            var directory = Path.GetDirectoryName(ScenePath);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            var saved = EditorSceneManager.SaveScene(scene, ScenePath);
+
+            // Batch mode swallows a failed save otherwise, and an absent scene that reported success
+            // is the one outcome this entry point exists to rule out.
+            if (!saved)
+            {
+                Debug.LogError("SceneBuilder: failed to save the match scene to " + ScenePath);
+                return;
+            }
+
+            AssetDatabase.Refresh();
+
+            Debug.Log(
+                "SceneBuilder: wrote " + ScenePath + " with " + built.HotspotMarkers.Count
+                + " hotspot markers (R-10) and a top-down camera (R-30).");
         }
     }
 }

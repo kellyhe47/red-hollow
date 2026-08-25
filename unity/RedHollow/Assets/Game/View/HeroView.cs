@@ -1,4 +1,3 @@
-using System;
 using RedHollow.Game.Input;
 using RedHollow.Sim;
 using UnityEngine;
@@ -13,6 +12,9 @@ namespace RedHollow.Game.View
     /// </summary>
     public sealed class HeroView : MonoBehaviour
     {
+        /// <summary>Below this a cursor is sitting on the hero, and "which way" has no answer.</summary>
+        private const float DegenerateAim = 1e-6f;
+
         public string HeroId { get; private set; }
 
         public VisualHandle Visual { get; private set; }
@@ -33,18 +35,73 @@ namespace RedHollow.Game.View
 
         public void Bind(string heroId, VisualHandle visual)
         {
-            throw new NotImplementedException("ticket 016 — hero view binding");
+            HeroId = heroId;
+            Visual = visual;
+
+            // A bound hero always has a facing, so nothing downstream has to handle a zero one. Up
+            // is ground-space forward (see InputSnapshot.CursorGroundPoint); the first Apply
+            // replaces it.
+            Facing = Vector2.up;
+
+            ViewRig.Attach(transform, visual);
         }
 
+        /// <summary>
+        /// R-51 — the hero's own values, copied out of replicated state. Identical in kind to
+        /// <see cref="MonsterView.RenderFrom"/>: the sim's numbers, not the client's guess. Ticket
+        /// 011 owns reconciling this with local prediction (R-52); the read direction is the same
+        /// either way.
+        /// </summary>
         public void RenderFrom(MatchState state)
         {
-            throw new NotImplementedException("ticket 016 — render from replicated sim state");
+            if (state == null || string.IsNullOrEmpty(HeroId))
+            {
+                return;
+            }
+
+            Hero hero;
+            if (!state.Heroes.TryGetValue(HeroId, out hero) || hero == null)
+            {
+                return;
+            }
+
+            DisplayedHp = hero.Hp;
+            DisplayedAlive = hero.Alive;
+            WorldPosition = SimSpace.ToWorld(hero.Pos);
+
+            transform.position = WorldPosition;
+            ViewRig.SetVisible(Visual, DisplayedAlive);
         }
 
-        /// <summary>R-30 — turn to face this frame's aim point.</summary>
+        /// <summary>
+        /// R-30 — turn to face this frame's aim point.
+        ///
+        /// The aim point and *only* the aim point: <see cref="HeroIntent.MoveDirection"/> is not
+        /// read here, which is the whole of "the hero faces the mouse cursor rather than turning
+        /// toward movement". A hero strafing right while the cursor sits behind it walks right and
+        /// looks back, and that is the case the test discriminates on.
+        ///
+        /// A cursor resting exactly on the hero leaves the facing where it was rather than snapping
+        /// to a default — the direction is genuinely undefined there, and inventing one makes the
+        /// hero spin whenever the mouse passes over its feet.
+        /// </summary>
         public void Apply(HeroIntent intent)
         {
-            throw new NotImplementedException("ticket 016 — cursor facing");
+            if (intent == null)
+            {
+                return;
+            }
+
+            var here = SimSpace.ToGroundVector(WorldPosition);
+            var toCursor = intent.AimPoint - here;
+
+            if (toCursor.sqrMagnitude <= DegenerateAim)
+            {
+                return;
+            }
+
+            Facing = toCursor.normalized;
+            transform.rotation = Quaternion.LookRotation(SimSpace.DirectionToWorld(Facing), Vector3.up);
         }
     }
 }

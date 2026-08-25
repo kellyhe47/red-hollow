@@ -1,4 +1,3 @@
-using System;
 using RedHollow.Sim;
 using UnityEngine;
 
@@ -27,14 +26,47 @@ namespace RedHollow.Game.View
         /// <summary>Exactly what the sim says. The view never applies the death rule itself.</summary>
         public bool DisplayedAlive { get; private set; }
 
+        /// <summary>
+        /// Ties this component to one replicated monster id and to the visual it wears. The visual
+        /// is parented here so the two share a lifetime — a view destroyed on despawn must not leave
+        /// its stand-in standing in the colony.
+        /// </summary>
         public void Bind(string monsterId, VisualHandle visual)
         {
-            throw new NotImplementedException("ticket 016 — monster view binding");
+            MonsterId = monsterId;
+            Visual = visual;
+            ViewRig.Attach(transform, visual);
         }
 
+        /// <summary>
+        /// R-51 — copy this frame's replicated values out of the world. Read-only by construction:
+        /// every assignment below writes a property of this component, never a field of the sim.
+        ///
+        /// An unknown id is a no-op rather than an error. Replication and view lifetime are ticket
+        /// 011's to synchronise; until then a view that outlives its monster by a frame must keep
+        /// showing its last replicated values rather than throw in the middle of a session.
+        /// </summary>
         public void RenderFrom(MatchState state)
         {
-            throw new NotImplementedException("ticket 016 — render from replicated sim state");
+            if (state == null || string.IsNullOrEmpty(MonsterId))
+            {
+                return;
+            }
+
+            Monster monster;
+            if (!state.Monsters.TryGetValue(MonsterId, out monster) || monster == null)
+            {
+                return;
+            }
+
+            // Mirrored, not derived: DisplayedAlive is the sim's ruling even when it disagrees with
+            // the HP beside it, because only MatchSim decides death (R-51).
+            DisplayedHp = monster.Hp;
+            DisplayedAlive = monster.Alive;
+            WorldPosition = SimSpace.ToWorld(monster.Pos);
+
+            transform.position = WorldPosition;
+            ViewRig.SetVisible(Visual, DisplayedAlive);
         }
     }
 }
