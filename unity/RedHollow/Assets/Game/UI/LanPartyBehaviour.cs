@@ -71,10 +71,22 @@ namespace RedHollow.Game.UI
         private void Awake()
         {
             _ngoRoot = new GameObject("RedHollow_NGO");
-            _ngoRoot.transform.SetParent(null, false);
-            var networkManager = _ngoRoot.AddComponent<NetworkManager>();
+            DontDestroyOnLoad(_ngoRoot);
+            // Transport first, then assign onto the NetworkConfig Awake already created.
+            // Replacing NetworkConfig wholesale is what left ConnectionManager.NetworkManager
+            // unset and threw "There is no NetworkManager assigned to this instance!".
             var transport = _ngoRoot.AddComponent<UnityTransport>();
-            networkManager.NetworkConfig = new NetworkConfig { NetworkTransport = transport };
+            var networkManager = _ngoRoot.AddComponent<NetworkManager>();
+            if (networkManager.NetworkConfig == null)
+            {
+                networkManager.NetworkConfig = new NetworkConfig();
+            }
+
+            networkManager.NetworkConfig.NetworkTransport = transport;
+            if (NetworkManager.Singleton != networkManager)
+            {
+                networkManager.SetSingleton();
+            }
 
             _wire = new NgoWire(networkManager);
             _transport = new NgoNetTransport(new LanServices(port: hostPort), _wire);

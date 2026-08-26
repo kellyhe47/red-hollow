@@ -33,8 +33,10 @@ creates its own `NetworkManager` + `UnityTransport`). Solo Play must keep `GameE
 
 Single-editor host listen (no second process): drop `/workspace/unity/lan.request`. The open
 editor disables `GameEntryBehaviour`, enters Play with `LanPartyBehaviour`, HOST GAMEs into
-the lobby, and writes `/workspace/unity/lan.status` (`joinCode=LAN`, port 7777). Exit Play
-re-enables GameEntry.
+the lobby, dumps `/workspace/unity/shots/lan-lobby.png` of S2 with the join code, and writes
+`/workspace/unity/lan.status` (`joinCode=LAN`, UDP 7777). Exit Play re-enables GameEntry.
+NGO StartHost itself needs Play mode (NetworkManager singleton); batchmode `-executeMethod`
+without Play fails with "There is no NetworkManager assigned to this instance!".
 
 Headless 2P decisions: EditMode fixture `T30_ReplicationTests` (in-memory channel pair +
 `LanServices` bring-up). NGO StartHost itself needs Play mode (NetworkManager singleton); use LanPartyBehaviour in Play. Two-process Unity on this box is too heavy (llvmpipe / ~15GB).

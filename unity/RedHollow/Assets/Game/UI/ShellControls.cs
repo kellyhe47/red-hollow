@@ -95,7 +95,12 @@ namespace RedHollow.Game.UI
             var lobbyBanner = NewLabel(lobby, "LobbyBanner", 32);
             lobbyBanner.text = "CHOOSE YOUR HERO";
             lobbyBanner.color = UiStyle.Ember;
-            UiStyle.Anchor(lobbyBanner.rectTransform, 0.2f, 0.78f, 0.8f, 0.9f);
+            UiStyle.Anchor(lobbyBanner.rectTransform, 0.2f, 0.70f, 0.8f, 0.82f);
+
+            // Wireframe S2: "Join code: ABC123 (click to copy) — share with friends".
+            JoinCodeLabel = NewLabel(lobby, "LobbyJoinCode", 28);
+            JoinCodeLabel.color = UiStyle.Ember;
+            UiStyle.Anchor(JoinCodeLabel.rectTransform, 0.15f, 0.84f, 0.85f, 0.96f);
 
             var classes = new[] { HeroClass.Gunslinger, HeroClass.Rancher, HeroClass.Sawbones };
             for (var i = 0; i < classes.Length; i++)
@@ -243,6 +248,9 @@ namespace RedHollow.Game.UI
         /// <summary>S2 — READY (LobbyScreenModel.SetReady; all-ready auto-starts the match).</summary>
         public Button LobbyReadyButton { get; }
 
+        /// <summary>S2 — the join code to share (R-07). Empty until HOST GAME brings the lobby up.</summary>
+        public Text JoinCodeLabel { get; }
+
         // ---- S3 · Planning --------------------------------------------------------------------
 
         /// <summary>
@@ -371,6 +379,21 @@ namespace RedHollow.Game.UI
         internal void Refresh()
         {
             JoinErrorLabel.text = _shell.Title.JoinError ?? string.Empty;
+
+            var lobby = _shell.Lobby;
+            var code = lobby != null ? lobby.JoinCode : null;
+            if (string.IsNullOrEmpty(code))
+            {
+                JoinCodeLabel.text = string.Empty;
+            }
+            else if (lobby.WaitingAlone)
+            {
+                JoinCodeLabel.text = "Join code: " + code + " — share with friends";
+            }
+            else
+            {
+                JoinCodeLabel.text = "Join code: " + code;
+            }
 
             RefreshGhostVisual();
             RefreshShopBar();
