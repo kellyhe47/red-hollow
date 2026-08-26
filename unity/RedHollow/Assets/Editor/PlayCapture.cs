@@ -36,6 +36,7 @@ namespace RedHollow.EditorTools
         private const string TurretLastHitPath = "/workspace/unity/shots/turret-lasthit.png";
         private const string EndShotPath = "/workspace/unity/shots/wave10-end.png";
         private const string HotspotFrontsPath = "/workspace/unity/shots/hotspot-fronts.png";
+        private const string LookPath = "/workspace/unity/shots/lykos-look.png";
         private const double MatchTimeoutSeconds = 240.0;
 
         private static double _enteredAt;
@@ -64,6 +65,7 @@ namespace RedHollow.EditorTools
         private static readonly List<string> PurchaseLog = new List<string>();
         private static readonly StringBuilder Logs = new StringBuilder();
         private static bool _hotspotFrontsCaptured;
+        private static bool _lookCaptured;
         private static string _playMode = "full";
 
         static PlayCapture()
@@ -132,6 +134,7 @@ namespace RedHollow.EditorTools
                 _holdFireSince = 0;
                 PurchaseLog.Clear();
                 _hotspotFrontsCaptured = false;
+                _lookCaptured = false;
                 const string MatchScene = "Assets/Scenes/RedHollow.unity";
                 if (SceneManager.GetActiveScene().path != MatchScene)
                 {
@@ -169,15 +172,18 @@ namespace RedHollow.EditorTools
             DriveCombatInput();
             DriveWaveProgression();
             TryCaptureHotspotFronts(elapsed);
+            TryCaptureLook(elapsed);
 
             var timedOut = elapsed >= MatchTimeoutSeconds;
             var matchOver = MatchIsOver();
             var frontsOnlyDone = _playMode == "fronts" && _hotspotFrontsCaptured;
+            var lookOnlyDone = _playMode == "look" && _lookCaptured;
             // Turret last-hit is already proven. Stay in Play until victory, defeat, or timeout
             // so autoplay can finish a 10-wave run (or dump the leak if it cannot).
             // "fronts" mode exits after the hotspot-front dump so art wiring can be checked
-            // without another 10-wave campaign.
-            if (!timedOut && !matchOver && !frontsOnlyDone)
+            // without another 10-wave campaign. "look" dumps wave-1 Game view (no victory
+            // overlay) and exits so a cavern pass does not wait on a 10-wave run.
+            if (!timedOut && !matchOver && !frontsOnlyDone && !lookOnlyDone)
             {
                 return;
             }
@@ -1264,6 +1270,35 @@ namespace RedHollow.EditorTools
                 + " wave=" + (match.State.Wave != null ? match.State.Wave.Number : 0));
         }
 
+        /// <summary>
+        /// Wave-1 Game-camera dump with no victory overlay. Used by playtest mode "look".
+        /// </summary>
+        private static void TryCaptureLook(double elapsed)
+        {
+            if (_lookCaptured || elapsed < 1.7)
+            {
+                return;
+            }
+
+            var match = LiveMatch();
+            if (match == null || match.State == null || match.State.IsOver)
+            {
+                return;
+            }
+
+            if (match.State.Wave == null || match.State.Wave.Number != 1)
+            {
+                return;
+            }
+
+            DumpCamera(Camera.main, LookPath);
+            _lookCaptured = true;
+            PurchaseLog.Add("lykos-look shot elapsed=" + elapsed.ToString("0.00")
+                + " phase=" + match.State.Phase
+                + " wave=" + match.State.Wave.Number
+                + " living=" + match.State.Wave.LivingMonsterIds.Count);
+        }
+
         private static void DumpFacades(StringBuilder sb)
         {
             var n = 0;
@@ -1300,6 +1335,8 @@ namespace RedHollow.EditorTools
             sb.Append("facadeCount=").Append(n).Append('\n');
             sb.Append("hotspotFrontsShot=").Append(HotspotFrontsPath)
                 .Append(" exists=").Append(File.Exists(HotspotFrontsPath)).Append('\n');
+            sb.Append("lykosLookShot=").Append(LookPath)
+                .Append(" exists=").Append(File.Exists(LookPath)).Append('\n');
         }
 
         /// <summary>

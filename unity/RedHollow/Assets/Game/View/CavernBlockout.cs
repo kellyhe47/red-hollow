@@ -17,10 +17,12 @@ namespace RedHollow.Game.View
         public const float WallHeight = 110f;
         public const float CeilingHeight = 96f;
         public const float WallThickness = 18f;
-        public const float InnerMargin = 8f;
+        // Tight enough that the N/S inner faces sit inside a 62° ortho frustum
+        // (InnerMargin 8 parked them past the top/bottom of the Game view).
+        public const float InnerMargin = 3f;
 
-        public const float HabHeightMin = 7f;
-        public const float HabHeightMax = 12f;
+        public const float HabHeightMin = 6f;
+        public const float HabHeightMax = 22f;
 
         private static readonly Color Rock = new Color(0.42f, 0.26f, 0.14f);
         private static readonly Color RockDark = new Color(0.22f, 0.12f, 0.07f);
@@ -33,6 +35,12 @@ namespace RedHollow.Game.View
         private static readonly Color AmberGlow = new Color(1.0f, 0.72f, 0.32f);
         private static readonly Color LostTint = new Color(0.18f, 0.10f, 0.06f);
         private static readonly Color LiveTint = Color.white;
+        // Unlit albedo tints: contrast has to live in the texture*color product
+        // because lanterns do not shade Unlit meshes.
+        private static readonly Color RoofTint = new Color(0.28f, 0.15f, 0.08f);
+        private static readonly Color HabWallTint = new Color(1.10f, 0.92f, 0.66f);
+        private static readonly Color CavernTint = new Color(0.46f, 0.27f, 0.14f);
+        private static readonly Color RockTint = new Color(0.26f, 0.14f, 0.08f);
 
         /// <summary>
         /// Raise the cavern shell (wall ring + ceiling) around the play square. Camera at
@@ -118,6 +126,38 @@ namespace RedHollow.Game.View
             Box(cavern.transform, "Rubble_S",
                 new Vector3(0f, 1.8f, -(inner - 3.5f)), new Vector3(inner * 1.2f, 3.6f, 6.5f), rockMat);
 
+            // In-frustum cliff faces. The 110-unit box walls sit at ±inner; with InnerMargin 3
+            // that is z≈±33, which a 62° camera actually sees. Split north/east/west around
+            // the four tunnel mouths so a breach still reads as a hole in the rock.
+            var cliff = wallMat;
+            Box(cavern.transform, "Cliff_North_W",
+                new Vector3(-(inner * 0.58f), 38f, inner - 0.6f),
+                new Vector3(inner * 0.82f, 76f, 7.5f), cliff);
+            Box(cavern.transform, "Cliff_North_E",
+                new Vector3(inner * 0.58f, 36f, inner - 0.8f),
+                new Vector3(inner * 0.78f, 72f, 7.0f), cliff);
+            Box(cavern.transform, "Cliff_East_N",
+                new Vector3(inner - 0.6f, 34f, inner * 0.55f),
+                new Vector3(7.2f, 68f, inner * 0.72f), cliff);
+            Box(cavern.transform, "Cliff_East_S",
+                new Vector3(inner - 0.8f, 28f, -(inner * 0.52f)),
+                new Vector3(6.8f, 56f, inner * 0.68f), cliff);
+            Box(cavern.transform, "Cliff_West_N",
+                new Vector3(-(inner - 0.6f), 32f, inner * 0.5f),
+                new Vector3(7.0f, 64f, inner * 0.7f), cliff);
+            Box(cavern.transform, "Cliff_West_S",
+                new Vector3(-(inner - 0.9f), 26f, -(inner * 0.5f)),
+                new Vector3(6.6f, 52f, inner * 0.66f), cliff);
+            // South of the camera only low geometry stays in front of the lens; a short
+            // ridge at the bottom of the frame is the readable "near wall". Split around
+            // the south tunnel mouth.
+            Box(cavern.transform, "Cliff_South_W",
+                new Vector3(-(inner * 0.6f), 6.5f, -(inner - 1.2f)),
+                new Vector3(inner * 0.85f, 13f, 6.5f), rockMat);
+            Box(cavern.transform, "Cliff_South_E",
+                new Vector3(inner * 0.6f, 6.0f, -(inner - 1.4f)),
+                new Vector3(inner * 0.8f, 12f, 6.0f), rockMat);
+
             // Stalactites hanging out of the haze so the ceiling is a cavern, not a lid.
             for (var s = 0; s < 10; s++)
             {
@@ -187,16 +227,17 @@ namespace RedHollow.Game.View
             };
             var wingSizes = new[]
             {
-                new Vector3(3.4f, 8.6f, 4.0f),
-                new Vector3(3.6f, 7.0f, 3.8f),
-                new Vector3(5.0f, 9.4f, 3.4f),
-                new Vector3(4.2f, 6.6f, 3.2f),
+                new Vector3(3.4f, 10.2f, 4.0f),
+                new Vector3(3.6f, 7.4f, 3.8f),
+                new Vector3(5.0f, 11.6f, 3.4f),
+                new Vector3(4.2f, 6.8f, 3.2f),
             };
+            var wingStories = new[] { 3, 1, 2, 1 };
 
             for (var i = 0; i < wings.Length; i++)
             {
                 RaiseHab(hab.transform, "Wing_" + i, rot * wings[i], wingSizes[i], metal, roof,
-                    stacked: i == 0 || i == 2);
+                    wingStories[i]);
             }
 
             var mast = rot * new Vector3(5.2f, 0f, 5.2f);
@@ -285,13 +326,14 @@ namespace RedHollow.Game.View
             };
             var sizes = new[]
             {
-                new Vector3(4.2f, 5.5f, 3.8f),
-                new Vector3(3.4f, 7.2f, 3.4f),
-                new Vector3(5.0f, 4.6f, 4.2f),
-                new Vector3(3.2f, 6.4f, 3.6f),
-                new Vector3(4.6f, 5.0f, 3.2f),
-                new Vector3(3.8f, 8.0f, 3.5f),
+                new Vector3(4.2f, 6.4f, 3.8f),
+                new Vector3(3.4f, 8.6f, 3.4f),
+                new Vector3(5.0f, 5.2f, 4.2f),
+                new Vector3(3.2f, 7.4f, 3.6f),
+                new Vector3(4.6f, 5.8f, 3.2f),
+                new Vector3(3.8f, 9.6f, 3.5f),
             };
+            var storyCounts = new[] { 2, 3, 1, 2, 1, 4 };
 
             var n = 0;
             foreach (var spec in map.Hotspots)
@@ -320,7 +362,7 @@ namespace RedHollow.Game.View
                     var pos = origin + offset;
                     var size = sizes[(i + n) % sizes.Length];
                     RaiseHab(settlement.transform, "Hab_" + spec.Id + "_" + i, pos, size, metal, roof,
-                        stacked: i == 1 || i == 3 || i == 5);
+                        storyCounts[(i + n) % storyCounts.Length]);
                 }
 
                 // Metal catwalk stitching the cluster together.
@@ -375,10 +417,11 @@ namespace RedHollow.Game.View
                         continue;
                     }
 
-                    var h = 4.2f + (extra % 5) * 1.1f;
+                    var h = 5.6f + (extra % 6) * 1.5f;
                     var w = 3.0f + (extra % 3) * 0.5f;
+                    var stories = 1 + (extra % 4);
                     RaiseHab(settlement.transform, "GridHab_" + extra, pos,
-                        new Vector3(w, h, w - 0.3f), metal, roof, stacked: (extra % 3) == 0);
+                        new Vector3(w, h, w - 0.3f), metal, roof, stories);
                     extra++;
                 }
             }
@@ -503,8 +546,8 @@ namespace RedHollow.Game.View
             var floor = new GameObject("FloorDressing");
             floor.transform.SetParent(root, false);
 
-            var gravel = Tiled("RedHollowArt/gravel-border", new Color(0.45f, 0.28f, 0.16f), new Vector2(8f, 8f));
-            var cracked = Tiled("RedHollowArt/cracked-soil", new Color(0.55f, 0.32f, 0.18f), new Vector2(4f, 4f));
+            var gravel = Tiled("RedHollowArt/gravel-border", new Color(0.70f, 0.48f, 0.30f), new Vector2(6f, 6f));
+            var cracked = Tiled("RedHollowArt/cracked-soil", new Color(0.78f, 0.52f, 0.32f), new Vector2(3.5f, 3.5f));
             var deck = DeckingMaterial();
 
             var span = Mathf.Max(playArea.size.x, playArea.size.z) + 18f;
@@ -650,29 +693,50 @@ namespace RedHollow.Game.View
 
         private static void RaiseHab(
             Transform parent, string name, Vector3 pos, Vector3 size, Material metal, Material roof,
-            bool stacked)
+            int stories)
         {
+            if (stories < 1)
+            {
+                stories = 1;
+            }
+
+            if (stories > 4)
+            {
+                stories = 4;
+            }
+
             var hab = new GameObject(name);
             hab.transform.SetParent(parent, false);
-            Box(hab.transform, "Body",
-                new Vector3(pos.x, size.y * 0.5f, pos.z),
-                size,
-                metal);
-            Box(hab.transform, "Roof",
-                new Vector3(pos.x, size.y + 0.16f, pos.z),
-                new Vector3(size.x + 0.4f, 0.32f, size.z + 0.4f),
-                roof);
-
-            if (stacked)
+            var trim = TrimMaterial();
+            var y = 0f;
+            for (var s = 0; s < stories; s++)
             {
-                Box(hab.transform, "Stack",
-                    new Vector3(pos.x + size.x * 0.12f, size.y + 0.32f + 1.6f, pos.z),
-                    new Vector3(size.x * 0.55f, 3.2f, size.z * 0.55f),
+                var shrink = 1f - (s * 0.16f);
+                var storyH = s == 0 ? size.y : Mathf.Max(2.6f, size.y * (0.58f - s * 0.07f));
+                var sx = size.x * shrink;
+                var sz = size.z * shrink;
+                var ox = pos.x + (s * size.x * 0.07f);
+                var oz = pos.z;
+                var bodyName = s == 0 ? "Body" : "Stack_" + s;
+                var roofName = s == 0 ? "Roof" : "StackRoof_" + s;
+                var corniceName = s == 0 ? "Cornice" : "Cornice_" + s;
+
+                Box(hab.transform, bodyName,
+                    new Vector3(ox, y + storyH * 0.5f, oz),
+                    new Vector3(sx, storyH, sz),
                     metal);
-                Box(hab.transform, "StackRoof",
-                    new Vector3(pos.x + size.x * 0.12f, size.y + 0.32f + 3.2f + 0.16f, pos.z),
-                    new Vector3(size.x * 0.62f, 0.28f, size.z * 0.62f),
+                // Western wear: a thin wood eave so the dark roof cap is a separate plane,
+                // not the same brown as the wall, at 62° down.
+                Box(hab.transform, corniceName,
+                    new Vector3(ox, y + storyH + 0.08f, oz),
+                    new Vector3(sx + 0.55f, 0.16f, sz + 0.55f),
+                    trim);
+                Box(hab.transform, roofName,
+                    new Vector3(ox, y + storyH + 0.42f, oz),
+                    new Vector3(sx + 0.9f, 0.58f, sz + 0.9f),
                     roof);
+
+                y += storyH + 0.58f;
             }
         }
 
@@ -720,26 +784,27 @@ namespace RedHollow.Game.View
 
         private static Material WallMaterial()
         {
-            return Tiled("RedHollowArt/sandstone-wall", Rock, new Vector2(6f, 8f),
+            return Tiled("RedHollowArt/sandstone-wall", CavernTint, new Vector2(3.2f, 4.0f),
                 "RedHollowArt/cavern-ground");
         }
 
         private static Material RockMaterial()
         {
-            return Tiled("RedHollowArt/sandstone-wall", RockDark, new Vector2(3f, 4f),
+            return Tiled("RedHollowArt/sandstone-wall", RockTint, new Vector2(2.2f, 2.6f),
                 "RedHollowArt/cavern-ground");
         }
 
         private static Material RoofMaterial()
         {
             // Hab cube TOPS: authored rusty roof plates, then decking, then cladding.
+            // Dark umber tint so roofs read as a separate plane from the lifted walls.
             var tex = ViewLook.LoadTexture("RedHollowArt/hab-block-roof")
                 ?? ViewLook.LoadTexture("RedHollowArt/colony-decking")
                 ?? ViewLook.LoadTexture("RedHollowArt/hab-block-cladding");
-            var mat = ViewLook.Unlit(tex != null ? Color.white : Roof, tex);
+            var mat = ViewLook.Unlit(tex != null ? RoofTint : Roof, tex);
             if (mat != null && tex != null)
             {
-                ViewLook.SetTiling(mat, new Vector2(2.4f, 2.4f));
+                ViewLook.SetTiling(mat, new Vector2(1.6f, 1.6f));
             }
 
             return mat;
@@ -752,10 +817,10 @@ namespace RedHollow.Game.View
                 ?? ViewLook.LoadTexture("RedHollowArt/colony-wall")
                 ?? ViewLook.LoadTexture("RedHollowArt/metal-floor-plate")
                 ?? ViewLook.LoadTexture("RedHollowArt/cavern-ground");
-            var mat = ViewLook.Unlit(tex != null ? Color.white : Metal, tex);
+            var mat = ViewLook.Unlit(tex != null ? HabWallTint : Metal, tex);
             if (mat != null && tex != null)
             {
-                ViewLook.SetTiling(mat, new Vector2(1.15f, 1.7f));
+                ViewLook.SetTiling(mat, new Vector2(1.05f, 1.35f));
             }
 
             return mat;
@@ -763,8 +828,8 @@ namespace RedHollow.Game.View
 
         private static Material DeckingMaterial()
         {
-            return Tiled("RedHollowArt/colony-decking", new Color(0.55f, 0.36f, 0.22f),
-                new Vector2(5f, 5f), "RedHollowArt/metal-floor-plate");
+            return Tiled("RedHollowArt/colony-decking", new Color(0.82f, 0.58f, 0.36f),
+                new Vector2(4f, 4f), "RedHollowArt/metal-floor-plate");
         }
 
         private static Material TrimMaterial()
@@ -773,12 +838,12 @@ namespace RedHollow.Game.View
             return ViewLook.Unlit(tex != null ? new Color(0.75f, 0.55f, 0.32f) : WoodTrim, tex);
         }
 
-        private static Material Tiled(string resourcePath, Color fallback, Vector2 scale,
+        private static Material Tiled(string resourcePath, Color tint, Vector2 scale,
             string altPath = null)
         {
             var tex = ViewLook.LoadTexture(resourcePath)
                 ?? (altPath != null ? ViewLook.LoadTexture(altPath) : null);
-            var mat = ViewLook.Unlit(tex != null ? Color.white : fallback, tex);
+            var mat = ViewLook.Unlit(tint, tex);
             if (mat != null && tex != null)
             {
                 ViewLook.SetTiling(mat, scale);
