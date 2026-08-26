@@ -26,6 +26,9 @@ namespace RedHollow.Game.View
         /// <summary>Exactly what the sim says. The view never applies the death rule itself.</summary>
         public bool DisplayedAlive { get; private set; }
 
+        private Vector3 _lastWorld;
+        private bool _hasLastWorld;
+
         /// <summary>
         /// Ties this component to one replicated monster id and to the visual it wears. The visual
         /// is parented here so the two share a lifetime — a view destroyed on despawn must not leave
@@ -66,8 +69,29 @@ namespace RedHollow.Game.View
             WorldPosition = SimSpace.ToWorld(monster.Pos);
 
             transform.position = WorldPosition;
+            FaceWalk();
             ScatterVisual();
             ViewRig.SetVisible(Visual, DisplayedAlive);
+        }
+
+        /// <summary>
+        /// Yaw only, toward this frame's ground delta so a shambler shows its SIDE as it
+        /// walks. Presentation — never writes sim state (T10).
+        /// </summary>
+        private void FaceWalk()
+        {
+            if (_hasLastWorld)
+            {
+                var delta = WorldPosition - _lastWorld;
+                delta.y = 0f;
+                if (delta.sqrMagnitude > 1e-6f)
+                {
+                    transform.rotation = Quaternion.LookRotation(delta.normalized, Vector3.up);
+                }
+            }
+
+            _lastWorld = WorldPosition;
+            _hasLastWorld = true;
         }
 
         /// <summary>

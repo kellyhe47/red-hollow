@@ -49,8 +49,10 @@ namespace RedHollow.Game.View
     public static class MatchSceneBuilder
     {
         /// <summary>
-        /// How far above the colony floor the camera sits. Low enough that hab south
-        /// walls fill the frame under a 60° perspective look; 40 made every hab a roof stamp.
+        /// How far above the colony floor the camera sits. Street-scale: hab south
+        /// walls fill the frame under a 60° look. Height 28 turned the Game view into
+        /// a zenith roof-stamp. GridHabs are kept out of the south follow corridor by
+        /// CavernBlockout's 22u spawn courtyard, so 22 no longer sits inside a wall.
         /// </summary>
         public const float CameraHeight = 22f;
 

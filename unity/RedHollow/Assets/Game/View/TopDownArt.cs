@@ -5,9 +5,9 @@ namespace RedHollow.Game.View
 {
     /// <summary>
     /// Presentation sizes and paint for the tilted Lykos camera. The cavern is 3D meshes
-    /// (<see cref="CavernEnvironment"/>). Heroes and monsters are camera-facing upright
-    /// cards (2.5D) with a blob shadow — never XZ-flat sprites (those go edge-on) and
-    /// never 8-dir sprite cycles. A later 3D hero swaps this view mesh only.
+    /// (<see cref="CavernEnvironment"/>). Heroes and monsters are world-facing Lit
+    /// volumes (<see cref="UnitBillboard"/>), not camera-facing cards. Placeable icons
+    /// may still use a standing card. Never XZ-flat character sprites.
     /// </summary>
     internal static class TopDownArt
     {

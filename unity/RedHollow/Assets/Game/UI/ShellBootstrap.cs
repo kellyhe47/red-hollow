@@ -1496,10 +1496,9 @@ namespace RedHollow.Game.UI
 
         /// <summary>
         /// One representative asset entry: load the Resources copy and stand it up. Heroes
-        /// and monsters are camera-facing upright cards (blob shadow, lantern tint) in the
-        /// 3D cavern — never XZ-flat sprites. Turret / barricade / med station stand as
-        /// cards too; floor traps stay XZ decals. The cavern-ground tile is still registered
-        /// (T21) but is not the match floor.
+        /// and monsters are world-facing Lit volumes (canon albedo on a capsule/hat)
+        /// in the 3D cavern — never camera-facing Unlit postcards, never XZ-flat sprites.
+        /// Turret / barricade / med station stand as cards; floor traps stay XZ decals.
         /// </summary>
         private static void RegisterResourceArt(ArtCatalog catalog, string artKey, string resourcePath)
         {
@@ -1540,28 +1539,19 @@ namespace RedHollow.Game.UI
 
                 if (IsCharacterKey(artKey))
                 {
+                    Texture2D punched = texture;
                     var standing = ViewLook.CreateStandingSprite(texture);
-                    if (standing == null)
+                    if (standing != null && standing.texture != null)
                     {
-                        return null;
+                        punched = standing.texture as Texture2D;
+                        if (punched == null)
+                        {
+                            punched = texture;
+                        }
                     }
 
-                    var go = new GameObject(name);
-                    var renderer = go.AddComponent<SpriteRenderer>();
-                    renderer.sprite = standing;
-                    renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                    renderer.receiveShadows = false;
-
-                    var targetHeight = CharacterHeight(artKey);
-                    var natural = standing.bounds.size.y;
-                    if (natural > 0.0001f)
-                    {
-                        var s = targetHeight / natural;
-                        go.transform.localScale = new Vector3(s, s, 1f);
-                    }
-
-                    var height = standing.bounds.size.y * go.transform.localScale.y;
-                    return UnitBillboard.WrapStandingSprite(go, height);
+                    return UnitBillboard.CreateFromCanon(
+                        name, punched, artKey, CharacterHeight(artKey));
                 }
 
                 if (IsStandingSprite(artKey))
@@ -1589,17 +1579,17 @@ namespace RedHollow.Game.UI
         {
             if (artKey == MonsterType.BullBehemoth)
             {
-                return 8.4f;
+                return 5.50f;
             }
 
             if (artKey == HeroClass.Gunslinger
                 || artKey == HeroClass.Rancher
                 || artKey == HeroClass.Sawbones)
             {
-                return 6.6f;
+                return UnitBillboard.HeroHeight;
             }
 
-            return 5.5f;
+            return UnitBillboard.MonsterHeight;
         }
 
         private static bool IsStandingSprite(string artKey)

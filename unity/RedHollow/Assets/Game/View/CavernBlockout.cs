@@ -336,7 +336,9 @@ namespace RedHollow.Game.View
                 for (var gz = gridMin; gz <= gridMax; gz += 16)
                 {
                     var pos = new Vector3(gx + (gz % 2) * 1.4f, 0f, gz + (gx % 3) * 0.6f);
-                    if ((pos - spawn).sqrMagnitude < 14f * 14f)
+                    // Must keep the follow-cam south of spawn in open street. Height 28
+                    // sits ~16u south; a 14u courtyard left a GridHab under the eye.
+                    if ((pos - spawn).sqrMagnitude < 22f * 22f)
                     {
                         continue;
                     }
