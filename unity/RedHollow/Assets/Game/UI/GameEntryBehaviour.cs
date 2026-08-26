@@ -121,10 +121,7 @@ namespace RedHollow.Game.UI
                 return;
             }
 
-            _shell.Title.SetCallsign("Kelly");
-            _shell.RequestHost();
-            _shell.Lobby.PickClass(HeroClass.Gunslinger);
-            _shell.Lobby.SetReady(true);
+            _shell.StartSoloPlayMatch();
         }
 
         private void Update()

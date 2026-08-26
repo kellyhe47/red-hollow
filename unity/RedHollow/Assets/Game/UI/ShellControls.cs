@@ -67,27 +67,39 @@ namespace RedHollow.Game.UI
             var titleBanner = NewLabel(title, "TitleBanner", 48);
             titleBanner.text = "THE RED HOLLOW";
             titleBanner.color = UiStyle.Ember;
-            UiStyle.Anchor(titleBanner.rectTransform, 0.2f, 0.68f, 0.8f, 0.92f);
+            UiStyle.Anchor(titleBanner.rectTransform, 0.2f, 0.74f, 0.8f, 0.94f);
 
             CallsignInput = NewInput(title, "CallsignInput", "callsign");
-            UiStyle.Anchor((RectTransform)CallsignInput.transform, 0.35f, 0.54f, 0.65f, 0.61f);
+            UiStyle.Anchor((RectTransform)CallsignInput.transform, 0.32f, 0.62f, 0.68f, 0.70f);
             CallsignInput.onValueChanged.AddListener(v => _shell.Title.SetCallsign(v));
 
+            PlayMatchButton = NewButton(title, "PlayMatchButton", "PLAY MATCH");
+            UiStyle.Anchor((RectTransform)PlayMatchButton.transform, 0.25f, 0.48f, 0.75f, 0.60f);
+            EnlargeCaption(PlayMatchButton, 28);
+            PlayMatchButton.onClick.AddListener(() => _shell.StartSoloPlayMatch());
+
             HostButton = NewButton(title, "HostButton", "HOST GAME");
-            UiStyle.Anchor((RectTransform)HostButton.transform, 0.35f, 0.44f, 0.65f, 0.52f);
+            UiStyle.Anchor((RectTransform)HostButton.transform, 0.35f, 0.38f, 0.65f, 0.46f);
             HostButton.onClick.AddListener(() => _shell.RequestHost());
 
             JoinCodeInput = NewInput(title, "JoinCodeInput", "join code");
-            UiStyle.Anchor((RectTransform)JoinCodeInput.transform, 0.35f, 0.3f, 0.65f, 0.37f);
+            UiStyle.Anchor((RectTransform)JoinCodeInput.transform, 0.35f, 0.26f, 0.65f, 0.34f);
             JoinCodeInput.onValueChanged.AddListener(v => _shell.Title.SetJoinCodeInput(v));
 
             JoinButton = NewButton(title, "JoinButton", "JOIN");
-            UiStyle.Anchor((RectTransform)JoinButton.transform, 0.35f, 0.2f, 0.65f, 0.28f);
+            UiStyle.Anchor((RectTransform)JoinButton.transform, 0.35f, 0.16f, 0.65f, 0.24f);
             JoinButton.onClick.AddListener(() => _shell.RequestJoin());
 
             JoinErrorLabel = NewLabel(title, "JoinErrorLabel", 16);
             JoinErrorLabel.color = UiStyle.ErrorTint;
-            UiStyle.Anchor(JoinErrorLabel.rectTransform, 0.25f, 0.13f, 0.75f, 0.18f);
+            UiStyle.Anchor(JoinErrorLabel.rectTransform, 0.25f, 0.09f, 0.75f, 0.15f);
+
+#if UNITY_EDITOR
+            var editorHint = NewLabel(title, "EditorPlayHint", 14);
+            editorHint.text = "Editor: press the Play triangle at the top of Unity first.";
+            editorHint.color = new Color(0.72f, 0.64f, 0.5f, 0.85f);
+            UiStyle.Anchor(editorHint.rectTransform, 0.08f, 0.01f, 0.92f, 0.07f);
+#endif
 
             // ---- S2 · Lobby — one PICK per class card, plus READY.
             var lobby = ui.ScreenRoot(UiScreen.Lobby);
@@ -245,7 +257,15 @@ namespace RedHollow.Game.UI
         /// <summary>S1 — the callsign input; typing loads the profile (TitleScreenModel.SetCallsign).</summary>
         public InputField CallsignInput { get; }
 
-        /// <summary>S1 — HOST GAME: opens the lobby as the typed callsign (R-50).</summary>
+        /// <summary>
+        /// S1 — PLAY MATCH: the large primary control. Same path as
+        /// <see cref="GameEntryBehaviour"/> Start — SetCallsign, RequestHost,
+        /// PickClass(Gunslinger), SetReady(true) — so a human lands in wave-1 combat
+        /// without hunting the lobby.
+        /// </summary>
+        public Button PlayMatchButton { get; }
+
+        /// <summary>S1 — HOST GAME: opens the lobby as the typed callsign (R-50). LAN path.</summary>
         public Button HostButton { get; }
 
         /// <summary>S1 — the join-code input; editing clears the inline error.</summary>
@@ -718,6 +738,16 @@ namespace RedHollow.Game.UI
             if (label != null)
             {
                 label.text = caption ?? string.Empty;
+            }
+        }
+
+        /// <summary>Bump a primary button's caption so PLAY MATCH reads larger than HOST GAME.</summary>
+        private static void EnlargeCaption(Button button, int size)
+        {
+            var label = button.GetComponentInChildren<Text>(true);
+            if (label != null)
+            {
+                label.fontSize = size;
             }
         }
 

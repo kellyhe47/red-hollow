@@ -466,8 +466,9 @@ namespace RedHollow.Tests.EditMode
         /// <summary>
         /// The owner's exact repro, pinned: a fresh shell with no session shows S1 — and S1 is
         /// VISIBLE: a real banner text (nonempty, banner-sized, with a font) plus renderable
-        /// labels and clickable HOST/JOIN buttons. Copy stays free; existence, font, size and
-        /// graphics are the contract.
+        /// labels and clickable PLAY MATCH / HOST GAME / JOIN buttons. Copy stays free;
+        /// existence, font, size and graphics are the contract. PLAY MATCH is the large
+        /// primary and sits above HOST GAME.
         /// </summary>
         [Test]
         public void Booting_with_no_session_shows_a_visible_title_screen()
@@ -497,8 +498,27 @@ namespace RedHollow.Tests.EditMode
                 "T-27: S1 shows a visible TITLE banner — some nonempty text at banner size "
                 + "(>= " + MinBannerSize + "pt); its copy is presentation and stays free");
 
+            AssertVisiblyClickable(shell.Controls.PlayMatchButton, shell.Ui.Root.transform);
             AssertVisiblyClickable(shell.Controls.HostButton, shell.Ui.Root.transform);
             AssertVisiblyClickable(shell.Controls.JoinButton, shell.Ui.Root.transform);
+
+            var playCaption = shell.Controls.PlayMatchButton.GetComponentInChildren<Text>(true);
+            Assert.That(playCaption, Is.Not.Null, "PLAY MATCH has a caption");
+            Assert.That(playCaption.text, Is.EqualTo("PLAY MATCH"));
+            Assert.That(playCaption.fontSize, Is.GreaterThanOrEqualTo(MinBannerSize),
+                "T-27: PLAY MATCH is the large primary — banner-sized caption");
+
+            RectTransform playSide, hostSide;
+            SplitAtCommonAncestor(
+                shell.Controls.PlayMatchButton.transform,
+                shell.Controls.HostButton.transform,
+                shell.Ui.Root.transform,
+                out playSide, out hostSide);
+            var playMidY = (playSide.anchorMin.y + playSide.anchorMax.y) * 0.5f;
+            var hostMidY = (hostSide.anchorMin.y + hostSide.anchorMax.y) * 0.5f;
+            Assert.That(playMidY, Is.GreaterThan(hostMidY),
+                "T-27: PLAY MATCH sits above HOST GAME — play mid " + playMidY
+                + " vs host mid " + hostMidY);
         }
 
         /// <summary>

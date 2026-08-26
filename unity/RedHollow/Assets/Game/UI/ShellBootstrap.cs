@@ -503,6 +503,22 @@ namespace RedHollow.Game.UI
         }
 
         /// <summary>
+        /// Skip S1/S2 so a human (or Unity Play's <c>GameEntryBehaviour.Start</c>) lands in
+        /// wave-1 combat without a lobby scavenger hunt: SetCallsign, RequestHost,
+        /// PickClass(Gunslinger), SetReady(true). HOST GAME stays the LAN path.
+        /// </summary>
+        public void StartSoloPlayMatch()
+        {
+            Title.SetCallsign("Kelly");
+            RequestHost();
+            if (_lobby != null)
+            {
+                _lobby.PickClass(HeroClass.Gunslinger);
+                _lobby.SetReady(true);
+            }
+        }
+
+        /// <summary>
         /// T-23 / R-50 — HOST GAME: seat the local peer as host, carrying the TYPED callsign as
         /// its account (R-44). Ignored while a lobby/match is already up (those screens carry no
         /// HOST button anyway).

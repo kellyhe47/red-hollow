@@ -98,10 +98,19 @@ namespace RedHollow.Tests.EditMode
 
             var root = shell.Ui.ScreenRoot(UiScreen.Title);
             AssertControlUnder(shell.Controls.CallsignInput, root, "the callsign input");
+            AssertControlUnder(shell.Controls.PlayMatchButton, root, "PLAY MATCH");
             AssertControlUnder(shell.Controls.HostButton, root, "HOST GAME");
             AssertControlUnder(shell.Controls.JoinCodeInput, root, "the join-code input");
             AssertControlUnder(shell.Controls.JoinButton, root, "JOIN");
             AssertControlUnder(shell.Controls.JoinErrorLabel, root, "the inline join error");
+
+            var hostCaption = shell.Controls.HostButton.GetComponentInChildren<Text>(true);
+            Assert.That(hostCaption, Is.Not.Null, "HOST GAME still has a caption");
+            Assert.That(hostCaption.text, Is.EqualTo("HOST GAME"),
+                "T-23: HOST GAME remains the LAN host label — PLAY MATCH is a separate control");
+            var playCaption = shell.Controls.PlayMatchButton.GetComponentInChildren<Text>(true);
+            Assert.That(playCaption, Is.Not.Null, "PLAY MATCH has a caption");
+            Assert.That(playCaption.text, Is.EqualTo("PLAY MATCH"));
         }
 
         /// <summary>
@@ -161,6 +170,35 @@ namespace RedHollow.Tests.EditMode
                 "the wiring hosts as the shell's own LocalPeerId");
             Assert.That(seat.AccountId, Is.EqualTo(HostAccount),
                 "R-44: the seat carries the TYPED callsign as its account");
+        }
+
+        /// <summary>
+        /// PLAY MATCH is the one-click path a human can find on S1: same four calls as
+        /// GameEntryBehaviour.Start (SetCallsign, RequestHost, PickClass(Gunslinger),
+        /// SetReady(true)). HOST GAME still only opens the lobby.
+        /// </summary>
+        [Test]
+        public void Play_match_click_lands_in_the_live_match_without_a_lobby_hunt()
+        {
+            var shell = NewShell();
+            shell.Pump(0.0);
+            AssertOnlyActiveScreen(shell, UiScreen.Title, "a fresh shell is on S1");
+
+            shell.Controls.PlayMatchButton.onClick.Invoke();
+            shell.Pump(0.0);
+            shell.Pump(0.0);
+
+            Assert.That(shell.Session.Phase, Is.EqualTo(NetSessionPhase.InMatch),
+                "PLAY MATCH hosted, picked Gunslinger, and readied — no lobby scavenger hunt");
+            Assert.That(shell.Router.Screen,
+                Is.EqualTo(UiScreen.Combat).Or.EqualTo(UiScreen.Planning),
+                "the player is looking at the live match (planning or combat)");
+
+            var hero = shell.Session.Match.State.Heroes.Values.FirstOrDefault(
+                h => string.Equals(h.AccountId, "Kelly", StringComparison.Ordinal));
+            Assert.That(hero, Is.Not.Null, "the started match seated Kelly");
+            Assert.That(hero.HeroClass, Is.EqualTo(HeroClass.Gunslinger),
+                "PLAY MATCH picks Gunslinger, matching GameEntryBehaviour.Start");
         }
 
         /// <summary>
