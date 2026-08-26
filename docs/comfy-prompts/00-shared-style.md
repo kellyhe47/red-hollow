@@ -31,7 +31,7 @@
 - Environment = **fully 3D** Martian terraformed underground colony inspired by Lykos (Red Rising) / `seed-env.webp`. Mix **~70% colony / ~30% western frontier accents**. Stacked blocky settlement, real building height, volumetric haze, amber lanterns.
 - Buildings are **Mars-type 3D kitbash modules** (Quaternius Modular Sci-Fi MegaKit Standard, CC0) retextured with Lykos URP Lit maps (hab-block-wall/cladding, hab-block-roof, colony-decking, cavern-ground, metal-floor-plate, colony-wall). Stacked habitat walls, 3D deck plates, roofs, doors, columns. **2D facade cards are retired.** Western is wood/brass/lantern wear on those forms — **not** western-only-on-characters, **not** a cowboy main street.
 - **Zero natural light** (DEC-025, still in force): no sun, no sky, no directional golden-hour. Lanterns, not sun.
-- Camera: **tilted perspective follow-cam (~58–62° down, FOV ~38°, street-scale)** so side walls, roof slabs and thick deck plates read. Not orthographic, not `Quaternion.LookRotation(Vector3.down)` bird's-eye, not a whole-map diorama. Reference language: r/DestroyMyGame 1hijaq4 trailer camera, but lanterns not sun.
+- Camera: **tilted perspective follow-cam (~55–58° down, FOV ~38°, eye ~16u, street-scale)** so side walls, roof slabs and thick deck plates read. Not orthographic, not `Quaternion.LookRotation(Vector3.down)` bird's-eye, not a whole-map diorama. Reference language: r/DestroyMyGame 1hijaq4 trailer camera, but lanterns not sun.
 - Heroes and monsters are **painted canon sheets on world-facing Lit volumes** (capsule/hat thickness, yaw from aim/walk — not camera-facing postcards). **v1 still defers Mixamo/rigged meshes** (hard lift).
 - Comfy environment tiles = albedo/normal/AO for **3D mesh UVs**, not a flat 2D tilemap.
 - Hotspot **names** Saloon, Chapel, Homestead remain sim/fixture IDs (R-10); their 3D meshes are Lykos colony blocks (kit modules + Lykos textures) with western wear. Camera is a **tilted perspective follow-cam**; characters stay 2.5D sheets planted on the 3D deck.
@@ -57,7 +57,7 @@ Most of Lantern Deep is a **scene-lighting** achievement, deliberately kept out 
 - All light sourced: amber point lights at lanterns/string lights/windows; one bright landmark (lift shaft / arc towers) as the "glowing distance".
 - Cavern dome mesh textured with the sandstone/carved-rock wall tile; no skybox — the dome IS the sky.
 - Semi-realistic depth comes from URP lighting + derived normal/AO maps over painterly albedo on **3D meshes** (see per-pipeline deliverables) — NOT from photoreal source textures, and **not from a flat 2D tilemap**.
-- Camera is a tilted perspective follow-cam (~58–62° down, FOV ~38°). Heroes/monsters are world-facing Lit volumes (painted albedo on a capsule) in that 3D space — not camera-facing cards.
+- Camera is a tilted perspective follow-cam (~55–58° down, FOV ~38°, eye ~16u). Heroes/monsters are world-facing Lit volumes (painted albedo on a capsule) in that 3D space — not camera-facing cards.
 
 **Process rules (all agents):**
 1. Start from a Comfy Cloud text-to-image template; get one image out before building anything.

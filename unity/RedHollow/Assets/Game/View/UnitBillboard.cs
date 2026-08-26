@@ -9,12 +9,12 @@ namespace RedHollow.Game.View
     /// </summary>
     public static class UnitBillboard
     {
-        public const float HeroWidth = 1.60f;
-        public const float HeroHeight = 4.00f;
-        public const float HeroDepth = 0.90f;
-        public const float MonsterWidth = 1.40f;
-        public const float MonsterHeight = 3.40f;
-        public const float MonsterDepth = 0.80f;
+        public const float HeroWidth = 1.55f;
+        public const float HeroHeight = 3.60f;
+        public const float HeroDepth = 0.85f;
+        public const float MonsterWidth = 1.25f;
+        public const float MonsterHeight = 3.10f;
+        public const float MonsterDepth = 0.75f;
 
         /// <summary>Placeholder volume for a hero or monster class.</summary>
         public static GameObject CreatePlaceholder(VisualClass visualClass)
@@ -107,6 +107,14 @@ namespace RedHollow.Game.View
 
             if (cowboyHat)
             {
+                var coat = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                coat.name = "duster";
+                coat.transform.SetParent(root.transform, false);
+                coat.transform.localScale = new Vector3(width * 0.92f, height * 0.52f, depth * 1.12f);
+                coat.transform.localPosition = new Vector3(0f, height * 0.36f, depth * 0.04f);
+                ViewLook.StripCollider(coat);
+                ViewLook.Paint(coat, ViewLook.Lit(new Color(0.22f, 0.13f, 0.07f), smoothness: 0.08f), castShadows: true);
+
                 var brim = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                 brim.name = "hat_brim";
                 brim.transform.SetParent(root.transform, false);

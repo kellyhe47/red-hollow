@@ -49,18 +49,17 @@ namespace RedHollow.Game.View
     public static class MatchSceneBuilder
     {
         /// <summary>
-        /// How far above the colony floor the camera sits. Street-scale: hab south
-        /// walls fill the frame under a 60° look. Height 28 turned the Game view into
-        /// a zenith roof-stamp. GridHabs are kept out of the south follow corridor by
-        /// CavernBlockout's 22u spawn courtyard, so 22 no longer sits inside a wall.
+        /// How far above the colony floor the camera sits. Street-scale: hab SIDES and
+        /// the gunslinger body fill the frame under a ~56° look. Height 22 still read
+        /// as a roof-stamp; 28 clipped habs. Keep the south follow corridor empty.
         /// </summary>
-        public const float CameraHeight = 22f;
+        public const float CameraHeight = 16f;
 
         /// <summary>
-        /// Pitch down from the horizon, degrees. ~58-62 so roof edges AND wall sides read;
-        /// 90 would hide every vertical face.
+        /// Pitch down from the horizon, degrees. ~55-58 so roof edges AND wall sides
+        /// and the unit body read; 90 would hide every vertical face.
         /// </summary>
-        public const float CameraPitchDown = 60f;
+        public const float CameraPitchDown = 55f;
 
         /// <summary>Vertical FOV for the street-scale follow cam. Ortho is retired.</summary>
         public const float StreetFov = 38f;
@@ -103,14 +102,14 @@ namespace RedHollow.Game.View
         private const float TypicalViewAspect = 16f / 9f;
 
         /// <summary>Warm brown haze — dust under lamplight, never a blue night mist.</summary>
-        private static readonly Color FogDust = new Color(0.46f, 0.26f, 0.12f);
+        private static readonly Color FogDust = new Color(0.12f, 0.075f, 0.04f);
 
         /// <summary>
-        /// Warm umber fill. Street-mast lanterns sit below the roof plane so Lambert on a
-        /// +Y face is zero; ambient is the floor that keeps roofs and alley gaps readable
-        /// umber instead of void-black. Still far under daylight.
+        /// Low warm umber fill. Keys pool on the deck; ambient keeps unlit sides
+        /// dark-umber instead of void-black. High values plus a fill grid were the
+        /// orange flood.
         /// </summary>
-        private static readonly Color AmbientUmber = new Color(0.40f, 0.27f, 0.14f);
+        private static readonly Color AmbientUmber = new Color(0.07f, 0.045f, 0.022f);
 
         /// <summary>
         /// Compose the scene the session is played in: a tilted top-down camera, the colony floor,
@@ -250,7 +249,7 @@ namespace RedHollow.Game.View
             RenderSettings.fogColor = FogDust;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
             // Dense enough to haze the far wall / lift shaft; the playable square stays readable.
-            RenderSettings.fogDensity = 0.008f;
+            RenderSettings.fogDensity = 0.016f;
 
             RenderSettings.skybox = null;
             RenderSettings.sun = null;
@@ -314,43 +313,27 @@ namespace RedHollow.Game.View
         }
 
         /// <summary>
-        /// Soft shadows on sourced lanterns. llvmpipe may hitch or go black with cubemap
-        /// point shadows; flip this off and keep the extra lights if PlayCapture dies.
+        /// Soft shadows on the courtyard keys (spawn + two flank masts). Far lanterns
+        /// stay unshadowed so the URP atlas can actually draw those three. Blob
+        /// shadows remain as a fallback if cubemap point shadows hitch.
         /// </summary>
-        private const bool LanternSoftShadows = false;
+        private const bool LanternSoftShadows = true;
 
         /// <summary>
-        /// Street-mast height. High lamps (y=16+) left umber holes between habs because
-        /// inverse-square died before the floor; keep this layer's pool on the pavement.
-        /// </summary>
-        private const float ClusterLanternHeight = 8f;
-
-        /// <summary>Sphere radius from the cluster lamp; must clear height plus a street radius.</summary>
-        private const float ClusterLanternRange = 26f;
-
-        /// <summary>
-        /// Roof-graze height. 4-story stacks peak ~y=25; sit above that so N·L on the roof
-        /// plane is positive, with enough range to still kiss the street.
-        /// </summary>
-        private const float RoofLanternHeight = 28f;
-
-        /// <summary>Sphere radius from a roof lamp: 28 down to the floor plus a street pool.</summary>
-        private const float RoofLanternRange = 46f;
-
-        /// <summary>Spawn / shelter keys hang over open courtyards, just above 4-story peak.</summary>
-        private const float KeyLanternHeight = 28f;
-
-        /// <summary>
-        /// R-15 — sourced amber point lights over spawn, each shelter, each tunnel mouth,
-        /// and a fill grid so walking a street is not an umber hole. Named and typed as
-        /// lanterns (never Directional) so the no-sun tests still pass.
+        /// R-15 — 8 sourced amber keys (spawn + 3 shelters + 4 street masts). No fill
+        /// grid, no roof flood. Only the courtyard keys carry Soft shadows — 8
+        /// shadowed points overflow the URP atlas and become an unshadowed orange
+        /// wash. Named and typed as lanterns (never Directional).
         /// </summary>
         private static void RaiseLanterns(Transform root, ColonyMap map)
         {
-            var amber = new Color(1.0f, 0.62f, 0.28f);
-            var keyShadows = LanternSoftShadows ? LightShadows.Soft : LightShadows.None;
+            var amber = new Color(1.0f, 0.70f, 0.36f);
+            var soft = LanternSoftShadows ? LightShadows.Soft : LightShadows.None;
 
-            AddLantern(root, "Lantern_Spawn", map.TeamSpawn, KeyLanternHeight, amber, 56f, 110f, keyShadows);
+            // Offset off the hero's head so the body is side-lit and the deck
+            // pools instead of flooding. Matches the spawn-pad lamp mesh.
+            var spawn = new Vec2(map.TeamSpawn.X + 2.8, map.TeamSpawn.Y + 2.8);
+            AddLantern(root, "Lantern_Spawn", spawn, 5.2f, amber, 9f, 48f, soft);
 
             foreach (var spec in map.Hotspots)
             {
@@ -359,46 +342,23 @@ namespace RedHollow.Game.View
                     continue;
                 }
 
-                AddLantern(root, "Lantern_" + spec.Id, spec.Pos, KeyLanternHeight, amber, 48f, 90f, keyShadows);
+                AddLantern(root, "Lantern_" + spec.Id, spec.Pos, 6.2f, amber, 11f, 32f, LightShadows.None);
             }
 
-            for (var i = 0; i < map.EntryTunnels.Count; i++)
+            // Street masts at hab rims. Two courtyard-facing masts keep Soft
+            // shadows so habs and the gunslinger blob the deck.
+            var masts = new[]
             {
-                AddLantern(root, "Lantern_Tunnel_" + i, map.EntryTunnels[i], 14f, amber, 40f, 60f, LightShadows.None);
-            }
-
-            var n = 0;
-            for (var x = -40; x <= 40; x += 16)
+                new Vec2(8.2, -3.2),
+                new Vec2(-8.2, -3.2),
+                new Vec2(3.0, 8.5),
+                new Vec2(-9.0, 6.0),
+            };
+            var mastShadows = new[] { soft, soft, LightShadows.None, LightShadows.None };
+            var mastCd = new[] { 42f, 42f, 30f, 30f };
+            for (var i = 0; i < masts.Length; i++)
             {
-                for (var z = -40; z <= 40; z += 16)
-                {
-                    if (x == 0 && z == 0)
-                    {
-                        continue;
-                    }
-
-                    AddLantern(root, "Lantern_Fill_" + n, new Vec2(x, z), ClusterLanternHeight,
-                        amber, ClusterLanternRange, 220f, LightShadows.None);
-                    n++;
-                }
-            }
-
-            // Sparse high cluster: a few lamps above the roof plane so hab tops and
-            // alley gaps get amber, not only the pavement immediately under a mast.
-            var r = 0;
-            for (var x = -32; x <= 32; x += 32)
-            {
-                for (var z = -32; z <= 32; z += 32)
-                {
-                    if (x == 0 && z == 0)
-                    {
-                        continue;
-                    }
-
-                    AddLantern(root, "Lantern_Roof_" + r, new Vec2(x, z), RoofLanternHeight,
-                        amber, RoofLanternRange, 180f, LightShadows.None);
-                    r++;
-                }
+                AddLantern(root, "Lantern_Mast_" + i, masts[i], 5.6f, amber, 10f, mastCd[i], mastShadows[i]);
             }
         }
 

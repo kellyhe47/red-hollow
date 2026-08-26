@@ -51,6 +51,11 @@ namespace RedHollow.Game.View
         public const string LightWide = Props + "Prop_Light_Wide";
         public const string LightSmall = Props + "Prop_Light_Small";
         public const string Vent = Props + "Prop_Vent_Big";
+        public const string CrateA = Props + "Prop_Crate3";
+        public const string CrateB = Props + "Prop_Crate4";
+        public const string Barrel = Props + "Prop_Barrel_Large";
+        public const string Cable = Props + "Prop_Cable_1";
+        public const string PipeHolder = Props + "Prop_PipeHolder";
 
         /// <summary>West face (kit default, -X). Unity yaw degrees for the other three.</summary>
         public static readonly Quaternion FaceWest = Quaternion.identity;
@@ -118,7 +123,41 @@ namespace RedHollow.Game.View
             go.transform.localScale = Vector3.one * WorldScale;
             Strip(go);
             Paint(go, material, castShadows);
+            SitOnLocalY(go);
             return go;
+        }
+
+        /// <summary>
+        /// Slide the instance so its rendered bounds sit on the local Y it was placed at.
+        /// Kit pivots vary (floor vs mid-wall); without this, roofs and columns float.
+        /// </summary>
+        public static void SitOnLocalY(GameObject go)
+        {
+            if (go == null)
+            {
+                return;
+            }
+
+            var renderers = go.GetComponentsInChildren<Renderer>(true);
+            if (renderers.Length == 0)
+            {
+                return;
+            }
+
+            var bounds = renderers[0].bounds;
+            for (var i = 1; i < renderers.Length; i++)
+            {
+                if (renderers[i] != null)
+                {
+                    bounds.Encapsulate(renderers[i].bounds);
+                }
+            }
+
+            var dy = go.transform.position.y - bounds.min.y;
+            if (Mathf.Abs(dy) > 0.001f)
+            {
+                go.transform.position += new Vector3(0f, dy, 0f);
+            }
         }
 
         public static void Strip(GameObject go)
@@ -163,7 +202,15 @@ namespace RedHollow.Game.View
                     continue;
                 }
 
-                renderer.sharedMaterial = material;
+                var slots = renderer.sharedMaterials;
+                var count = slots != null && slots.Length > 0 ? slots.Length : 1;
+                var painted = new Material[count];
+                for (var m = 0; m < count; m++)
+                {
+                    painted[m] = material;
+                }
+
+                renderer.sharedMaterials = painted;
                 var lit = ViewLook.IsLitShader(material);
                 renderer.shadowCastingMode = lit && castShadows
                     ? ShadowCastingMode.On

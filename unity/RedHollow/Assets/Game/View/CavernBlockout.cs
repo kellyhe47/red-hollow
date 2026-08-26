@@ -42,8 +42,8 @@ namespace RedHollow.Game.View
         // Lit albedo tints: lanterns do the shading. Roof stays darker than walls so
         // the 62° camera still reads a separate roof plane — but not so dark that
         // ambient * albedo collapses to void-black on the +Y face.
-        private static readonly Color RoofTint = new Color(0.90f, 0.66f, 0.44f);
-        private static readonly Color HabWallTint = new Color(1.00f, 0.84f, 0.60f);
+        private static readonly Color RoofTint = new Color(0.40f, 0.26f, 0.15f);
+        private static readonly Color HabWallTint = new Color(0.48f, 0.33f, 0.20f);
         private static readonly Color CavernTint = new Color(0.62f, 0.38f, 0.20f);
         private static readonly Color RockTint = new Color(0.38f, 0.22f, 0.12f);
 
@@ -216,19 +216,21 @@ namespace RedHollow.Game.View
             SciFiKit.Place(hab.transform, "Courtyard", SciFiKit.FloorSquares,
                 new Vector3(0f, DeckSurface, 0f), Quaternion.identity, deck, castShadows: true);
 
-            var yaw = hotspotId == "hs_chapel" ? 25f
-                : hotspotId == "hs_homestead" ? -20f
-                : 8f;
+            var yaw = hotspotId == "hs_chapel" ? 12f
+                : hotspotId == "hs_homestead" ? -10f
+                : 6f;
 
             var g = SciFiKit.Grid;
+            // Courtyard on the sim point stays open. Wings sit a full cell off the
+            // marker so pathing through the hotspot origin is clear. Skip a south
+            // wing so the follow-cam reads wall SIDES instead of a near-plane slab.
             var wings = new[]
             {
-                new Vector3(g, 0f, 0.4f),
-                new Vector3(-g, 0f, 0.2f),
-                new Vector3(0.2f, 0f, g),
-                new Vector3(0.6f, 0f, -g),
+                new Vector3(g * 1.15f, 0f, 0.4f),
+                new Vector3(-g * 1.15f, 0f, 0.2f),
+                new Vector3(0.2f, 0f, g * 1.15f),
             };
-            var stories = new[] { 3, 2, 3, 2 };
+            var stories = new[] { 3, 2, 3 };
             for (var i = 0; i < wings.Length; i++)
             {
                 RaiseKitHab(hab.transform, "Wing_" + i, wings[i], stories[i], yaw);
@@ -272,112 +274,35 @@ namespace RedHollow.Game.View
             settlement.transform.SetParent(root, false);
 
             var dark = DarkMetalMaterial();
-            var deck = DeckingMaterial();
             var brass = ViewLook.Unlit(Brass);
-            var g = SciFiKit.Grid;
 
-            var cluster = new[]
-            {
-                new Vector3(g * 1.5f, 0f, g * 0.5f),
-                new Vector3(-g * 1.5f, 0f, g * 0.6f),
-                new Vector3(g, 0f, -g * 0.4f),
-                new Vector3(-g * 0.5f, 0f, g * 1.4f),
-            };
-            var clusterStories = new[] { 3, 2, 2, 4 };
-
-            var n = 0;
-            foreach (var spec in map.Hotspots)
-            {
-                if (spec == null)
-                {
-                    continue;
-                }
-
-                var origin = SimSpace.ToWorld(spec.Pos);
-                for (var i = 0; i < cluster.Length; i++)
-                {
-                    var offset = cluster[i];
-                    if ((n % 2) == 1)
-                    {
-                        offset = new Vector3(-offset.x, 0f, offset.z);
-                    }
-
-                    RaiseKitHab(settlement.transform, "Hab_" + spec.Id + "_" + i,
-                        origin + offset, clusterStories[(i + n) % clusterStories.Length], n * 18f);
-                }
-
-                SciFiKit.Place(settlement.transform, "DeckStrip_" + spec.Id, SciFiKit.FloorMetal,
-                    new Vector3(origin.x + 1.5f, DeckSurface, origin.z),
-                    Quaternion.identity, deck, castShadows: true);
-                Box(settlement.transform, "DeckStripBox_" + spec.Id,
-                    new Vector3(origin.x + 1.5f, DeckThickness * 0.5f, origin.z),
-                    new Vector3(g * 1.6f, DeckThickness, 3.2f),
-                    deck, castShadows: true);
-
-                n++;
-            }
-
+            // DressHotspot already raises coherent wings around each shelter. Do NOT
+            // dump extra kit cells on those courtyards — that was the floating-shard
+            // scatter. Street habs sit outside the spawn follow corridor.
             var spawn = SimSpace.ToWorld(map.TeamSpawn);
 
+            // Street-scale: flanking habs sit just outside the south follow corridor
+            // (|x| >= 5) so the camera at ~12u south sees SIDE walls + roof slabs.
+            // A hab at z=+20 is above the 56° frustum and reads as empty courtyard.
+            // 1-storey flanks: roof slabs sit at ~y=7, under a y=16 eye, so the
+            // 55° look reads SIDE + ROOF instead of a 12m orange canyon.
+            RaiseKitHab(settlement.transform, "StreetHab_SE",
+                spawn + new Vector3(10.5f, 0f, -4.8f), 1, 4f);
+            RaiseKitHab(settlement.transform, "StreetHab_SW",
+                spawn + new Vector3(-10.5f, 0f, -4.8f), 1, -4f);
             RaiseKitHab(settlement.transform, "StreetHab_N",
-                spawn + new Vector3(2.5f, 0f, 10f), 3, 8f);
+                spawn + new Vector3(0f, 0f, 10.5f), 2, 6f);
             RaiseKitHab(settlement.transform, "StreetHab_NE",
-                spawn + new Vector3(12f, 0f, 6f), 2, -12f);
+                spawn + new Vector3(13f, 0f, 6.5f), 1, -8f);
             RaiseKitHab(settlement.transform, "StreetHab_NW",
-                spawn + new Vector3(-12f, 0f, 7f), 3, 16f);
-            RaiseKitHab(settlement.transform, "StreetHab_E",
-                spawn + new Vector3(11f, 0f, -2f), 2, 4f);
-
-            var extra = 0;
-            var gridMin = -40;
-            var gridMax = 40;
-            for (var gx = gridMin; gx <= gridMax; gx += 16)
-            {
-                for (var gz = gridMin; gz <= gridMax; gz += 16)
-                {
-                    var pos = new Vector3(gx + (gz % 2) * 1.4f, 0f, gz + (gx % 3) * 0.6f);
-                    // Must keep the follow-cam south of spawn in open street. Height 28
-                    // sits ~16u south; a 14u courtyard left a GridHab under the eye.
-                    if ((pos - spawn).sqrMagnitude < 22f * 22f)
-                    {
-                        continue;
-                    }
-
-                    var tooClose = false;
-                    foreach (var spec in map.Hotspots)
-                    {
-                        if (spec == null)
-                        {
-                            continue;
-                        }
-
-                        var hp = SimSpace.ToWorld(spec.Pos);
-                        if ((pos - hp).sqrMagnitude < 12f * 12f)
-                        {
-                            tooClose = true;
-                            break;
-                        }
-                    }
-
-                    if (tooClose)
-                    {
-                        continue;
-                    }
-
-                    var stories = 2 + (extra % 3);
-                    RaiseKitHab(settlement.transform, "GridHab_" + extra, pos, stories, extra * 11f);
-                    extra++;
-                }
-            }
+                spawn + new Vector3(-13f, 0f, 6.5f), 1, 10f);
 
             var masts = new[]
             {
-                new Vector3(10f, 0f, 10f),
-                new Vector3(-11f, 0f, 8f),
-                new Vector3(8f, 0f, -12f),
-                new Vector3(-9f, 0f, -9f),
-                new Vector3(16f, 0f, 2f),
-                new Vector3(-15f, 0f, -4f),
+                new Vector3(8.2f, 0f, -3.2f),
+                new Vector3(-8.2f, 0f, -3.2f),
+                new Vector3(3.0f, 0f, 8.5f),
+                new Vector3(-9.0f, 0f, 6.0f),
             };
             for (var i = 0; i < masts.Length; i++)
             {
@@ -639,9 +564,9 @@ namespace RedHollow.Game.View
         }
 
         /// <summary>
-        /// One kitbashed habitat cell: four kit walls per storey, columns, a thick
-        /// deck, a kit roof slab. Cube-composite RaiseHab is retired — it fought the
-        /// kit silhouette. Missing FBX (R-15) falls back to a single box.
+        /// One coherent habitat volume: structural Lit wall slabs + roof overhang per
+        /// storey, kit floor/door/columns/wall cladding sitting on the deck (SitOnLocalY
+        /// so kit pivots cannot float). Missing FBX (R-15) still leaves a building.
         /// </summary>
         private static void RaiseKitHab(
             Transform parent, string name, Vector3 pos, int stories, float yawDeg)
@@ -665,38 +590,43 @@ namespace RedHollow.Game.View
             var roofMat = RoofMaterial();
             var dark = DarkMetalMaterial();
             var deck = DeckingMaterial();
+            var g = SciFiKit.Grid;
+            var half = g * 0.48f;
+            var wallT = 0.62f;
+            var storey = SciFiKit.StoryHeight;
 
             Box(hab.transform, "Deck",
                 new Vector3(0f, DeckThickness * 0.5f, 0f),
-                new Vector3(SciFiKit.Grid, DeckThickness, SciFiKit.Grid),
+                new Vector3(g, DeckThickness, g),
                 deck, castShadows: true);
-
-            var kitFloor = SciFiKit.Place(hab.transform, "Floor", SciFiKit.FloorDark,
+            SciFiKit.Place(hab.transform, "Floor", SciFiKit.FloorDark,
                 new Vector3(0f, DeckSurface, 0f), Quaternion.identity, deck, castShadows: true);
-            if (kitFloor == null)
-            {
-                var h = stories * SciFiKit.StoryHeight;
-                Box(hab.transform, "Body",
-                    new Vector3(0f, DeckSurface + h * 0.5f, 0f),
-                    new Vector3(SciFiKit.Grid * 0.92f, h, SciFiKit.Grid * 0.92f),
-                    metal, castShadows: true);
-                Box(hab.transform, "Roof",
-                    new Vector3(0f, DeckSurface + h + 0.36f, 0f),
-                    new Vector3(SciFiKit.Grid + 1.1f, 0.72f, SciFiKit.Grid + 1.1f),
-                    roofMat, castShadows: true);
-                return;
-            }
 
             var faces = new[]
             {
                 SciFiKit.FaceSouth, SciFiKit.FaceNorth, SciFiKit.FaceEast, SciFiKit.FaceWest,
             };
             var faceNames = new[] { "S", "N", "E", "W" };
-            var inset = SciFiKit.Grid * 0.42f;
+            var inset = g * 0.42f;
 
             for (var s = 0; s < stories; s++)
             {
-                var y = DeckSurface + (s * SciFiKit.StoryHeight);
+                var y0 = DeckSurface + (s * storey);
+                var yMid = y0 + (storey * 0.5f);
+
+                Box(hab.transform, "Wall_S_" + s,
+                    new Vector3(0f, yMid, -half),
+                    new Vector3(g * 0.96f, storey, wallT), metal, castShadows: true);
+                Box(hab.transform, "Wall_N_" + s,
+                    new Vector3(0f, yMid, half),
+                    new Vector3(g * 0.96f, storey, wallT), metal, castShadows: true);
+                Box(hab.transform, "Wall_E_" + s,
+                    new Vector3(half, yMid, 0f),
+                    new Vector3(wallT, storey, g * 0.96f), metal, castShadows: true);
+                Box(hab.transform, "Wall_W_" + s,
+                    new Vector3(-half, yMid, 0f),
+                    new Vector3(wallT, storey, g * 0.96f), metal, castShadows: true);
+
                 for (var f = 0; f < 4; f++)
                 {
                     string module;
@@ -713,40 +643,65 @@ namespace RedHollow.Game.View
                         module = (s % 2) == 0 ? SciFiKit.WallSolid : SciFiKit.WallBand;
                     }
 
-                    SciFiKit.Place(hab.transform, "Wall_" + faceNames[f] + "_" + s,
-                        module, new Vector3(0f, y, 0f), faces[f], metal, castShadows: true);
+                    SciFiKit.Place(hab.transform, "KitWall_" + faceNames[f] + "_" + s,
+                        module, new Vector3(0f, y0, 0f), faces[f], metal, castShadows: true);
                 }
 
                 SciFiKit.Place(hab.transform, "Col_NW_" + s, SciFiKit.ColumnStory,
-                    new Vector3(-inset, y, inset), Quaternion.identity, dark);
+                    new Vector3(-inset, y0, inset), Quaternion.identity, dark);
                 SciFiKit.Place(hab.transform, "Col_NE_" + s, SciFiKit.ColumnStory,
-                    new Vector3(inset, y, inset), Quaternion.identity, dark);
+                    new Vector3(inset, y0, inset), Quaternion.identity, dark);
                 SciFiKit.Place(hab.transform, "Col_SW_" + s, SciFiKit.ColumnStory,
-                    new Vector3(-inset, y, -inset), Quaternion.identity, dark);
+                    new Vector3(-inset, y0, -inset), Quaternion.identity, dark);
                 SciFiKit.Place(hab.transform, "Col_SE_" + s, SciFiKit.ColumnStory,
-                    new Vector3(inset, y, -inset), Quaternion.identity, dark);
+                    new Vector3(inset, y0, -inset), Quaternion.identity, dark);
             }
 
-            SciFiKit.Place(hab.transform, "Bottom_S", SciFiKit.BottomTrim,
-                new Vector3(0f, DeckSurface, 0f), SciFiKit.FaceSouth, dark);
+            SciFiKit.Place(hab.transform, "Door", SciFiKit.DoorSimple,
+                new Vector3(0f, DeckSurface, 0f), SciFiKit.FaceSouth, dark, castShadows: true);
+            Box(hab.transform, "DoorSlab",
+                new Vector3(0f, DeckSurface + 1.55f, -(half + 0.08f)),
+                new Vector3(1.7f, 3.1f, 0.18f), dark, castShadows: true);
 
-            var topY = DeckSurface + ((stories - 1) * SciFiKit.StoryHeight);
-            for (var f = 0; f < 4; f++)
-            {
-                var top = (f % 2) == 0 ? SciFiKit.TopTrim : SciFiKit.TopCables;
-                SciFiKit.Place(hab.transform, "Top_" + faceNames[f], top,
-                    new Vector3(0f, topY, 0f), faces[f], roofMat, castShadows: true);
-            }
-
-            var roofY = DeckSurface + (stories * SciFiKit.StoryHeight);
+            var roofY = DeckSurface + (stories * storey);
             Box(hab.transform, "RoofSlab",
-                new Vector3(0f, roofY + 0.36f, 0f),
-                new Vector3(SciFiKit.Grid + 1.2f, 0.72f, SciFiKit.Grid + 1.2f),
+                new Vector3(0f, roofY + 0.38f, 0f),
+                new Vector3(g + 1.6f, 0.76f, g + 1.6f),
+                roofMat, castShadows: true);
+            Box(hab.transform, "Overhang_S",
+                new Vector3(0f, roofY + 0.18f, -(half + 0.7f)),
+                new Vector3(g * 0.92f, 0.22f, 1.4f),
                 roofMat, castShadows: true);
             SciFiKit.Place(hab.transform, "Roof", SciFiKit.FloorMetal,
                 new Vector3(0f, roofY, 0f), Quaternion.identity, roofMat, castShadows: true);
             SciFiKit.Place(hab.transform, "Vent", SciFiKit.Vent,
-                new Vector3(1.2f, roofY, 1.2f), Quaternion.identity, dark);
+                new Vector3(1.1f, roofY, 1.1f), Quaternion.identity, dark);
+
+            DressRimClutter(hab.transform, "Clutter", 0f, 0f, half + 0.85f);
+        }
+
+        /// <summary>
+        /// Crates, barrels, pipes along the east/north rims. Outside the hab volume so
+        /// they sell the street; not in the spawn/hotspot courtyard.
+        /// </summary>
+        private static void DressRimClutter(
+            Transform parent, string name, float x, float z, float rim)
+        {
+            var dark = DarkMetalMaterial();
+            var deck = DeckingMaterial();
+            // South rim (local -Z) sits outside the spawn courtyard for the flanking habs.
+            SciFiKit.Place(parent, name + "_crateA", SciFiKit.CrateA,
+                new Vector3(x + 1.15f, DeckSurface, z - rim), Quaternion.Euler(0f, 18f, 0f),
+                deck, castShadows: true);
+            SciFiKit.Place(parent, name + "_crateB", SciFiKit.CrateB,
+                new Vector3(x - 0.9f, DeckSurface, z - rim - 0.15f), Quaternion.Euler(0f, -25f, 0f),
+                deck, castShadows: true);
+            SciFiKit.Place(parent, name + "_barrel", SciFiKit.Barrel,
+                new Vector3(x + 2.3f, DeckSurface, z - rim + 0.2f), Quaternion.identity,
+                dark, castShadows: true);
+            SciFiKit.Place(parent, name + "_pipe", SciFiKit.ColumnPipes,
+                new Vector3(x - 2.1f, DeckSurface, z - rim + 0.1f), Quaternion.identity,
+                dark, castShadows: true);
         }
 
         /// <summary>
@@ -864,7 +819,7 @@ namespace RedHollow.Game.View
 
         private static Material DeckingMaterial()
         {
-            return Tiled("RedHollowArt/colony-decking", new Color(0.82f, 0.58f, 0.36f),
+            return Tiled("RedHollowArt/colony-decking", new Color(0.40f, 0.30f, 0.18f),
                 new Vector2(4f, 4f), "RedHollowArt/metal-floor-plate");
         }
 
