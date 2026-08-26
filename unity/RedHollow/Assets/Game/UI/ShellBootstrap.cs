@@ -366,6 +366,14 @@ namespace RedHollow.Game.UI
         public IInputSource Input => _input;
 
         /// <summary>
+        /// R-43 / R-44 — the profile store this shell was composed with (the in-memory default
+        /// when none was). The same accessor-pin shape as <see cref="Input"/>: the entry composes
+        /// a persistent store, and the test that keeps launched XP surviving a restart reads it
+        /// back here.
+        /// </summary>
+        public IProfileStore Profiles => _profiles;
+
+        /// <summary>
         /// Ticket 025 (T-25) — the combat action tunables this shell routes SPACE/Q/E with:
         /// the <see cref="ShellBootstrapOptions.CombatActions"/> it was composed with, or the
         /// shipped defaults when none was.

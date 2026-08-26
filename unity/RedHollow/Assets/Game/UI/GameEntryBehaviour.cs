@@ -61,13 +61,19 @@ namespace RedHollow.Game.UI
 
         private void Awake()
         {
-            // Loopback by default — every option null except identity and the device seam, which
-            // only a scene entry can own (ShellBootstrap deliberately has no device default).
+            // Loopback by default — every option null except identity, the device seam (which
+            // only a scene entry can own; ShellBootstrap deliberately has no device default) and
+            // the profile store: R-43/R-44 make lifetime XP survive the process, and the shell's
+            // in-memory default is a store whose XP dies on quit. The JSON document lives in
+            // Unity's per-app data directory — the same "server-local" file a dedicated host
+            // would own.
             _shell = new ShellBootstrap(new ShellBootstrapOptions
             {
                 LocalPeerId = LocalPeerId,
                 LocalAccountId = LocalAccountId,
                 InputSource = new LegacyDeviceInputSource(null),
+                Profiles = new JsonProfileStore(
+                    System.IO.Path.Combine(Application.persistentDataPath, "redhollow-profiles.json")),
             });
 
             EnsureEventSystem();

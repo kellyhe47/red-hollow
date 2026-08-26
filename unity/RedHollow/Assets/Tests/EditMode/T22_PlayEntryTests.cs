@@ -204,6 +204,29 @@ namespace RedHollow.Tests.EditMode
         }
 
         /// <summary>
+        /// R-43 / R-44 — a LAUNCHED game keeps lifetime XP across a restart: the entry composes a
+        /// persistent <see cref="JsonProfileStore"/> (the shell's own default is in-memory, which
+        /// is "XP dies on quit"), pointed under Unity's per-app data directory. The store type and
+        /// its location are the honest pins; the document format is the store's own contract.
+        /// </summary>
+        [Test]
+        public void Awake_composes_a_persistent_profile_store_so_launched_xp_survives_a_restart()
+        {
+            var entry = NewEntry();
+
+            Drive(entry, "Awake");
+            _shell = entry.Shell;
+
+            var store = _shell.Profiles as JsonProfileStore;
+            Assert.That(store, Is.Not.Null,
+                "R-43: the entry composes the persistent store — the in-memory default is a "
+                + "launched game whose accounts reset on every boot");
+            Assert.That(store.FilePath, Does.StartWith(Application.persistentDataPath),
+                "R-44: the server-local document lives in the app's own data directory, not the "
+                + "working directory of whatever launched the process");
+        }
+
+        /// <summary>
         /// "Ensure", not "add": a scene that already owns an EventSystem must not gain a second —
         /// two EventSystems fight over uGUI focus and Unity logs errors about it.
         /// </summary>
