@@ -9,12 +9,12 @@ namespace RedHollow.Game.View
     /// </summary>
     public static class UnitBillboard
     {
-        public const float HeroWidth = 1.55f;
-        public const float HeroHeight = 3.60f;
-        public const float HeroDepth = 0.85f;
-        public const float MonsterWidth = 1.25f;
-        public const float MonsterHeight = 3.10f;
-        public const float MonsterDepth = 0.75f;
+        public const float HeroWidth = 1.95f;
+        public const float HeroHeight = 4.50f;
+        public const float HeroDepth = 1.05f;
+        public const float MonsterWidth = 1.55f;
+        public const float MonsterHeight = 3.80f;
+        public const float MonsterDepth = 0.90f;
 
         /// <summary>Placeholder volume for a hero or monster class.</summary>
         public static GameObject CreatePlaceholder(VisualClass visualClass)

@@ -105,6 +105,19 @@ namespace RedHollow.Game.View
                 material.SetFloat("_Cull", 2f);
             }
 
+            // URP Lit with no probes/sky reads unlit as 0,0,0 (black IBL). A dim
+            // umber emissive keeps the near-cam deck readable without a sun or a
+            // fill-grid flood; lanterns still pool on top.
+            if (material.HasProperty("_EmissionColor"))
+            {
+                material.EnableKeyword("_EMISSION");
+                material.SetColor("_EmissionColor", new Color(0.16f, 0.100f, 0.045f));
+                if (material.HasProperty("_EmissionMap"))
+                {
+                    material.SetTexture("_EmissionMap", Texture2D.whiteTexture);
+                }
+            }
+
             return material;
         }
 

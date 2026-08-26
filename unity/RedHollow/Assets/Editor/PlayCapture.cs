@@ -1344,6 +1344,8 @@ namespace RedHollow.EditorTools
             {
                 var clean = "/workspace/unity/shots/units-visible-clean.png";
                 File.Copy(lookPath, clean, true);
+                var stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+                File.Copy(lookPath, "/workspace/unity/shots/progress-" + stamp + ".png", true);
             }
             _lookCaptured = true;
             PurchaseLog.Add("lykos-look shot path=" + lookPath

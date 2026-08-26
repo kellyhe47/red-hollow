@@ -49,11 +49,11 @@ namespace RedHollow.Game.View
     public static class MatchSceneBuilder
     {
         /// <summary>
-        /// How far above the colony floor the camera sits. Street-scale: hab SIDES and
-        /// the gunslinger body fill the frame under a ~56° look. Height 22 still read
-        /// as a roof-stamp; 28 clipped habs. Keep the south follow corridor empty.
+        /// How far above the colony floor the camera sits. Dropped from 16 so the
+        /// gunslinger reads ~1/8 frame like the trailer survivor vs houses. Keep the
+        /// south follow corridor empty so 1-storey flanks show SIDE+ROOF, not cliffs.
         /// </summary>
-        public const float CameraHeight = 16f;
+        public const float CameraHeight = 13.5f;
 
         /// <summary>
         /// Pitch down from the horizon, degrees. ~55-58 so roof edges AND wall sides
@@ -62,7 +62,7 @@ namespace RedHollow.Game.View
         public const float CameraPitchDown = 55f;
 
         /// <summary>Vertical FOV for the street-scale follow cam. Ortho is retired.</summary>
-        public const float StreetFov = 38f;
+        public const float StreetFov = 44f;
 
         /// <summary>Legacy name kept so older callers compile; no longer drives the view.</summary>
         public const float StreetOrthoSize = 10f;
@@ -102,14 +102,14 @@ namespace RedHollow.Game.View
         private const float TypicalViewAspect = 16f / 9f;
 
         /// <summary>Warm brown haze — dust under lamplight, never a blue night mist.</summary>
-        private static readonly Color FogDust = new Color(0.12f, 0.075f, 0.04f);
+        private static readonly Color FogDust = new Color(0.32f, 0.20f, 0.10f);
 
         /// <summary>
-        /// Low warm umber fill. Keys pool on the deck; ambient keeps unlit sides
-        /// dark-umber instead of void-black. High values plus a fill grid were the
-        /// orange flood.
+        /// Readable warm umber fill. Keys still pool; unlit ground/walls must stay
+        /// brown, not 0,0,0. 0.07 crushed the near-cam deck into a black letterbox.
+        /// Ceiling 0.25 is T-13 near-black; stay under it.
         /// </summary>
-        private static readonly Color AmbientUmber = new Color(0.07f, 0.045f, 0.022f);
+        private static readonly Color AmbientUmber = new Color(0.24f, 0.155f, 0.075f);
 
         /// <summary>
         /// Compose the scene the session is played in: a tilted top-down camera, the colony floor,
@@ -248,8 +248,8 @@ namespace RedHollow.Game.View
             RenderSettings.fog = true;
             RenderSettings.fogColor = FogDust;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
-            // Dense enough to haze the far wall / lift shaft; the playable square stays readable.
-            RenderSettings.fogDensity = 0.016f;
+            // Haze the mid-street so distance is dusty umber, not a black void.
+            RenderSettings.fogDensity = 0.028f;
 
             RenderSettings.skybox = null;
             RenderSettings.sun = null;
@@ -320,20 +320,22 @@ namespace RedHollow.Game.View
         private const bool LanternSoftShadows = true;
 
         /// <summary>
-        /// R-15 — 8 sourced amber keys (spawn + 3 shelters + 4 street masts). No fill
-        /// grid, no roof flood. Only the courtyard keys carry Soft shadows — 8
-        /// shadowed points overflow the URP atlas and become an unshadowed orange
-        /// wash. Named and typed as lanterns (never Directional).
+        /// R-15 — courtyard keys + dim foreground fills. Soft shadows stay on the
+        /// three courtyard lanterns only (atlas overflow was the orange wash).
+        /// Four extra DIM fills light the near-cam deck so the bottom of the
+        /// Game view is umber, not a black letterbox. Named point lights, never
+        /// Directional.
         /// </summary>
         private static void RaiseLanterns(Transform root, ColonyMap map)
         {
             var amber = new Color(1.0f, 0.70f, 0.36f);
+            var fill = new Color(1.0f, 0.64f, 0.32f);
             var soft = LanternSoftShadows ? LightShadows.Soft : LightShadows.None;
 
             // Offset off the hero's head so the body is side-lit and the deck
             // pools instead of flooding. Matches the spawn-pad lamp mesh.
             var spawn = new Vec2(map.TeamSpawn.X + 2.8, map.TeamSpawn.Y + 2.8);
-            AddLantern(root, "Lantern_Spawn", spawn, 5.2f, amber, 9f, 48f, soft);
+            AddLantern(root, "Lantern_Spawn", spawn, 5.2f, amber, 10f, 40f, soft);
 
             foreach (var spec in map.Hotspots)
             {
@@ -342,23 +344,38 @@ namespace RedHollow.Game.View
                     continue;
                 }
 
-                AddLantern(root, "Lantern_" + spec.Id, spec.Pos, 6.2f, amber, 11f, 32f, LightShadows.None);
+                AddLantern(root, "Lantern_" + spec.Id, spec.Pos, 6.2f, amber, 11f, 28f, LightShadows.None);
             }
 
             // Street masts at hab rims. Two courtyard-facing masts keep Soft
             // shadows so habs and the gunslinger blob the deck.
             var masts = new[]
             {
-                new Vec2(8.2, -3.2),
-                new Vec2(-8.2, -3.2),
-                new Vec2(3.0, 8.5),
-                new Vec2(-9.0, 6.0),
+                new Vec2(10.4, -1.1),
+                new Vec2(-10.4, -1.1),
+                new Vec2(4.0, 9.5),
+                new Vec2(-11.0, 7.0),
             };
             var mastShadows = new[] { soft, soft, LightShadows.None, LightShadows.None };
-            var mastCd = new[] { 42f, 42f, 30f, 30f };
+            var mastCd = new[] { 36f, 36f, 24f, 24f };
             for (var i = 0; i < masts.Length; i++)
             {
                 AddLantern(root, "Lantern_Mast_" + i, masts[i], 5.6f, amber, 10f, mastCd[i], mastShadows[i]);
+            }
+
+            // Dim fills on the SOUTH near deck — the 55° follow-cam's foreground.
+            // Intensity well below the keys so pools still read; no shadows.
+            var fills = new[]
+            {
+                new Vec2(0.0, -5.4),
+                new Vec2(6.2, -4.6),
+                new Vec2(-6.2, -4.6),
+                new Vec2(0.0, -1.6),
+            };
+            var fillCd = new[] { 14f, 12f, 12f, 10f };
+            for (var i = 0; i < fills.Length; i++)
+            {
+                AddLantern(root, "Lantern_Fill_" + i, fills[i], 3.2f, fill, 9f, fillCd[i], LightShadows.None);
             }
         }
 

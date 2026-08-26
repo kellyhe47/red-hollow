@@ -1,5 +1,7 @@
 using RedHollow.Sim;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 namespace RedHollow.Game.View
 {
@@ -281,35 +283,43 @@ namespace RedHollow.Game.View
             // scatter. Street habs sit outside the spawn follow corridor.
             var spawn = SimSpace.ToWorld(map.TeamSpawn);
 
-            // Street-scale: flanking habs sit just outside the south follow corridor
-            // (|x| >= 5) so the camera at ~12u south sees SIDE walls + roof slabs.
-            // A hab at z=+20 is above the 56° frustum and reads as empty courtyard.
-            // 1-storey flanks: roof slabs sit at ~y=7, under a y=16 eye, so the
-            // 55° look reads SIDE + ROOF instead of a 12m orange canyon.
+            // Open street: 1-storey flanks sit AWAY from the near plane so the
+            // 13.5u / 55° follow cam sees SIDE walls + roof slabs + cavern haze
+            // above, not two cliffs. Inner faces at |x|~10 leave a ~20u street.
+            // No hab on the +Z centerline — that was the far-end canyon wall.
             RaiseKitHab(settlement.transform, "StreetHab_SE",
-                spawn + new Vector3(10.5f, 0f, -4.8f), 1, 4f);
+                spawn + new Vector3(15.0f, 0f, 0.6f), 1, 6f);
             RaiseKitHab(settlement.transform, "StreetHab_SW",
-                spawn + new Vector3(-10.5f, 0f, -4.8f), 1, -4f);
-            RaiseKitHab(settlement.transform, "StreetHab_N",
-                spawn + new Vector3(0f, 0f, 10.5f), 2, 6f);
+                spawn + new Vector3(-15.0f, 0f, 0.6f), 1, -6f);
             RaiseKitHab(settlement.transform, "StreetHab_NE",
-                spawn + new Vector3(13f, 0f, 6.5f), 1, -8f);
+                spawn + new Vector3(16.0f, 0f, 8.4f), 1, -8f);
             RaiseKitHab(settlement.transform, "StreetHab_NW",
-                spawn + new Vector3(-13f, 0f, 6.5f), 1, 10f);
+                spawn + new Vector3(-16.0f, 0f, 8.4f), 1, 10f);
 
             var masts = new[]
             {
-                new Vector3(8.2f, 0f, -3.2f),
-                new Vector3(-8.2f, 0f, -3.2f),
-                new Vector3(3.0f, 0f, 8.5f),
-                new Vector3(-9.0f, 0f, 6.0f),
+                new Vector3(10.4f, 0f, -1.1f),
+                new Vector3(-10.4f, 0f, -1.1f),
+                new Vector3(4.0f, 0f, 9.5f),
+                new Vector3(-11.0f, 0f, 7.0f),
+                new Vector3(5.6f, 0f, -3.6f),
+                new Vector3(-5.6f, 0f, -3.6f),
+                new Vector3(0.0f, 0f, 5.2f),
+                new Vector3(7.5f, 0f, 3.0f),
             };
             for (var i = 0; i < masts.Length; i++)
             {
                 var p = masts[i];
                 RaiseStreetLamp(settlement.transform, "Mast_" + i, p.x, p.z, dark, brass);
+                // Extra posts carry their own dim point (keys stay in MatchSceneBuilder).
+                if (i >= 4)
+                {
+                    PointLamp(settlement.transform, "MastLamp_" + i,
+                        new Vector3(p.x + 1.7f, DeckSurface + 7.5f, p.z), 9f, 22f);
+                }
             }
 
+            HangStringLights(settlement.transform, spawn);
             RaiseLiftShaft(settlement.transform, playArea, dark);
         }
 
@@ -391,9 +401,9 @@ namespace RedHollow.Game.View
             SciFiKit.Place(pad.transform, "KitPlate", SciFiKit.FloorMetal,
                 new Vector3(0f, DeckSurface, 0f), Quaternion.identity, deck, castShadows: true);
             SciFiKit.Place(pad.transform, "Col_0", SciFiKit.ColumnTall,
-                new Vector3(-3.4f, DeckSurface, -3.4f), Quaternion.identity, dark);
+                new Vector3(-3.4f, DeckSurface, 3.4f), Quaternion.identity, dark);
             SciFiKit.Place(pad.transform, "Col_1", SciFiKit.ColumnTall,
-                new Vector3(3.4f, DeckSurface, -3.4f), Quaternion.identity, dark);
+                new Vector3(3.4f, DeckSurface, 3.4f), Quaternion.identity, dark);
             RaiseStreetLamp(pad.transform, "PadLamp", 3.4f, 3.4f, dark, brass);
         }
 
@@ -677,6 +687,8 @@ namespace RedHollow.Game.View
             SciFiKit.Place(hab.transform, "Vent", SciFiKit.Vent,
                 new Vector3(1.1f, roofY, 1.1f), Quaternion.identity, dark);
 
+            DressWindowsAndEaveLantern(hab.transform, stories, half, roofY);
+
             DressRimClutter(hab.transform, "Clutter", 0f, 0f, half + 0.85f);
         }
 
@@ -725,6 +737,100 @@ namespace RedHollow.Game.View
             Box(parent, name + "_glass",
                 new Vector3(x + 1.7f, DeckSurface + poleH - 0.85f, z),
                 new Vector3(0.48f, 0.62f, 0.48f), glow);
+        }
+
+        /// <summary>
+        /// Unlit amber window boxes on the street (south) face plus a hanging lantern
+        /// under the south eave. Each carries a small point light so the hab actually
+        /// lights the street a little — not just a painted glow.
+        /// </summary>
+        private static void DressWindowsAndEaveLantern(
+            Transform hab, int stories, float half, float roofY)
+        {
+            var glow = ViewLook.Unlit(AmberGlow);
+            var dark = DarkMetalMaterial();
+            var storey = SciFiKit.StoryHeight;
+            for (var s = 0; s < stories; s++)
+            {
+                var y = DeckSurface + (s * storey) + 2.35f;
+                Box(hab, "Window_SL_" + s,
+                    new Vector3(-1.55f, y, -(half + 0.10f)),
+                    new Vector3(1.45f, 1.15f, 0.14f), glow);
+                Box(hab, "Window_SR_" + s,
+                    new Vector3(1.55f, y, -(half + 0.10f)),
+                    new Vector3(1.45f, 1.15f, 0.14f), glow);
+                PointLamp(hab, "WindowLamp_" + s,
+                    new Vector3(0f, y, -(half + 0.55f)), 8.0f, 18f);
+            }
+
+            var hangY = roofY - 0.55f;
+            var hangZ = -(half + 0.55f);
+            Box(hab, "EaveCage",
+                new Vector3(0f, hangY, hangZ),
+                new Vector3(0.55f, 0.70f, 0.55f), dark);
+            Box(hab, "EaveGlass",
+                new Vector3(0f, hangY, hangZ),
+                new Vector3(0.36f, 0.50f, 0.36f), glow);
+            PointLamp(hab, "EaveLamp",
+                new Vector3(0f, hangY - 0.15f, hangZ), 9.0f, 22f);
+        }
+
+        /// <summary>
+        /// Authored string-lights strip hung across the spawn street, plus a line of
+        /// small amber points along each span. Overhead, not a deck fill-grid.
+        /// </summary>
+        private static void HangStringLights(Transform parent, Vector3 spawn)
+        {
+            var tex = ViewLook.LoadTexture("RedHollowArt/string-lights");
+            var mat = tex != null
+                ? ViewLook.UnlitCutout(new Color(1.08f, 0.88f, 0.52f), tex)
+                : ViewLook.Unlit(AmberGlow);
+
+            var spans = new[]
+            {
+                new Vector3(0f, 6.4f, -3.2f),
+                new Vector3(0f, 6.9f, 1.2f),
+                new Vector3(0f, 7.4f, 5.4f),
+            };
+            for (var i = 0; i < spans.Length; i++)
+            {
+                var pos = spawn + spans[i];
+                var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                go.name = "StringLights_" + i;
+                go.transform.SetParent(parent, false);
+                go.transform.position = pos;
+                go.transform.localRotation = Quaternion.Euler(18f, 0f, 0f);
+                go.transform.localScale = new Vector3(18f, 3.2f, 1f);
+                ViewLook.StripCollider(go);
+                if (mat != null)
+                {
+                    ViewLook.Paint(go, mat, castShadows: false);
+                }
+
+                for (var b = 0; b < 3; b++)
+                {
+                    var x = -6.0f + (b * 6.0f);
+                    PointLamp(parent, "StringBulb_" + i + "_" + b,
+                        new Vector3(pos.x + x, pos.y - 0.4f, pos.z), 11f, 18f);
+                }
+            }
+        }
+
+        /// <summary>Presentation-only punctual amber. Never Directional. No shadows.</summary>
+        private static void PointLamp(
+            Transform parent, string name, Vector3 localPos, float range, float intensity)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = localPos;
+            var light = go.AddComponent<Light>();
+            light.type = LightType.Point;
+            light.color = new Color(1.0f, 0.70f, 0.36f);
+            light.intensity = intensity;
+            light.range = range;
+            light.shadows = LightShadows.None;
+            light.renderMode = LightRenderMode.ForcePixel;
+            light.GetUniversalAdditionalLightData();
         }
 
         private static void RaiseLiftShaft(Transform parent, Bounds playArea, Material dark)
@@ -819,7 +925,7 @@ namespace RedHollow.Game.View
 
         private static Material DeckingMaterial()
         {
-            return Tiled("RedHollowArt/colony-decking", new Color(0.40f, 0.30f, 0.18f),
+            return Tiled("RedHollowArt/colony-decking", new Color(0.56f, 0.40f, 0.24f),
                 new Vector2(4f, 4f), "RedHollowArt/metal-floor-plate");
         }
 
