@@ -173,6 +173,27 @@ namespace RedHollow.Game.UI
         public IReadOnlyList<Text> HotspotLabels;
 
         /// <summary>
+        /// R-63 — the planning countdown (wireframe S3's "⏱ 0:47"), off
+        /// <see cref="PlanningScreenModel.TimerRemainingSeconds"/>. Empty outside planning: the
+        /// combat top bar has no clock to show.
+        /// </summary>
+        public Text PlanningTimerLabel;
+
+        /// <summary>
+        /// R-63 — the ready fraction ("1/2 ready", denominator = connected players), off
+        /// <see cref="PlanningScreenModel.ReadyCount"/> / <see cref="PlanningScreenModel.ConnectedCount"/>.
+        /// Empty outside planning.
+        /// </summary>
+        public Text ReadyLabel;
+
+        /// <summary>
+        /// R-61 — account level and lifetime XP (wireframe S4's "XP bar + account level"), off
+        /// <see cref="CombatHudModel.Level"/> / <see cref="CombatHudModel.LifetimeXp"/>. The model
+        /// carried both since T-12; nothing rendered them.
+        /// </summary>
+        public Text XpLabel;
+
+        /// <summary>
         /// The panel the HUD labels hang under, kept so the bootstrap can grow the per-hotspot
         /// label row to match the live colony without rebuilding the shell. Since T-27 this is
         /// the HUD's TOP BAR (wave · scrip · monsters · shelters), anchored to the top band of
@@ -252,10 +273,13 @@ namespace RedHollow.Game.UI
             DressPanel(ui.SelfBar, "RedHollowArt/dialog-panel");
 
             ui.WaveLabel = NewLabel(ui.HudPanel, "WaveLabel", 18);
+            ui.PlanningTimerLabel = NewLabel(ui.HudPanel, "PlanningTimerLabel", 18);
+            ui.ReadyLabel = NewLabel(ui.HudPanel, "ReadyLabel", 18);
             ui.ScripLabel = NewLabel(ui.HudPanel, "ScripLabel", 18);
             ui.HpLabel = NewLabel(ui.SelfBar, "HpLabel", 20);
             ui.QLabel = NewLabel(ui.SelfBar, "QLabel", 16);
             ui.ELabel = NewLabel(ui.SelfBar, "ELabel", 16);
+            ui.XpLabel = NewLabel(ui.SelfBar, "XpLabel", 16);
             ui.MonstersRemainingLabel = NewLabel(ui.HudPanel, "MonstersRemainingLabel", 18);
             ui.HotspotLabels = ui.HotspotLabelList;
             ui.ArrangeTopBar();

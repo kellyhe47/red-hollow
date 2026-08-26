@@ -1270,6 +1270,9 @@ namespace RedHollow.Game.UI
                 _ui.HpLabel.text = string.Empty;
                 _ui.QLabel.text = string.Empty;
                 _ui.ELabel.text = string.Empty;
+                _ui.XpLabel.text = string.Empty;
+                _ui.PlanningTimerLabel.text = string.Empty;
+                _ui.ReadyLabel.text = string.Empty;
                 _ui.MonstersRemainingLabel.text = string.Empty;
                 _ui.EnsureHotspotLabels(0);
                 return;
@@ -1285,6 +1288,22 @@ namespace RedHollow.Game.UI
             _ui.QLabel.text = HudCopy.SlotFace(_hud.SlotFor(AbilitySlot.Q));
             _ui.ELabel.text = HudCopy.SlotFace(_hud.SlotFor(AbilitySlot.E));
 
+            // R-61 — level + lifetime XP (the model carried both since T-12; nothing showed them).
+            _ui.XpLabel.text = "Lv " + _hud.Level.ToString(CultureInfo.InvariantCulture)
+                + " · " + ((int)_hud.LifetimeXp).ToString(CultureInfo.InvariantCulture) + " xp";
+
+            // R-63 — the planning clock and the ready fraction, live exactly while the sim is in
+            // its planning phase; the combat top bar has neither to show.
+            var planningLive = _planning != null && _boundMatch != null
+                && _boundMatch.State != null && _boundMatch.State.Phase == MatchPhase.Planning;
+            _ui.PlanningTimerLabel.text = planningLive
+                ? PlanningClock(_planning.TimerRemainingSeconds)
+                : string.Empty;
+            _ui.ReadyLabel.text = planningLive
+                ? _planning.ReadyCount.ToString(CultureInfo.InvariantCulture)
+                  + "/" + _planning.ConnectedCount.ToString(CultureInfo.InvariantCulture) + " ready"
+                : string.Empty;
+
             var hotspots = _hud.Hotspots;
             _ui.EnsureHotspotLabels(hotspots.Count);
             for (var i = 0; i < hotspots.Count; i++)
@@ -1292,6 +1311,16 @@ namespace RedHollow.Game.UI
                 _ui.HotspotLabelList[i].text = HudCopy.HotspotName(hotspots[i].HotspotId) + ": "
                     + hotspots[i].Civilians.ToString(CultureInfo.InvariantCulture);
             }
+        }
+
+        /// <summary>Wireframe S3's "⏱ 0:47" shape: whole minutes, two-digit seconds, floored.</summary>
+        private static string PlanningClock(double remainingSeconds)
+        {
+            var whole = (int)Math.Max(0.0, remainingSeconds);
+            var minutes = whole / 60;
+            var seconds = whole % 60;
+            return minutes.ToString(CultureInfo.InvariantCulture)
+                + ":" + seconds.ToString("D2", CultureInfo.InvariantCulture);
         }
 
         /// <summary>
