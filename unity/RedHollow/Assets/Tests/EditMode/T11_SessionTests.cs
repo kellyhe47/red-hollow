@@ -348,6 +348,60 @@ namespace RedHollow.Tests.EditMode
                 + "the shelter behind it");
         }
 
+        /// <summary>
+        /// R-17's "ranged acid, range 10" through the REAL driven session (ticket 029): a Spitter
+        /// walks to its line, holds there, and drains the shelter from range — movement's
+        /// hold-at-reach, the contact source's widened reach, the R-18 gate and R-11's civilian
+        /// arithmetic, all in one pass. Before 029 a Spitter walked into hugging distance like
+        /// every melee archetype, and nothing anywhere exercised the row's one distinguishing
+        /// column.
+        /// </summary>
+        [Test]
+        public void A_spitter_drains_a_shelter_from_its_acid_line()
+        {
+            var lobby = NewTwoPlayerLoopbackLobby();
+            Assert.That(lobby.Session.TryStartMatch(HostPeerId), Is.True, "the host starts the match");
+            var match = lobby.Session.Match;
+
+            // Seeded by the chapel, far from wave 1's saloon-bound shamblers, with no target so
+            // the session's own R-16 pass picks the shelter. Stats come off the shipped row.
+            var stats = match.Sim.Config.Monsters.StatsFor(MonsterType.Spitter);
+            var chapel = match.State.Hotspots["hs_chapel"];
+            match.State.Monsters["m_spit"] = new Monster
+            {
+                Id = "m_spit",
+                Type = MonsterType.Spitter,
+                Pos = new Vec2(chapel.Pos.X, chapel.Pos.Y + 20.0),
+                Hp = stats.MaxHp,
+                BaseSpeed = stats.MoveSpeed,
+                CurrentSpeed = stats.MoveSpeed,
+                AttackRange = stats.AttackRange,
+                Alive = true,
+            };
+
+            var civiliansBefore = chapel.Civilians;
+            Assert.That(civiliansBefore, Is.GreaterThan(0), "sanity: the chapel is sheltering people");
+
+            var spitter = match.State.Monsters["m_spit"];
+            var drained = DriveUntil(
+                lobby.Session, match.Clock,
+                () => chapel.Civilians < civiliansBefore, budgetSeconds: 15.0);
+
+            Assert.That(drained, Is.True,
+                "R-17/R-11: the Spitter must hurt the shelter — walk in (10 units of ground at "
+                + "speed 2), hold its line, clear the R-18 gate, land acid");
+            Assert.That(spitter.Alive, Is.True, "nothing fought back; the spitter is still working");
+
+            // The first acid can land from one step outside the line ("arrived this tick", the
+            // same allowance melee contact has always had). A couple more steps settle the walk
+            // exactly onto the line, where it holds for the rest of the match.
+            lobby.Session.Step(Step60Hz);
+            lobby.Session.Step(Step60Hz);
+            Assert.That(spitter.Pos.DistanceTo(chapel.Pos), Is.EqualTo(stats.AttackRange).Within(1e-6),
+                "R-17: the spitter works FROM its line — one standing on the shelter is the "
+                + "pre-029 melee walk wearing a ranged monster's name");
+        }
+
         // ==========================================================================================
         //  AC3 — rematch (R-07)
         // ==========================================================================================
