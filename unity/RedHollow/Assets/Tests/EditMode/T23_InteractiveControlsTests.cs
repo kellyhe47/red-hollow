@@ -42,6 +42,8 @@ namespace RedHollow.Tests.EditMode
 
         private const string HostPeerId = "peer_host";
         private const string HostAccount = "acc_calamity";
+        private const string GuestPeerId = "peer_guest";
+        private const string GuestAccount = "acc_doc";
 
         /// <summary>The well-known roots the shell composes under (T21's teardown convention).</summary>
         private static readonly string[] ShellRootNames =
@@ -763,6 +765,102 @@ namespace RedHollow.Tests.EditMode
                 "the hero wears the clicked pick");
         }
 
+        /// <summary>
+        /// R-01, the bar itself: a SOLO Play session wins a REAL ten-wave match through the
+        /// shipped combat path — every monster dies to a SPACE basic attack routed by the pump
+        /// (<c>ResolveHeroAttack</c> → the shell's reap → <c>RecordMonsterKill</c>), and every
+        /// planning phase is ended by the shell's own READY UP control. T-11 walks the campaign
+        /// with direct kill commands; this is the first test in the repo in which the campaign is
+        /// WON by playing it.
+        ///
+        /// Tuned for runtime, not balance — both knobs are numbers the PRD itself calls
+        /// config-tunable: the gunslinger's <c>BasicAttackDamage</c> one-shots so a wave dies in
+        /// about its headcount of pumps, and the attack cadence matches the pump so a held SPACE
+        /// fires every pump. R-19 says the balance numbers are playtest taste; what this test
+        /// grades is that the LOOP — spawn → aim → fire → reap → wave clear → planning → ready →
+        /// next wave → victory — is real, with not one harness kill anywhere.
+        /// </summary>
+        [Test]
+        public void A_solo_session_wins_a_real_ten_wave_match_through_the_combat_path()
+        {
+            var shell = NewOneShotShell();
+            shell.Pump(0.0);
+
+            TypeInto(shell.Controls.CallsignInput, HostAccount);
+            shell.Controls.HostButton.onClick.Invoke();
+            shell.Pump(0.0);
+
+            shell.Controls.ClassPickButton(HeroClass.Gunslinger).onClick.Invoke();
+            shell.Controls.LobbyReadyButton.onClick.Invoke();
+            shell.Pump(0.0);
+            shell.Pump(0.0);
+
+            var match = shell.Session.Match;
+            Assert.That(match, Is.Not.Null, "sanity: the solo ready auto-started a match");
+
+            DriveTheCampaignByPlaying(shell, match);
+
+            Assert.That(match.State.Status, Is.EqualTo(MatchStatus.Victory),
+                "R-01: playing all ten waves through the combat path wins the map");
+            Assert.That(match.State.Wave.Number, Is.EqualTo(match.State.Wave.TotalWaves),
+                "R-01: the victory is the final wave's, not an early exit");
+            Assert.That(match.State.TotalCivilians, Is.GreaterThan(0),
+                "R-02: a won colony still holds civilians — victory and defeat are exclusive");
+
+            shell.Pump(Step60Hz);
+            Assert.That(shell.Session.Phase, Is.EqualTo(NetSessionPhase.PostMatch),
+                "the session noticed the win");
+            AssertOnlyActiveScreen(shell, UiScreen.Victory, "the campaign ends on S6");
+        }
+
+        /// <summary>
+        /// R-50 — the same real ten-wave victory with a 2-player party seated: a guest joins the
+        /// lobby before READY, the match seats two heroes, and the host's combat path carries the
+        /// campaign while the guest's READY arrives as the sim command a replicated client ready
+        /// would issue. 4-player is R-50's ceiling and NGO territory; two seated players IS the
+        /// current bar.
+        /// </summary>
+        [Test]
+        public void A_two_player_party_wins_a_real_ten_wave_match_through_the_combat_path()
+        {
+            var shell = NewOneShotShell();
+            shell.Pump(0.0);
+
+            TypeInto(shell.Controls.CallsignInput, HostAccount);
+            shell.Controls.HostButton.onClick.Invoke();
+            shell.Pump(0.0);
+
+            Assert.That(shell.Session.TryJoin(new NetPeer
+            {
+                PeerId = GuestPeerId,
+                AccountId = GuestAccount,
+                HeroClass = HeroClass.Sawbones,
+            }), Is.True, "R-50: a second player takes a lobby seat");
+
+            shell.Controls.ClassPickButton(HeroClass.Gunslinger).onClick.Invoke();
+            shell.Controls.LobbyReadyButton.onClick.Invoke();
+
+            // The guest's lobby READY, on the seam a replicated toggle arrives through (T-12).
+            shell.Lobby.NotePeerReady(GuestPeerId, true);
+            shell.Pump(0.0);
+            shell.Pump(0.0);
+
+            var match = shell.Session.Match;
+            Assert.That(match, Is.Not.Null, "the all-ready party auto-started the match");
+            Assert.That(match.State.Heroes.Count, Is.EqualTo(2),
+                "R-50: one hero per seated player");
+
+            var guestSlot = match.State.Players
+                .First(p => string.Equals(p.AccountId, GuestAccount, StringComparison.Ordinal)).Id;
+
+            DriveTheCampaignByPlaying(shell, match, guestSlot);
+
+            Assert.That(match.State.Status, Is.EqualTo(MatchStatus.Victory),
+                "R-01/R-50: a 2-player party plays all ten waves to a victory");
+            Assert.That(match.State.Heroes.Count, Is.EqualTo(2),
+                "both heroes are still seated at the end");
+        }
+
         // ==========================================================================================
         //  thinness — the wiring is plain C# inside the scanned assembly
         // ==========================================================================================
@@ -804,6 +902,124 @@ namespace RedHollow.Tests.EditMode
             });
 
             return _shell;
+        }
+
+        /// <summary>
+        /// The full-campaign shell: identical wiring to <see cref="NewShell"/> with two tuned
+        /// numbers so ten played waves fit a test's runtime — one-shot basics (config-tunable
+        /// damage, R-31's numbers are balance data) and a per-pump attack cadence. Nothing else
+        /// differs; every command still travels the shipped path.
+        /// </summary>
+        private ShellBootstrap NewOneShotShell()
+        {
+            _profiles = new InMemoryProfileStore();
+            _input = new FakeInputSource();
+
+            var config = new SimConfig();
+            config.HeroKits.KitFor(HeroClass.Gunslinger).BasicAttackDamage = 100000.0;
+
+            _shell = new ShellBootstrap(new ShellBootstrapOptions
+            {
+                Transport = new LoopbackNetTransport(),
+                Profiles = _profiles,
+                SimConfig = config,
+                LocalPeerId = HostPeerId,
+                LocalAccountId = HostAccount,
+                InputSource = _input,
+                CombatActions = new CombatActionConfig { AttackCadenceSeconds = Step60Hz },
+            });
+
+            return _shell;
+        }
+
+        /// <summary>
+        /// Play the campaign out: every combat pump aims the cursor at the nearest living monster
+        /// and holds SPACE (the shell fires, reaps and advances the wave), every planning phase is
+        /// ended with the READY UP control (plus the guest's own sim-level ready when a second
+        /// slot is seated). Bounded so a stalled campaign fails naming where it stopped rather
+        /// than hanging the runner.
+        /// </summary>
+        private void DriveTheCampaignByPlaying(
+            ShellBootstrap shell, HostedMatch match, string guestSlotId = null)
+        {
+            _input.Held.Add(PlayerKey.Space);
+
+            // A played wave dies in about its headcount of pumps and planning is one ready-up
+            // pump, so a healthy campaign finishes near 500 pumps. 12000 (200 sim-seconds) is the
+            // loud-failure bound.
+            const int MaxPumps = 12000;
+
+            for (var i = 0; i < MaxPumps && !match.State.IsOver; i++)
+            {
+                var state = match.State;
+
+                if (state.Phase == MatchPhase.Combat)
+                {
+                    AimAtTheNearestMonster(state);
+                }
+                else if (state.Phase == MatchPhase.Planning)
+                {
+                    shell.Controls.PlanningReadyButton.onClick.Invoke();
+
+                    if (guestSlotId != null)
+                    {
+                        // The command a replicated client READY issues (T-11's reading).
+                        match.Sim.SetPlayerReady(guestSlotId);
+                    }
+                }
+
+                shell.Pump(Step60Hz);
+            }
+
+            _input.Held.Remove(PlayerKey.Space);
+
+            Assert.That(match.State.IsOver, Is.True, DescribeUnfinishedCampaign(match));
+        }
+
+        /// <summary>Park the cursor on the nearest living monster, so the aim line crosses it.</summary>
+        private void AimAtTheNearestMonster(MatchState state)
+        {
+            var hero = OwnHero(state);
+            if (hero == null)
+            {
+                return;
+            }
+
+            Monster nearest = null;
+            var best = double.MaxValue;
+            foreach (var monster in state.Monsters.Values)
+            {
+                if (monster == null || !monster.Alive)
+                {
+                    continue;
+                }
+
+                var distance = hero.Pos.DistanceTo(monster.Pos);
+                if (distance < best)
+                {
+                    best = distance;
+                    nearest = monster;
+                }
+            }
+
+            if (nearest != null)
+            {
+                _input.Cursor = new Vector2((float)nearest.Pos.X, (float)nearest.Pos.Y);
+            }
+        }
+
+        /// <summary>Names where a stalled campaign stopped, for whoever reads the red test.</summary>
+        private static string DescribeUnfinishedCampaign(HostedMatch match)
+        {
+            var state = match.State;
+            var living = state.Monsters.Values.Count(m => m != null && m.Alive);
+            var hero = OwnHero(state);
+
+            return "the campaign never ended: wave " + state.Wave.Number + "/" + state.Wave.TotalWaves
+                + ", phase '" + state.Phase + "', status '" + state.Status + "', "
+                + state.Wave.LivingMonsterIds.Count + " on the roster (" + living + " alive), "
+                + state.TotalCivilians + " civilian(s) left, hero "
+                + (hero == null ? "MISSING" : (hero.Alive ? "alive at " + hero.Hp + " HP" : "down"));
         }
 
         /// <summary>A shell with the host seated — the S2 starting point (T21's helper).</summary>
