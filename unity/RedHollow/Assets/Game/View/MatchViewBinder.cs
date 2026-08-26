@@ -55,6 +55,31 @@ namespace RedHollow.Game.View
         /// <summary>The hero ids that currently have a view.</summary>
         public IReadOnlyCollection<string> BoundHeroIds => _heroViews.Keys;
 
+        /// <summary>
+        /// T-26 — the standing placeable ids that currently have a view. Follows the world:
+        /// one view per placeable with <see cref="Placeable.Exists"/>, released when it flips.
+        /// </summary>
+        public IReadOnlyCollection<string> BoundPlaceableIds
+        {
+            get { throw new System.NotImplementedException("T26: placeable view binding"); }
+        }
+
+        /// <summary>
+        /// T-26 — the R-23 catalog the barricade damage readout takes its full-HP denominator
+        /// from. Null is allowed (a binder must never block on config any more than on art) and
+        /// means no denominator is known.
+        /// </summary>
+        public PlaceableCatalog PlaceableCatalog
+        {
+            get { throw new System.NotImplementedException("T26: placeable view binding"); }
+            set { throw new System.NotImplementedException("T26: placeable view binding"); }
+        }
+
+        public PlaceableView PlaceableViewFor(string placeableId)
+        {
+            throw new System.NotImplementedException("T26: placeable view binding");
+        }
+
         public MonsterView MonsterViewFor(string monsterId)
         {
             if (monsterId == null)

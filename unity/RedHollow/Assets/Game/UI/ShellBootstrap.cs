@@ -311,6 +311,25 @@ namespace RedHollow.Game.UI
         /// <summary>The session this shell fronts. Hosting/joining goes through it directly.</summary>
         public NetSession Session => _session;
 
+        /// <summary>T-26 — the colony scene this shell refreshes marker state on (null until attached).</summary>
+        public MatchScene Scene
+        {
+            get { throw new NotImplementedException("T26: scene marker state"); }
+        }
+
+        /// <summary>
+        /// T-26 — hand this shell the built <see cref="MatchScene"/> so the pump can refresh the
+        /// wireframe marker states from the models each frame: entry-tunnel pulse (S3, from
+        /// <see cref="PlanningScreenModel.PulsingEntryTunnels"/>), entry flare (S4, from
+        /// <see cref="CombatHudModel.EntryFlares"/>), and the lost/dark hotspot marking (S4, from
+        /// the sim's emptied answer). Null detaches. The shell never builds the scene itself —
+        /// scene ownership stays with the entry point, exactly as before.
+        /// </summary>
+        public void AttachScene(MatchScene scene)
+        {
+            throw new NotImplementedException("T26: scene marker state");
+        }
+
         /// <summary>R-60 — the screen router the UI activation follows.</summary>
         public UiRouter Router => _router;
 

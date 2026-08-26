@@ -23,6 +23,12 @@ namespace RedHollow.Game.View
         public readonly Dictionary<string, GameObject> HotspotMarkers = new Dictionary<string, GameObject>();
 
         /// <summary>
+        /// T-26 / R-14 — one marker per <see cref="ColonyMap.EntryTunnels"/> entry, keyed by the
+        /// tunnel's index in that list (the same index the wave preview and the entry flare name).
+        /// </summary>
+        public readonly Dictionary<int, GameObject> EntryTunnelMarkers = new Dictionary<int, GameObject>();
+
+        /// <summary>
         /// R-15 — the cavern-dome mesh that IS the sky (there is no skybox in Lantern Deep). Null
         /// until <c>RedHollow.Game.Art.LanternDeepLighting.Apply</c> raises it; ticket 013.
         /// </summary>
