@@ -1,5 +1,6 @@
 using System;
 using RedHollow.Game.View;
+using UnityEngine;
 
 namespace RedHollow.Game.Art
 {
@@ -17,6 +18,9 @@ namespace RedHollow.Game.Art
     /// </summary>
     public sealed class ArtVisualResolver : IVisualResolver
     {
+        private readonly ArtCatalog _catalog;
+        private readonly IVisualResolver _fallback;
+
         /// <param name="catalog">The artKey→asset table. The mapping is data, not code.</param>
         /// <param name="fallback">
         /// The total resolver that answers for every key the catalog does not. Required: without a
@@ -25,13 +29,33 @@ namespace RedHollow.Game.Art
         /// </param>
         public ArtVisualResolver(ArtCatalog catalog, IVisualResolver fallback)
         {
-            throw new NotImplementedException("ticket 013: ArtVisualResolver constructor");
+            if (fallback == null)
+            {
+                throw new ArgumentNullException(nameof(fallback));
+            }
+
+            _catalog = catalog ?? new ArtCatalog();
+            _fallback = fallback;
         }
 
         /// <summary>Known key → real art, IsPlaceholder false. Anything else → the fallback's answer.</summary>
         public VisualHandle Resolve(VisualClass visualClass, string artKey)
         {
-            throw new NotImplementedException("ticket 013: ArtVisualResolver.Resolve");
+            GameObject instance;
+            if (_catalog.TryInstantiate(artKey, out instance))
+            {
+                return new VisualHandle
+                {
+                    Instance = instance,
+                    IsPlaceholder = false,
+                    Class = visualClass,
+                    ArtKey = artKey,
+                };
+            }
+
+            // The fallback's handle IS the answer — re-wrapping it would let the two layers
+            // disagree about IsPlaceholder.
+            return _fallback.Resolve(visualClass, artKey);
         }
     }
 }

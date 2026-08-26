@@ -74,7 +74,6 @@ namespace RedHollow.Game.View
             var scene = new MatchScene { Root = new GameObject("RedHollow_Match") };
 
             scene.Camera = BuildCamera(scene.Root.transform, playArea);
-            BuildKeyLight(scene.Root.transform);
 
             scene.Ground = BuildGround(scene.Root.transform, resolver, playArea);
 
@@ -128,20 +127,8 @@ namespace RedHollow.Game.View
             return camera;
         }
 
-        /// <summary>
-        /// Something for the placeholders to be lit by. Pure presentation — with no light in the
-        /// scene the whole colony renders black, which reads as "the build is broken" rather than
-        /// "the art is not in yet", and this ticket's job is to make the difference obvious.
-        /// </summary>
-        private static void BuildKeyLight(Transform root)
-        {
-            var go = new GameObject("KeyLight");
-            go.transform.SetParent(root, false);
-            go.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
-
-            var light = go.AddComponent<Light>();
-            light.type = LightType.Directional;
-        }
+        // The pre-013 placeholder KeyLight (a directional light) is retired: R-15 forbids any
+        // sun-like light, and RedHollow.Game.Art.LanternDeepLighting now lights the scene.
 
         /// <summary>
         /// The colony floor: one placeholder plane, stretched to cover the whole play area so no

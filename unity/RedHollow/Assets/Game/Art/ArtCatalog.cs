@@ -19,22 +19,32 @@ namespace RedHollow.Game.Art
     /// </summary>
     public sealed class ArtCatalog
     {
+        private readonly Dictionary<string, Func<GameObject>> _entries =
+            new Dictionary<string, Func<GameObject>>();
+
         /// <summary>Register one art entry. Later registration for the same key wins.</summary>
         public void Register(string artKey, Func<GameObject> instantiate)
         {
-            throw new NotImplementedException("ticket 013: ArtCatalog.Register");
+            if (string.IsNullOrEmpty(artKey) || instantiate == null)
+            {
+                // A nameless or bodiless entry can never be resolved; recording it would only
+                // let Contains and Resolve disagree. Absence is the honest state.
+                return;
+            }
+
+            _entries[artKey] = instantiate;
         }
 
         /// <summary>Whether this key names registered art.</summary>
         public bool Contains(string artKey)
         {
-            throw new NotImplementedException("ticket 013: ArtCatalog.Contains");
+            return !string.IsNullOrEmpty(artKey) && _entries.ContainsKey(artKey);
         }
 
         /// <summary>Every registered art key — the mapping is inspectable data, not hidden code.</summary>
         public IEnumerable<string> Keys
         {
-            get { throw new NotImplementedException("ticket 013: ArtCatalog.Keys"); }
+            get { return _entries.Keys; }
         }
 
         /// <summary>
@@ -43,7 +53,31 @@ namespace RedHollow.Game.Art
         /// </summary>
         public bool TryInstantiate(string artKey, out GameObject instance)
         {
-            throw new NotImplementedException("ticket 013: ArtCatalog.TryInstantiate");
+            instance = null;
+
+            if (string.IsNullOrEmpty(artKey))
+            {
+                return false;
+            }
+
+            Func<GameObject> factory;
+            if (!_entries.TryGetValue(artKey, out factory))
+            {
+                return false;
+            }
+
+            try
+            {
+                instance = factory();
+            }
+            catch (Exception)
+            {
+                // A factory that blows up is absence with extra noise: the seam's contract is
+                // that nothing here may fail, so the fallback answers instead.
+                instance = null;
+            }
+
+            return instance != null;
         }
     }
 }
