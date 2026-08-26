@@ -50,6 +50,18 @@ namespace RedHollow.Game.UI
         public IReadOnlyList<Text> HotspotLabels;
 
         /// <summary>
+        /// The panel the HUD labels hang under, kept so the bootstrap can grow the per-hotspot
+        /// label row to match the live colony without rebuilding the shell.
+        /// </summary>
+        internal GameObject HudPanel;
+
+        /// <summary>The writable list behind <see cref="HotspotLabels"/>.</summary>
+        internal readonly List<Text> HotspotLabelList = new List<Text>();
+
+        private readonly Dictionary<UiScreen, GameObject> _screenRoots =
+            new Dictionary<UiScreen, GameObject>();
+
+        /// <summary>
         /// R-60 — the container GameObject for one screen. Total over the enum: every screen S1–S7
         /// has a root, they are distinct, and after a <see cref="ShellBootstrap.Pump"/> exactly the
         /// root of <see cref="UiRouter.Screen"/> is active in the hierarchy — screen switching is
@@ -57,8 +69,103 @@ namespace RedHollow.Game.UI
         /// </summary>
         public GameObject ScreenRoot(UiScreen screen)
         {
-            throw new NotImplementedException(
-                "T21 not implemented: one root GameObject per UiScreen, switched by activation");
+            GameObject root;
+            return _screenRoots.TryGetValue(screen, out root) ? root : null;
+        }
+
+        /// <summary>
+        /// Build the whole headless hierarchy: root, Canvas, one container per S1–S7, and the
+        /// pinned HUD labels. Layout, fonts and copy are deliberately absent — presentation.
+        /// </summary>
+        internal static ShellUi Build()
+        {
+            var ui = new ShellUi();
+
+            ui.Root = new GameObject("RedHollow_Shell");
+
+            var canvasGo = new GameObject("Canvas");
+            canvasGo.transform.SetParent(ui.Root.transform, false);
+            ui.Canvas = canvasGo.AddComponent<Canvas>();
+
+            foreach (UiScreen screen in Enum.GetValues(typeof(UiScreen)))
+            {
+                var screenGo = new GameObject("Screen_" + screen);
+                screenGo.transform.SetParent(canvasGo.transform, false);
+                screenGo.SetActive(false);
+                ui._screenRoots[screen] = screenGo;
+            }
+
+            ui.HudPanel = new GameObject("HUD");
+            ui.HudPanel.transform.SetParent(canvasGo.transform, false);
+
+            ui.WaveLabel = NewLabel(ui.HudPanel, "WaveLabel");
+            ui.ScripLabel = NewLabel(ui.HudPanel, "ScripLabel");
+            ui.HpLabel = NewLabel(ui.HudPanel, "HpLabel");
+            ui.MonstersRemainingLabel = NewLabel(ui.HudPanel, "MonstersRemainingLabel");
+            ui.HotspotLabels = ui.HotspotLabelList;
+
+            return ui;
+        }
+
+        /// <summary>R-60 — exactly the routed screen's root is active; everything else is off.</summary>
+        internal void SetActiveScreen(UiScreen active)
+        {
+            foreach (var pair in _screenRoots)
+            {
+                var shouldBeActive = pair.Key == active;
+                if (pair.Value != null && pair.Value.activeSelf != shouldBeActive)
+                {
+                    pair.Value.SetActive(shouldBeActive);
+                }
+            }
+        }
+
+        /// <summary>
+        /// R-61 — one label per shelter readout. Grows and shrinks with the live colony; the
+        /// labels themselves persist across pumps (refresh, never rebuild-per-frame).
+        /// </summary>
+        internal void EnsureHotspotLabels(int count)
+        {
+            while (HotspotLabelList.Count < count)
+            {
+                HotspotLabelList.Add(NewLabel(HudPanel, "HotspotLabel_" + HotspotLabelList.Count));
+            }
+
+            while (HotspotLabelList.Count > count)
+            {
+                var last = HotspotLabelList[HotspotLabelList.Count - 1];
+                HotspotLabelList.RemoveAt(HotspotLabelList.Count - 1);
+                if (last != null)
+                {
+                    DestroyGameObject(last.gameObject);
+                }
+            }
+        }
+
+        private static Text NewLabel(GameObject parent, string name)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent.transform, false);
+            var label = go.AddComponent<Text>();
+            label.text = string.Empty;
+            return label;
+        }
+
+        private static void DestroyGameObject(GameObject go)
+        {
+            if (go == null)
+            {
+                return;
+            }
+
+            if (Application.isPlaying)
+            {
+                UnityEngine.Object.Destroy(go);
+            }
+            else
+            {
+                UnityEngine.Object.DestroyImmediate(go);
+            }
         }
     }
 }

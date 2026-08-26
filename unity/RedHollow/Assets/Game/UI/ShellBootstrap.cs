@@ -1,8 +1,12 @@
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using RedHollow.Game.Art;
+using RedHollow.Game.Host;
 using RedHollow.Game.Net;
 using RedHollow.Game.View;
 using RedHollow.Sim;
+using UnityEngine;
 
 namespace RedHollow.Game.UI
 {
@@ -116,59 +120,82 @@ namespace RedHollow.Game.UI
     /// </summary>
     public sealed class ShellBootstrap
     {
+        private readonly NetSession _session;
+        private readonly UiRouter _router;
+        private readonly ShellUi _ui;
+        private readonly FeelRouter _feel = new FeelRouter();
+        private readonly MatchViewBinder _views;
+        private readonly IVisualResolver _visuals;
+        private readonly ArtCatalog _catalog;
+        private readonly IProfileStore _profiles;
+        private readonly INetTransport _transport;
+        private readonly string _accountId;
+
+        /// <summary>The event tap each match this shell created carries (see the factory).</summary>
+        private readonly Dictionary<HostedMatch, SimEventTap> _taps =
+            new Dictionary<HostedMatch, SimEventTap>();
+
+        /// <summary>Scratch list the pump routes each frame's events out of.</summary>
+        private readonly List<SimEvent> _routing = new List<SimEvent>();
+
+        private HostedMatch _boundMatch;
+        private SimEventTap _tap;
+        private CombatHudModel _hud;
+        private int _noticesDelivered;
+        private bool _tornDown;
+
         public ShellBootstrap(ShellBootstrapOptions options = null)
         {
-            throw new NotImplementedException(
-                "T21 not implemented: the shell composition root — session, UI, feel and art wired together");
+            options = options ?? new ShellBootstrapOptions();
+
+            _transport = options.Transport ?? new LoopbackNetTransport();
+            _profiles = options.Profiles ?? new InMemoryProfileStore();
+            _accountId = options.LocalAccountId;
+
+            // R-15 — real art by default; the placeholder answers for everything unregistered.
+            _catalog = options.ArtCatalog ?? LoadRepresentativeArt();
+            _visuals = new ArtVisualResolver(_catalog, new PlaceholderVisualResolver());
+
+            // R-51 — one binder for the shell's lifetime; every match's session reuses it.
+            _views = new MatchViewBinder(_visuals);
+
+            var factory = new ColonyMatchFactory(options.Map, options.SimConfig, _profiles);
+            _session = new NetSession(
+                options.NetConfig, _transport, new ViewBoundMatchFactory(this, factory));
+
+            _router = new UiRouter(_session);
+            _ui = ShellUi.Build();
+
+            // The shell shows a screen from birth (S1 before anything is hosted).
+            RefreshPresentation();
         }
 
         /// <summary>The session this shell fronts. Hosting/joining goes through it directly.</summary>
-        public NetSession Session
-        {
-            get { throw new NotImplementedException("T21 not implemented: Session"); }
-        }
+        public NetSession Session => _session;
 
         /// <summary>R-60 — the screen router the UI activation follows.</summary>
-        public UiRouter Router
-        {
-            get { throw new NotImplementedException("T21 not implemented: Router"); }
-        }
+        public UiRouter Router => _router;
 
         /// <summary>The built uGUI hierarchy.</summary>
-        public ShellUi Ui
-        {
-            get { throw new NotImplementedException("T21 not implemented: Ui"); }
-        }
+        public ShellUi Ui => _ui;
 
         /// <summary>R-64 — the feel router every replicated event is offered to.</summary>
-        public FeelRouter Feel
-        {
-            get { throw new NotImplementedException("T21 not implemented: Feel"); }
-        }
+        public FeelRouter Feel => _feel;
 
         /// <summary>
         /// R-51 — the view binder every match this shell starts is bound with (one binder for the
         /// shell's lifetime; its reconciliation follows whatever match is live).
         /// </summary>
-        public MatchViewBinder Views
-        {
-            get { throw new NotImplementedException("T21 not implemented: Views"); }
-        }
+        public MatchViewBinder Views => _views;
 
         /// <summary>
         /// R-15 — the asset seam the binder resolves through: an <see cref="ArtVisualResolver"/>
         /// over <see cref="Art"/>, chained in front of the placeholder. Total for any input.
         /// </summary>
-        public IVisualResolver Visuals
-        {
-            get { throw new NotImplementedException("T21 not implemented: Visuals"); }
-        }
+        public IVisualResolver Visuals => _visuals;
 
         /// <summary>The artKey→asset table behind <see cref="Visuals"/>.</summary>
-        public ArtCatalog Art
-        {
-            get { throw new NotImplementedException("T21 not implemented: Art"); }
-        }
+        public ArtCatalog Art => _catalog;
 
         /// <summary>
         /// R-61 — the combat HUD model for the local account. Null until a match is live; rebuilt
@@ -176,13 +203,67 @@ namespace RedHollow.Game.UI
         /// </summary>
         public CombatHudModel Hud
         {
-            get { throw new NotImplementedException("T21 not implemented: Hud"); }
+            get
+            {
+                BindToCurrentMatch();
+                return _hud;
+            }
         }
 
         /// <summary>One presentation frame. See the class doc for the six-step contract.</summary>
         public void Pump(double deltaSeconds)
         {
-            throw new NotImplementedException("T21 not implemented: Pump");
+            BindToCurrentMatch();
+
+            // 1 — collect BEFORE stepping: events of commands issued directly between pumps are
+            // still sitting in LastObservation until the step's first command overwrites it.
+            if (_tap != null)
+            {
+                _tap.Drain();
+            }
+
+            // 2 — the step. Every command the session drives passes through the tap, so its
+            // events land in the pending list as they happen.
+            _session.Step(deltaSeconds);
+
+            // 3 — route, exactly once, in emission order.
+            _routing.Clear();
+            if (_tap != null)
+            {
+                _tap.TakePendingInto(_routing);
+            }
+
+            for (var i = 0; i < _routing.Count; i++)
+            {
+                var evt = _routing[i];
+                _router.OnSimEvent(evt);
+                if (_hud != null)
+                {
+                    _hud.OnSimEvent(evt);
+                }
+
+                _feel.Route(evt);
+            }
+
+            var notices = _session.Notices;
+            while (_noticesDelivered < notices.Count)
+            {
+                if (_hud != null)
+                {
+                    _hud.OnSessionNotice(notices[_noticesDelivered]);
+                }
+
+                _noticesDelivered++;
+            }
+
+            // 4 — feel time advances by the frame's delta (a zero delta decays nothing).
+            _feel.Tick(deltaSeconds);
+
+            // 5 — refresh the router, the models, the labels and the screen activation.
+            RefreshPresentation();
+
+            // 6 — presentation feel on top of the authoritative sync (transform only, T-10).
+            ApplyFeel();
         }
 
         /// <summary>
@@ -191,21 +272,222 @@ namespace RedHollow.Game.UI
         /// </summary>
         public void TearDown()
         {
-            throw new NotImplementedException("T21 not implemented: TearDown");
+            if (_tornDown)
+            {
+                return;
+            }
+
+            _tornDown = true;
+
+            if (_ui != null)
+            {
+                DestroyGameObject(_ui.Root);
+            }
+
+            if (_views != null)
+            {
+                DestroyGameObject(_views.Root);
+            }
+
+            if (_transport != null)
+            {
+                _transport.Shutdown();
+            }
         }
 
         /// <summary>
         /// R-15 — the default catalog: the four imported representative assets
         /// (Assets/Game/Art/{Textures,Characters,Icons,UI}/, the exact files T13's seam tests pin)
         /// registered under the <see cref="ShellArtKeys"/> spellings, each with a factory that
-        /// instantiates a renderable GameObject carrying that asset. HOW the asset is loaded is
-        /// free (a Resources copy, a serialized catalog asset — but never AssetDatabase: this is
-        /// runtime code); T13's imported paths must stay where its locked tests read them.
+        /// instantiates a renderable GameObject carrying that asset. Loaded through Resources
+        /// copies (Assets/Game/UI/Resources/RedHollowArt/) — a mechanism that works in EditMode
+        /// AND a build, never AssetDatabase; T13's imported originals stay untouched where its
+        /// locked tests read them.
         /// </summary>
         public static ArtCatalog LoadRepresentativeArt()
         {
-            throw new NotImplementedException(
-                "T21 not implemented: the four representative assets registered as catalog data");
+            var catalog = new ArtCatalog();
+
+            RegisterResourceArt(catalog, ShellArtKeys.GroundTile, "RedHollowArt/cavern-ground");
+            RegisterResourceArt(catalog, ShellArtKeys.GunslingerCharacter, "RedHollowArt/gunslinger");
+            RegisterResourceArt(catalog, ShellArtKeys.RevolverShotIcon, "RedHollowArt/gs-revolver-shot");
+            RegisterResourceArt(catalog, ShellArtKeys.ButtonFrame, "RedHollowArt/button-normal");
+
+            return catalog;
+        }
+
+        // ---- match binding --------------------------------------------------------------------
+
+        /// <summary>
+        /// Follow whatever match the session holds: a new match gets a fresh HUD model (R-07 — a
+        /// rematch is a different <see cref="HostedMatch"/>) and this shell's tap for it; no match
+        /// means no HUD and no tap.
+        /// </summary>
+        private void BindToCurrentMatch()
+        {
+            var match = _session.Match;
+            if (ReferenceEquals(match, _boundMatch))
+            {
+                return;
+            }
+
+            _boundMatch = match;
+
+            if (match == null)
+            {
+                _tap = null;
+                _hud = null;
+                return;
+            }
+
+            _taps.TryGetValue(match, out _tap);
+            _hud = new CombatHudModel(match, _accountId, _profiles);
+        }
+
+        // ---- presentation refresh -------------------------------------------------------------
+
+        private void RefreshPresentation()
+        {
+            _router.Update();
+
+            if (_hud != null)
+            {
+                _hud.Refresh();
+            }
+
+            RefreshLabels();
+            _ui.SetActiveScreen(_router.Screen);
+        }
+
+        /// <summary>
+        /// R-61 — push the model's values onto the labels. Copy and format are presentation; the
+        /// contract is only that each model value appears on its label.
+        /// </summary>
+        private void RefreshLabels()
+        {
+            if (_hud == null)
+            {
+                _ui.WaveLabel.text = string.Empty;
+                _ui.ScripLabel.text = string.Empty;
+                _ui.HpLabel.text = string.Empty;
+                _ui.MonstersRemainingLabel.text = string.Empty;
+                _ui.EnsureHotspotLabels(0);
+                return;
+            }
+
+            _ui.WaveLabel.text = "Wave "
+                + _hud.WaveNumber.ToString(CultureInfo.InvariantCulture)
+                + "/" + _hud.TotalWaves.ToString(CultureInfo.InvariantCulture);
+            _ui.ScripLabel.text = _hud.Scrip.ToString(CultureInfo.InvariantCulture);
+            _ui.HpLabel.text = ((int)_hud.Hp).ToString(CultureInfo.InvariantCulture);
+            _ui.MonstersRemainingLabel.text =
+                _hud.MonstersRemaining.ToString(CultureInfo.InvariantCulture);
+
+            var hotspots = _hud.Hotspots;
+            _ui.EnsureHotspotLabels(hotspots.Count);
+            for (var i = 0; i < hotspots.Count; i++)
+            {
+                _ui.HotspotLabelList[i].text = hotspots[i].HotspotId + ": "
+                    + hotspots[i].Civilians.ToString(CultureInfo.InvariantCulture);
+            }
+        }
+
+        /// <summary>
+        /// R-64 — <see cref="FeelRig.Apply"/> per bound monster view, on top of the position the
+        /// binder's sync wrote. The nudge lands on the TRANSFORM only; sim state is never written.
+        /// </summary>
+        private void ApplyFeel()
+        {
+            foreach (var monsterId in _views.BoundMonsterIds)
+            {
+                FeelRig.Apply(_views.MonsterViewFor(monsterId), _feel.FeelFor(monsterId));
+            }
+        }
+
+        // ---- plumbing -------------------------------------------------------------------------
+
+        /// <summary>
+        /// One representative asset entry: load the Resources copy, stand it up as a sprite. A
+        /// missing resource returns null, which the catalog answers with the resolver's fallback —
+        /// the seam stays total (R-30's delivery constraint).
+        /// </summary>
+        private static void RegisterResourceArt(ArtCatalog catalog, string artKey, string resourcePath)
+        {
+            Sprite sprite = null;
+
+            catalog.Register(artKey, () =>
+            {
+                if (sprite == null)
+                {
+                    var texture = Resources.Load<Texture2D>(resourcePath);
+                    if (texture == null)
+                    {
+                        return null;
+                    }
+
+                    sprite = Sprite.Create(
+                        texture,
+                        new Rect(0f, 0f, texture.width, texture.height),
+                        new Vector2(0.5f, 0.5f),
+                        100f);
+                }
+
+                var go = new GameObject("art_" + artKey.Replace('/', '_'));
+                var renderer = go.AddComponent<SpriteRenderer>();
+                renderer.sprite = sprite;
+                return go;
+            });
+        }
+
+        private static void DestroyGameObject(GameObject go)
+        {
+            if (go == null)
+            {
+                return;
+            }
+
+            if (Application.isPlaying)
+            {
+                UnityEngine.Object.Destroy(go);
+            }
+            else
+            {
+                UnityEngine.Object.DestroyImmediate(go);
+            }
+        }
+
+        /// <summary>
+        /// R-51 — the factory wrap that makes every match this shell's session creates view-bound:
+        /// the inner factory builds the match (all of ticket 011's rules), then the host seam is
+        /// decorated with the event tap and the session is rebuilt over it with the shell's one
+        /// binder. Rule-free — nothing here touches state the inner factory made.
+        /// </summary>
+        private sealed class ViewBoundMatchFactory : IHostedMatchFactory
+        {
+            private readonly ShellBootstrap _shell;
+            private readonly IHostedMatchFactory _inner;
+
+            public ViewBoundMatchFactory(ShellBootstrap shell, IHostedMatchFactory inner)
+            {
+                _shell = shell;
+                _inner = inner;
+            }
+
+            public HostedMatch CreateMatch(IReadOnlyList<NetPeer> party)
+            {
+                var match = _inner.CreateMatch(party);
+                if (match == null)
+                {
+                    return null;
+                }
+
+                var tap = new SimEventTap(match.Host);
+                match.Host = tap;
+                match.Session = new MatchSession(tap, null, _shell._views);
+
+                _shell._taps[match] = tap;
+                return match;
+            }
         }
     }
 }
