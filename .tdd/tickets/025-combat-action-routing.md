@@ -1,10 +1,10 @@
 ---
 id: 025
 title: Combat action routing — SPACE/Q/E intents reach the sim
-status: pending
+status: green
 depends_on: [024]
 touches: [unity/RedHollow/Assets/Game/UI/, unity/RedHollow/Assets/Game/Host/]
-iterations: 0
+iterations: 1
 test_files: [unity/RedHollow/Assets/Tests/EditMode/T25_CombatActionTests.cs]
 branch: ""
 board_id: T-25
@@ -37,11 +37,11 @@ Adds shell-side combat action routing:
 
 ## Acceptance criteria
 
-- [ ] holding SPACE in combat attacks along the cursor aim line at the configured cadence;
+- [x] holding SPACE in combat attacks along the cursor aim line at the configured cadence;
       monsters take catalog damage and die
-- [ ] Q/E issue `HeroAbilityRequest` for the mapped slot on press-edge; sim-side rejections
+- [x] Q/E issue `HeroAbilityRequest` for the mapped slot on press-edge; sim-side rejections
       surface; nothing double-fires
-- [ ] aim-line entity ordering is nearest-first from sim state only; the Cecil invariant
+- [x] aim-line entity ordering is nearest-first from sim state only; the Cecil invariant
       holds
 
 ## Test plan
@@ -102,6 +102,11 @@ width/length boundary in/exclusivity; where inside the pump the routing lives (p
 ## Attempt log
 
 _(created 2026-08-26 by the orchestrator at 024 close.)_
+
+- 2026-08-26 green in 1 pass. Red 17/19 verified; green verified by orchestrator: EditMode
+  237/237, dotnet 371/371. Owner flags: cadence 0.25s + line 30x1.5 are config guesses;
+  full-roster reap credits the local attacker (fine solo, revisit for multiplayer credit);
+  LastAbilityOutcome is a shell-side view (AbilityOutcomeView), downstream UI consumes it.
 
 ## Handoff notes
 

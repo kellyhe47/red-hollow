@@ -528,6 +528,21 @@
         "Q/E issue HeroAbilityRequest for the mapped slot; sim-side cooldown/lock rejections surface, nothing double-fires",
         "aim-line entity ordering is nearest-first and derived from sim state only; no MonoBehaviour writes sim state"
       ]
+    },
+    {
+      "id": "T-26",
+      "title": "Placeable views \u2014 placed defenses render and show damage",
+      "owns_requirements": [],
+      "grades_fixtures": [],
+      "depends_on": [
+        "T-25"
+      ],
+      "scope": "Final render audit: MatchViewBinder binds hero and monster views and the scene builder places hotspot/spawn markers, but NOTHING renders a placeable. A purchased barricade/trap/turret/med station is invisible; sells/breaks/destroys change nothing on screen. Wireframe S3 requires existing placeables shown, S4 requires barricade HP bars when damaged. Adds placeable view binding (create on Exists, remove on sold/broken/destroyed) through the same resolver seam, plus a damage readout (HP bar or equivalent) driven by state.",
+      "acceptance": [
+        "a purchased placeable appears at its position through the resolver seam (placeholder or real art)",
+        "sold, broken and destroyed placeables disappear; distinct events remain distinct for feel",
+        "a damaged barricade shows a damage readout driven by sim state; Cecil invariant holds"
+      ]
     }
   ]
 }
