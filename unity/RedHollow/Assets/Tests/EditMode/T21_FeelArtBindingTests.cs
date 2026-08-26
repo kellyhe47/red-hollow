@@ -267,11 +267,16 @@ namespace RedHollow.Tests.EditMode
                     "R-15: " + key + " instantiates something in the scene");
             }
 
-            var absent = resolver.Resolve(VisualClass.Monster, MonsterType.Shambler);
+            var shambler = resolver.Resolve(VisualClass.Monster, MonsterType.Shambler);
+            Track(shambler.Instance);
+            Assert.That(shambler.IsPlaceholder, Is.False,
+                "R-15: shambler is a delivered keeper registered under MonsterType — the live "
+                + "wave must wear real art, not the green capsule");
+
+            var absent = resolver.Resolve(VisualClass.Monster, "characters/never-generated_v1");
             Track(absent.Instance);
             Assert.That(absent.IsPlaceholder, Is.True,
-                "no monster representative was delivered, so the shambler key honestly falls "
-                + "through to the placeholder — registering art nobody made would be a lie");
+                "an unregistered key still falls through to the placeholder — the seam stays total");
         }
 
         // ==========================================================================================
@@ -281,13 +286,13 @@ namespace RedHollow.Tests.EditMode
         /// <summary>
         /// R-15 / R-51. The chain end to end, through the bootstrap's OWN binder in a driven match
         /// (the criterion this ticket was opened for — <c>MatchViewBinder(visuals: null)</c>
-        /// defaulted to placeholder-only everywhere): the host's gunslinger hero stands in real art
-        /// because its class key is registered, and a shambler stands in the placeholder because no
-        /// monster representative exists. Both answers come from the one resolver the bootstrap
-        /// exposes, and that resolver stays total.
+        /// defaulted to placeholder-only everywhere): the host's gunslinger hero AND a shambler
+        /// both stand in real art because those keys are registered. Unknown keys still fall
+        /// through to the placeholder, and both answers come from the one resolver the bootstrap
+        /// exposes.
         /// </summary>
         [Test]
-        public void The_bootstraps_binder_dresses_a_hero_in_real_art_and_a_shambler_in_the_placeholder()
+        public void The_bootstraps_binder_dresses_hero_and_shambler_in_real_art()
         {
             var shell = NewHostedShell();
             var match = StartMatch(shell);
@@ -319,9 +324,9 @@ namespace RedHollow.Tests.EditMode
             var monsterView = shell.Views.MonsterViewFor(match.State.Wave.LivingMonsterIds[0]);
             Assert.That(monsterView, Is.Not.Null, "sanity (R-51): the spawned monster has a view");
             Assert.That(monsterView.Visual, Is.Not.Null, "the monster view wears a resolved visual");
-            Assert.That(monsterView.Visual.IsPlaceholder, Is.True,
-                "R-15: an unregistered key (no monster representative was delivered) falls through "
-                + "the same chain to the placeholder — the seam stays total in both directions");
+            Assert.That(monsterView.Visual.IsPlaceholder, Is.False,
+                "R-15: the shambler key is registered against the delivered canon sprite, so the "
+                + "live view wears real art — the same chain the gunslinger uses");
 
             // And the resolver the bootstrap exposes answers both ways itself.
             var real = shell.Visuals.Resolve(VisualClass.Hero, ShellArtKeys.GunslingerCharacter);

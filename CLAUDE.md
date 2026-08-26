@@ -1,6 +1,6 @@
 # The Red Hollow — agent operating guide
 
-Week-8 game project. Spec: `docs/PRD.md` (v1.2, approved). Fixtures: `eval/golden/` (acceptance contract). Art contracts: `docs/comfy-prompts/`.
+Week-8 game project. Spec: `docs/PRD.md` (v1.3, DEC-026 owner art override). Fixtures: `eval/golden/` (acceptance contract). Art contracts: `docs/comfy-prompts/`.
 
 ## ⚠️ Multiple agents are working this repo concurrently
 
@@ -21,9 +21,9 @@ Several Claude (Desktop/Code) agents run in parallel, one per Comfy Cloud art pi
 - When creating your pipeline, **build or duplicate then immediately retitle** it (e.g. "Characters Pipeline") and change all SaveImage `filename_prefix` values to your class prefix (`characters/…`, `icons/…`, `ui/…`) BEFORE the first run — output prefixes are how everyone attributes assets in the shared feed.
 
 ### 3. Shared contracts — docs are the source of truth
-- Art direction is **"Lantern Deep" (DEC-025)** — read `docs/comfy-prompts/00-shared-style.md` before generating anything. The Comfy prompt nodes are deployed *copies* of that doc; if style must change, change the doc first (and tell the owner — style is an owner-level decision), then mirror to nodes.
-- Environment pipeline uses the **texture-core tail** documented in `01-environment-agent.md`, not the full scene tail (scene terms break tileability — verified).
-- Never mix pre- and post-DEC-025 assets in a delivered set; regenerate old-style assets.
+- Art direction is **"Lantern Deep" (DEC-025)** plus **DEC-026** (~70% Mars Lykos habitat / ~30% western accents + 2.5D heroes; tilted isometric, real building height; no sun) — read `docs/comfy-prompts/00-shared-style.md` before generating anything. The Comfy prompt nodes are deployed *copies* of that doc; if style must change, change the doc first (and tell the owner — style is an owner-level decision), then mirror to nodes.
+- Environment pipeline uses the **texture-core tail** documented in `01-environment-agent.md`, not the full scene tail (scene terms break tileability — verified). Tiles are **albedo/normal/AO for 3D meshes**, not a 2D tilemap. Do not generate more western-town ground (wagon-rut dirt, saloon porch).
+- Never mix pre- and post-DEC-025 assets in a delivered set; regenerate old-style assets. Do not mix western-town scenery into the Lykos environment (DEC-026).
 
 ### 4. Comfy pipeline discipline (all pipelines)
 - Seed stays pinned (20260824, `control_after_generate: fixed`). Steps 28 for keepers, 12–15 for drafts. cfg 7, dpmpp_2m/karras.

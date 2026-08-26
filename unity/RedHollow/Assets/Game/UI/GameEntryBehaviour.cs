@@ -1,4 +1,5 @@
 using System;
+using RedHollow.Game.Art;
 using RedHollow.Game.Input;
 using RedHollow.Game.View;
 using RedHollow.Sim;
@@ -60,13 +61,19 @@ namespace RedHollow.Game.UI
 
         private void Awake()
         {
-            // Loopback by default — every option null except identity and the device seam, which
-            // only a scene entry can own (ShellBootstrap deliberately has no device default).
+            // Loopback by default — every option null except identity, the device seam (which
+            // only a scene entry can own; ShellBootstrap deliberately has no device default) and
+            // the profile store: R-43/R-44 make lifetime XP survive the process, and the shell's
+            // in-memory default is a store whose XP dies on quit. The JSON document lives in
+            // Unity's per-app data directory — the same "server-local" file a dedicated host
+            // would own.
             _shell = new ShellBootstrap(new ShellBootstrapOptions
             {
                 LocalPeerId = LocalPeerId,
                 LocalAccountId = LocalAccountId,
                 InputSource = new LegacyDeviceInputSource(null),
+                Profiles = new JsonProfileStore(
+                    System.IO.Path.Combine(Application.persistentDataPath, "redhollow-profiles.json")),
             });
 
             EnsureEventSystem();
@@ -79,10 +86,27 @@ namespace RedHollow.Game.UI
             var baked = GameObject.Find("RedHollow_Match");
             if (baked != null)
             {
+                // Destroy is deferred in play mode: an enabled baked camera (Skybox + Unity
+                // default slate) keeps rendering beside the runtime one for a frame and
+                // letterboxes the Game view. Disable every camera first.
+                foreach (var cam in baked.GetComponentsInChildren<Camera>(true))
+                {
+                    cam.enabled = false;
+                    cam.gameObject.SetActive(false);
+                }
+
                 DestroyGameObjectCompat(baked);
             }
 
             _matchScene = MatchSceneBuilder.Build(ColonyMap.V1(), _shell.Visuals);
+            if (Application.isPlaying)
+            {
+                // Fog, warm ambient, no sun, cavern dome. Skipped in EditMode so T16/T22
+                // do not leak RenderSettings; the dome is taller than the camera so this
+                // no longer paints a shell over the colony.
+                LanternDeepLighting.Apply(_matchScene);
+            }
+
             _shell.AttachScene(_matchScene);
         }
 

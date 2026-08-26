@@ -11,8 +11,10 @@ namespace RedHollow.Game.Host
     ///
     /// It owns the wiring the PRD's loop implies but no single class held: opening the match with
     /// a wave (R-19), keeping monsters targeted (R-16) and moving (R-17/R-18), letting the R-18
-    /// gate turn contact into damage, moving the campaign on when a wave is cleared (R-02/R-03),
-    /// and keeping the view set level with the world (R-51).
+    /// gate turn contact into damage, driving placeable combat (R-23 turrets at 1 Hz, trap
+    /// crossings on footprint entry, R-02/R-40 kill accounting for those deaths), moving the
+    /// campaign on when a wave is cleared (R-02/R-03), and keeping the view set level with the
+    /// world (R-51).
     ///
     /// Plain C# rather than a MonoBehaviour, and that is the whole architecture of the shell:
     /// <see cref="MatchHostBehaviour"/> stays a two-member pump that holds one of these and calls
@@ -33,15 +35,56 @@ namespace RedHollow.Game.Host
         private readonly HostLoop _loop;
 
         /// <summary>
+        /// R-23 — turret Damage is 20 and the PRD's rate is 20 DPS; <see cref="MatchSim.TurretTick"/>
+        /// has no cooldown, so the host is the 1 Hz limiter. First combat step fires immediately
+        /// (the same "first swing is free" reading monster attacks use).
+        /// </summary>
+        private const double TurretFirePeriodSeconds = 1.0;
+
+        /// <summary>
         /// Scratch list for the monsters that need a target this step, so the retarget pass does
         /// not allocate sixty times a second and does not mutate
         /// <see cref="MatchState.Monsters"/> while enumerating it.
         /// </summary>
         private readonly List<string> _needTarget = new List<string>();
 
+        /// <summary>Scratch: standing turret ids this fire window, so a tick cannot mutate the dictionary under the enumerator.</summary>
+        private readonly List<string> _turretIds = new List<string>();
+
+        /// <summary>Scratch: standing spike / dynamite ids this step.</summary>
+        private readonly List<string> _trapIds = new List<string>();
+
+        /// <summary>Scratch: living monster ids this trap pass.</summary>
+        private readonly List<string> _livingScratch = new List<string>();
+
+        /// <summary>Scratch: living-roster copy for the placeable-kill reap.</summary>
+        private readonly List<string> _reapScratch = new List<string>();
+
+        /// <summary>
+        /// Trap occupancy last combat step, keyed <c>placeableId\0monsterId</c>. A key that is new
+        /// this step is a crossing; a key that remains is a monster standing on the trap, which
+        /// must not spend another trigger.
+        /// </summary>
+        private readonly HashSet<string> _trapOccupancy = new HashSet<string>();
+
+        /// <summary>Occupancy assembled this step; swapped into <see cref="_trapOccupancy"/> at the end of the pass.</summary>
+        private readonly HashSet<string> _trapOccupancyNow = new HashSet<string>();
+
+        /// <summary>
+        /// R-40 — which placeable's owner should be credited if this monster is reaped as a
+        /// placeable kill this step. Written when a turret tick or trap trigger drops HP to 0.
+        /// </summary>
+        private readonly Dictionary<string, string> _placeableKillOwner = new Dictionary<string, string>();
+
+        /// <summary>
+        /// Accrued combat time toward the next turret volley. Starts at the period so the first
+        /// positive-delta combat step fires; a zero-delta pump (presentation refresh) must not.
+        /// </summary>
+        private double _turretAccrual = TurretFirePeriodSeconds;
+
         /// <summary>
         /// R-19 — the wave whose monsters this session has already put in the colony. Zero means
-        /// "none yet". It is the only piece of state here, and it exists because
+        /// "none yet". It is the only piece of campaign state here, and it exists because
         /// <see cref="IMatchSimHost.SpawnWave"/> is not idempotent: the sim happily spawns wave 2
         /// twice, so *something* has to remember that it already asked, and the wave counter alone
         /// cannot say whether the monsters standing under it are this wave's or the last one's.
@@ -111,6 +154,10 @@ namespace RedHollow.Game.Host
             RetargetMonstersThatNeedOne();
 
             _loop.Step(deltaSeconds);
+
+            // R-23 / R-40 — placeable combat after movement, so a monster that walked onto a trap
+            // this step triggers this step, and a turret fires at where the wave actually stands.
+            DrivePlaceableCombat(deltaSeconds);
 
             AdvanceTheCampaign();
 
@@ -188,6 +235,290 @@ namespace RedHollow.Game.Host
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// R-23 / R-02 / R-40 — the placeable combat the sim exposes but cannot schedule: turrets
+        /// fire at 1 Hz, traps fire on footprint <i>entry</i>, and any monster a placeable already
+        /// marked dead is reaped through <see cref="IMatchSimHost.RecordMonsterKill"/> so the wave
+        /// roster actually shrinks. Combat only, and only on a positive delta — a <c>Pump(0)</c>
+        /// refresh must not spend a spike or take a free turret shot.
+        /// </summary>
+        private void DrivePlaceableCombat(double deltaSeconds)
+        {
+            var state = _sim.State;
+
+            if (state.IsOver || state.Phase != MatchPhase.Combat)
+            {
+                _trapOccupancy.Clear();
+                _trapOccupancyNow.Clear();
+                _placeableKillOwner.Clear();
+                _turretAccrual = TurretFirePeriodSeconds;
+                return;
+            }
+
+            if (!(deltaSeconds > 0.0))
+            {
+                return;
+            }
+
+            _turretAccrual += deltaSeconds;
+            while (_turretAccrual >= TurretFirePeriodSeconds)
+            {
+                FireEveryTurret(state);
+                _turretAccrual -= TurretFirePeriodSeconds;
+            }
+
+            DetectTrapCrossings(state);
+            ReapPlaceableKills(state);
+        }
+
+        /// <summary>R-23 / G-028 — every standing turret, once per fire window, nearest in range.</summary>
+        private void FireEveryTurret(MatchState state)
+        {
+            _turretIds.Clear();
+            foreach (var placeable in state.Placeables.Values)
+            {
+                if (placeable != null && placeable.Exists && placeable.Type == PlaceableType.Turret)
+                {
+                    _turretIds.Add(placeable.Id);
+                }
+            }
+
+            for (var i = 0; i < _turretIds.Count; i++)
+            {
+                var turretId = _turretIds[i];
+                var result = _sim.TurretTick(turretId);
+                if (result == null || string.IsNullOrEmpty(result.TargetId) || result.DamageDealt <= 0.0)
+                {
+                    continue;
+                }
+
+                if (state.Monsters.TryGetValue(result.TargetId, out var victim)
+                    && victim != null && !victim.Alive)
+                {
+                    NotePlaceableKillOwner(victim.Id, OwnerOf(state, turretId));
+                }
+            }
+        }
+
+        /// <summary>
+        /// R-23 / G-027 / G-029 — a monster that was outside a trap last step and is inside it now
+        /// is a crossing. Occupancy is rebuilt every step; standing still keeps the key and spends
+        /// nothing further.
+        /// </summary>
+        private void DetectTrapCrossings(MatchState state)
+        {
+            _trapOccupancyNow.Clear();
+
+            _trapIds.Clear();
+            foreach (var placeable in state.Placeables.Values)
+            {
+                if (placeable != null
+                    && placeable.Exists
+                    && (placeable.Type == PlaceableType.SpikeTrap
+                        || placeable.Type == PlaceableType.DynamiteTrap))
+                {
+                    _trapIds.Add(placeable.Id);
+                }
+            }
+
+            _livingScratch.Clear();
+            foreach (var monster in state.Monsters.Values)
+            {
+                if (monster != null && monster.Alive)
+                {
+                    _livingScratch.Add(monster.Id);
+                }
+            }
+
+            var radius = _sim.PlaceableFootprintRadius;
+
+            for (var t = 0; t < _trapIds.Count; t++)
+            {
+                var trapId = _trapIds[t];
+                if (!state.Placeables.TryGetValue(trapId, out var trap) || trap == null || !trap.Exists)
+                {
+                    continue;
+                }
+
+                for (var m = 0; m < _livingScratch.Count; m++)
+                {
+                    var monsterId = _livingScratch[m];
+                    if (!state.Monsters.TryGetValue(monsterId, out var monster)
+                        || monster == null || !monster.Alive)
+                    {
+                        continue;
+                    }
+
+                    if (trap.Pos.DistanceTo(monster.Pos) > radius)
+                    {
+                        continue;
+                    }
+
+                    var key = trapId + "\0" + monsterId;
+                    _trapOccupancyNow.Add(key);
+
+                    if (_trapOccupancy.Contains(key))
+                    {
+                        continue;
+                    }
+
+                    var owner = trap.OwnerPlayerId;
+                    var result = _sim.TriggerPlaceable(trapId, monsterId);
+                    NoteKillsFromTrigger(state, owner, monsterId, result);
+
+                    if (!state.Placeables.TryGetValue(trapId, out trap) || trap == null || !trap.Exists)
+                    {
+                        // Dynamite (and a spike's last trigger) leaves the world; further monsters
+                        // this step cannot cross a trap that is already gone.
+                        break;
+                    }
+                }
+            }
+
+            _trapOccupancy.Clear();
+            foreach (var key in _trapOccupancyNow)
+            {
+                _trapOccupancy.Add(key);
+            }
+        }
+
+        private void NoteKillsFromTrigger(
+            MatchState state, string ownerPlayerId, string triggerMonsterId, ISimResult result)
+        {
+            var blast = result as BlastTriggerResult;
+            if (blast != null)
+            {
+                for (var i = 0; i < blast.MonstersHit.Count; i++)
+                {
+                    var id = blast.MonstersHit[i];
+                    if (state.Monsters.TryGetValue(id, out var caught) && caught != null && !caught.Alive)
+                    {
+                        NotePlaceableKillOwner(id, ownerPlayerId);
+                    }
+                }
+
+                return;
+            }
+
+            if (state.Monsters.TryGetValue(triggerMonsterId, out var victim)
+                && victim != null && !victim.Alive)
+            {
+                NotePlaceableKillOwner(triggerMonsterId, ownerPlayerId);
+            }
+        }
+
+        private void NotePlaceableKillOwner(string monsterId, string ownerPlayerId)
+        {
+            if (string.IsNullOrEmpty(monsterId) || string.IsNullOrEmpty(ownerPlayerId))
+            {
+                return;
+            }
+
+            if (!_placeableKillOwner.ContainsKey(monsterId))
+            {
+                _placeableKillOwner[monsterId] = ownerPlayerId;
+            }
+        }
+
+        private static string OwnerOf(MatchState state, string placeableId)
+        {
+            if (state.Placeables.TryGetValue(placeableId, out var placeable) && placeable != null)
+            {
+                return placeable.OwnerPlayerId;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// R-02 / R-20 / R-40 — placeable <c>DamageMonster</c> flips <c>alive</c> at 0 HP without
+        /// shrinking the wave roster. Hero basics leave <c>alive</c> true for the shell to reap;
+        /// only the already-flagged corpses are taken here, credited to the placer when we saw
+        /// which placeable dropped them.
+        /// </summary>
+        private void ReapPlaceableKills(MatchState state)
+        {
+            _reapScratch.Clear();
+            _reapScratch.AddRange(state.Wave.LivingMonsterIds);
+
+            for (var i = 0; i < _reapScratch.Count; i++)
+            {
+                var monsterId = _reapScratch[i];
+                if (!state.Monsters.TryGetValue(monsterId, out var monster)
+                    || monster == null || monster.Alive)
+                {
+                    continue;
+                }
+
+                var stats = _sim.Config.Monsters.TryGet(monster.Type);
+                string ownerPlayerId;
+                _placeableKillOwner.TryGetValue(monsterId, out ownerPlayerId);
+
+                var hero = HeroForPlaceableOwner(state, ownerPlayerId);
+                var kill = new MonsterKillRequest
+                {
+                    MonsterId = monsterId,
+                    MonsterType = monster.Type,
+                    Bounty = stats == null ? 0 : stats.Bounty,
+                    KillerHeroId = hero == null ? null : hero.Id,
+                };
+
+                _sim.RecordMonsterKill(kill);
+
+                var accountId = AccountForPlayerSlot(state, ownerPlayerId);
+                if (string.IsNullOrEmpty(accountId) && hero != null)
+                {
+                    accountId = hero.AccountId;
+                }
+
+                if (!string.IsNullOrEmpty(accountId))
+                {
+                    _sim.AwardKillXp(kill, accountId);
+                }
+
+                _placeableKillOwner.Remove(monsterId);
+            }
+        }
+
+        private static string AccountForPlayerSlot(MatchState state, string playerSlotId)
+        {
+            if (string.IsNullOrEmpty(playerSlotId))
+            {
+                return null;
+            }
+
+            var players = state.Players;
+            for (var i = 0; i < players.Count; i++)
+            {
+                var player = players[i];
+                if (player != null && string.Equals(player.Id, playerSlotId, StringComparison.Ordinal))
+                {
+                    return player.AccountId;
+                }
+            }
+
+            return playerSlotId;
+        }
+
+        private static Hero HeroForPlaceableOwner(MatchState state, string ownerPlayerId)
+        {
+            var accountId = AccountForPlayerSlot(state, ownerPlayerId);
+            if (string.IsNullOrEmpty(accountId))
+            {
+                return null;
+            }
+
+            foreach (var hero in state.Heroes.Values)
+            {
+                if (hero != null && string.Equals(hero.AccountId, accountId, StringComparison.Ordinal))
+                {
+                    return hero;
+                }
+            }
+
+            return null;
         }
 
         /// <summary>

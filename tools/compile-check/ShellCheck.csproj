@@ -1,0 +1,82 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Headless compile check for the shell's UNITY-FREE layers (Host, Net-minus-NGO, SimEventTap),
+    for agents working without a Unity editor: `dotnet build tools/compile-check/ShellCheck.csproj`.
+
+    Stubs.cs stands in for the handful of Unity-side types those layers name (Vector2, HeroIntent,
+    MatchViewBinder, INetWire). This catches syntax and type errors in host/session/net edits that
+    would otherwise first surface in the owner's editor; it does NOT cover the uGUI-facing files
+    (ShellBootstrap, ShellControls, views) or the EditMode tests — those still need Unity.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Stubs.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/GameSim/**/*.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Host/HeroIntents.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Host/HostLoop.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Host/IMatchSimHost.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Host/ISimHost.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Host/MatchSession.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Host/MatchSimHost.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Host/MonsterAttack.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Host/PartyRoster.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Host/ClientPrediction.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/UI/SimEventTap.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/UI/CombatActionConfig.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/UI/CombatHudModel.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/UI/HudCopy.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/UI/LobbyScreenModel.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/UI/PlacementZoneOracle.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/UI/PlanningScreenModel.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/UI/PostMatchModel.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/UI/TitleScreenModel.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/UI/UiRouter.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/UI/WaveInterstitialModel.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Net/ColonyMatchFactory.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Net/HostedMatch.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Net/INetTransport.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Net/LoopbackNetTransport.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Net/NetSession.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Net/NetSessionConfig.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Net/NetTransportFactory.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Net/NgoNetTransport.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Net/UgsServices.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Net/LanServices.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Net/MatchSnapshot.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Net/MatchChannel.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Net/RemotePartyDriver.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Net/ClientMatchPresenter.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Input/HeroInput.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Input/AimLine.cs" />
+
+    <!-- The EditMode test files that are sim/net/model-pure (Unity touched only through
+         Time.timeScale and Debug.Log, stubbed above). These RUN here: `dotnet test
+         tools/compile-check` executes the real T11 session, T12 screens/HUD, T14 timing/non-goal
+         and T20 transport suites headlessly. Everything uGUI-facing (T16, T19, T21-T27, T10's
+         Cecil scan) still needs the Unity editor. -->
+    <Compile Include="../../unity/RedHollow/Assets/Tests/EditMode/T11_SessionTests.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Tests/EditMode/T14_TimingTests.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Tests/EditMode/T14_NonGoalTests.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Tests/EditMode/T20_NgoTransportTests.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Tests/EditMode/T12_UiScreensTests.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Tests/EditMode/T12_UiHudTests.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Tests/EditMode/T30_ReplicationTests.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.5.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+  </ItemGroup>
+
+</Project>

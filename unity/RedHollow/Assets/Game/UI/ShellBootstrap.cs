@@ -62,6 +62,13 @@ namespace RedHollow.Game.UI
         /// Null means the shipped <see cref="CombatActionConfig"/> defaults.
         /// </summary>
         public CombatActionConfig CombatActions;
+
+        /// <summary>
+        /// Ticket 030 — the replication channel a HOSTING shell broadcasts snapshots on and
+        /// receives remote commands from (an <see cref="NgoMatchChannel"/> in a LAN/Relay party).
+        /// Null means no remote party — the offline default, and every EditMode harness.
+        /// </summary>
+        public IHostMatchChannel HostChannel;
     }
 
     /// <summary>
@@ -189,6 +196,13 @@ namespace RedHollow.Game.UI
         private readonly INetTransport _transport;
         private readonly IInputSource _input;
         private readonly LocalHeroIntentSource _heroIntents;
+
+        /// <summary>Ticket 030 — remote peers' held input, applied through the same seams as local play.</summary>
+        private readonly RemotePartyDriver _remoteParty;
+
+        /// <summary>Ticket 030 — where snapshots go out, or null for an offline shell.</summary>
+        private IHostMatchChannel _hostChannel;
+
         private readonly string _localPeerId;
         private readonly NetSessionConfig _netConfig;
         private readonly IHostedMatchFactory _matchFactory;
@@ -285,6 +299,16 @@ namespace RedHollow.Game.UI
             // T-25 — combat tunables are shell policy: composed, never constants in the routing.
             _combatActions = options.CombatActions ?? new CombatActionConfig();
 
+            // Ticket 030 — the remote party's half of the pump: wire commands become the same sim
+            // commands the local paths issue. One driver for the shell's lifetime (its per-peer
+            // held state survives rematches the way the local intent source does); the channel is
+            // optional and null for every offline shell.
+            _remoteParty = new RemotePartyDriver(_combatActions) { AfterCommand = DrainTap };
+            if (options.HostChannel != null)
+            {
+                AttachHostChannel(options.HostChannel);
+            }
+
             // R-15 — real art by default; the placeholder answers for everything unregistered.
             _catalog = options.ArtCatalog ?? LoadRepresentativeArt();
             _visuals = new ArtVisualResolver(_catalog, new PlaceholderVisualResolver());
@@ -313,6 +337,33 @@ namespace RedHollow.Game.UI
 
         /// <summary>The session this shell fronts. Hosting/joining goes through it directly.</summary>
         public NetSession Session => _session;
+
+        /// <summary>
+        /// Ticket 030 — attach the replication channel once the wire is listening (NGO's
+        /// messaging manager exists only from that moment, so a LAN/Relay host attaches after
+        /// HOST GAME brought the transport up). Idempotent per channel; the offline shell never
+        /// calls it.
+        /// </summary>
+        public void AttachHostChannel(IHostMatchChannel channel)
+        {
+            if (channel == null || ReferenceEquals(channel, _hostChannel))
+            {
+                return;
+            }
+
+            _hostChannel = channel;
+            channel.CommandReceived += _remoteParty.HandleCommand;
+        }
+
+        /// <summary>
+        /// Ticket 030 / R-53 — a remote peer's wire dropped: its held input must stop steering
+        /// its hero. The session-level despawn is <see cref="NetSession.Disconnect"/>'s business;
+        /// the composition root calls both.
+        /// </summary>
+        public void DropRemotePeer(string peerId)
+        {
+            _remoteParty.DropPeer(peerId);
+        }
 
         /// <summary>T-26 — the colony scene this shell refreshes marker state on (null until attached).</summary>
         public MatchScene Scene => _scene;
@@ -364,6 +415,14 @@ namespace RedHollow.Game.UI
         /// is the one option with no offline default, because only a scene entry owns a device).
         /// </summary>
         public IInputSource Input => _input;
+
+        /// <summary>
+        /// R-43 / R-44 — the profile store this shell was composed with (the in-memory default
+        /// when none was). The same accessor-pin shape as <see cref="Input"/>: the entry composes
+        /// a persistent store, and the test that keeps launched XP surviving a restart reads it
+        /// back here.
+        /// </summary>
+        public IProfileStore Profiles => _profiles;
 
         /// <summary>
         /// Ticket 025 (T-25) — the combat action tunables this shell routes SPACE/Q/E with:
@@ -480,7 +539,10 @@ namespace RedHollow.Game.UI
             _session.StartHost(new NetPeer
             {
                 PeerId = _localPeerId,
-                AccountId = _title.Callsign,
+                AccountId = string.IsNullOrEmpty(_title.Callsign) ? _accountId : _title.Callsign,
+                // Default kit so HOST → READY without a card pick still seats a hero (KitFor
+                // throws on a null class). Lobby PICK still overwrites this before start.
+                HeroClass = HeroClass.Gunslinger,
                 IsHost = true,
             });
         }
@@ -532,6 +594,14 @@ namespace RedHollow.Game.UI
             // commands' events ride this same pump's routing.
             HandleCombatActions(deltaSeconds);
 
+            // Ticket 030 — the remote party's combat/planning input, applied through the same sim
+            // seams in the same pump slot. Its AfterCommand drain keeps every remote-caused event
+            // in this pump's feed, exactly as the local paths drain per command.
+            if (_boundMatch != null)
+            {
+                _remoteParty.Step(_boundMatch, deltaSeconds);
+            }
+
             // 1 — collect BEFORE stepping: events of commands issued directly between pumps are
             // still sitting in LastObservation until the step's first command overwrites it.
             if (_tap != null)
@@ -542,6 +612,13 @@ namespace RedHollow.Game.UI
             // 2 — the step. Every command the session drives passes through the tap, so its
             // events land in the pending list as they happen.
             _session.Step(deltaSeconds);
+
+            // Ticket 030 — the world goes out to the remote party after it moved (R-51: clients
+            // render the host's answer, never their own prediction of it).
+            if (_hostChannel != null && _boundMatch != null)
+            {
+                _remoteParty.BroadcastSnapshot(_boundMatch, _hostChannel);
+            }
 
             // 3 — route, exactly once, in emission order.
             _routing.Clear();
@@ -618,13 +695,12 @@ namespace RedHollow.Game.UI
         }
 
         /// <summary>
-        /// R-15 — the default catalog: the four imported representative assets
-        /// (Assets/Game/Art/{Textures,Characters,Icons,UI}/, the exact files T13's seam tests pin)
-        /// registered under the <see cref="ShellArtKeys"/> spellings, each with a factory that
-        /// instantiates a renderable GameObject carrying that asset. Loaded through Resources
-        /// copies (Assets/Game/UI/Resources/RedHollowArt/) — a mechanism that works in EditMode
-        /// AND a build, never AssetDatabase; T13's imported originals stay untouched where its
-        /// locked tests read them.
+        /// R-15 — the default catalog: the four T-13 representative assets plus the delivered
+        /// keepers bound to the keys the views actually resolve (HeroClass / MonsterType /
+        /// PlaceableType literals). Hotspot markers are industrial lantern pylons on Mars
+        /// habitat stacks — western facade art is for characters, not the environment. Resources
+        /// copies live under Assets/Game/UI/Resources/RedHollowArt/; T13's AssetDatabase originals
+        /// stay put.
         /// </summary>
         public static ArtCatalog LoadRepresentativeArt()
         {
@@ -634,6 +710,21 @@ namespace RedHollow.Game.UI
             RegisterResourceArt(catalog, ShellArtKeys.GunslingerCharacter, "RedHollowArt/gunslinger");
             RegisterResourceArt(catalog, ShellArtKeys.RevolverShotIcon, "RedHollowArt/gs-revolver-shot");
             RegisterResourceArt(catalog, ShellArtKeys.ButtonFrame, "RedHollowArt/button-normal");
+
+            RegisterResourceArt(catalog, HeroClass.Rancher, "RedHollowArt/rancher");
+            RegisterResourceArt(catalog, HeroClass.Sawbones, "RedHollowArt/sawbones");
+
+            RegisterResourceArt(catalog, MonsterType.Shambler, "RedHollowArt/shambler");
+            RegisterResourceArt(catalog, MonsterType.Ravager, "RedHollowArt/ravager");
+            RegisterResourceArt(catalog, MonsterType.Spitter, "RedHollowArt/spitter");
+            RegisterResourceArt(catalog, MonsterType.Burrower, "RedHollowArt/burrower");
+            RegisterResourceArt(catalog, MonsterType.BullBehemoth, "RedHollowArt/bull-behemoth");
+
+            RegisterResourceArt(catalog, PlaceableType.Barricade, "RedHollowArt/barricade");
+            RegisterResourceArt(catalog, PlaceableType.SpikeTrap, "RedHollowArt/spike-trap");
+            RegisterResourceArt(catalog, PlaceableType.DynamiteTrap, "RedHollowArt/dynamite-trap");
+            RegisterResourceArt(catalog, PlaceableType.Turret, "RedHollowArt/turret");
+            RegisterResourceArt(catalog, PlaceableType.MedStation, "RedHollowArt/med-station");
 
             return catalog;
         }
@@ -680,6 +771,18 @@ namespace RedHollow.Game.UI
             }
 
             _taps.TryGetValue(match, out _tap);
+
+            // Ticket 030 — every seated peer that is not this machine plays through the remote
+            // driver. Seating is idempotent, and a shell with no channel simply holds seats whose
+            // input never arrives.
+            foreach (var seat in _session.Seats)
+            {
+                if (seat != null && !string.Equals(seat.PeerId, _localPeerId, StringComparison.Ordinal))
+                {
+                    _remoteParty.SeatPeer(seat.PeerId, seat.AccountId);
+                }
+            }
+
             // T-24 — one oracle per match, over the match's own map; its radii are re-copied off
             // the live sim every pump (see HandlePlanningPointer) so retunes move both sides.
             _zoneOracle = new PlacementZoneOracle(match.Sim.ColonyMap);
@@ -1243,6 +1346,11 @@ namespace RedHollow.Game.UI
                 _ui.WaveLabel.text = string.Empty;
                 _ui.ScripLabel.text = string.Empty;
                 _ui.HpLabel.text = string.Empty;
+                _ui.QLabel.text = string.Empty;
+                _ui.ELabel.text = string.Empty;
+                _ui.XpLabel.text = string.Empty;
+                _ui.PlanningTimerLabel.text = string.Empty;
+                _ui.ReadyLabel.text = string.Empty;
                 _ui.MonstersRemainingLabel.text = string.Empty;
                 _ui.EnsureHotspotLabels(0);
                 return;
@@ -1251,18 +1359,46 @@ namespace RedHollow.Game.UI
             _ui.WaveLabel.text = "Wave "
                 + _hud.WaveNumber.ToString(CultureInfo.InvariantCulture)
                 + "/" + _hud.TotalWaves.ToString(CultureInfo.InvariantCulture);
-            _ui.ScripLabel.text = _hud.Scrip.ToString(CultureInfo.InvariantCulture);
-            _ui.HpLabel.text = ((int)_hud.Hp).ToString(CultureInfo.InvariantCulture);
+            _ui.ScripLabel.text = _hud.Scrip.ToString(CultureInfo.InvariantCulture) + " scrip";
+            _ui.HpLabel.text = ((int)_hud.Hp).ToString(CultureInfo.InvariantCulture) + " HP";
             _ui.MonstersRemainingLabel.text =
-                _hud.MonstersRemaining.ToString(CultureInfo.InvariantCulture);
+                _hud.MonstersRemaining.ToString(CultureInfo.InvariantCulture) + " left";
+            _ui.QLabel.text = HudCopy.SlotFace(_hud.SlotFor(AbilitySlot.Q));
+            _ui.ELabel.text = HudCopy.SlotFace(_hud.SlotFor(AbilitySlot.E));
+
+            // R-61 — level + lifetime XP (the model carried both since T-12; nothing showed them).
+            _ui.XpLabel.text = "Lv " + _hud.Level.ToString(CultureInfo.InvariantCulture)
+                + " · " + ((int)_hud.LifetimeXp).ToString(CultureInfo.InvariantCulture) + " xp";
+
+            // R-63 — the planning clock and the ready fraction, live exactly while the sim is in
+            // its planning phase; the combat top bar has neither to show.
+            var planningLive = _planning != null && _boundMatch != null
+                && _boundMatch.State != null && _boundMatch.State.Phase == MatchPhase.Planning;
+            _ui.PlanningTimerLabel.text = planningLive
+                ? PlanningClock(_planning.TimerRemainingSeconds)
+                : string.Empty;
+            _ui.ReadyLabel.text = planningLive
+                ? _planning.ReadyCount.ToString(CultureInfo.InvariantCulture)
+                  + "/" + _planning.ConnectedCount.ToString(CultureInfo.InvariantCulture) + " ready"
+                : string.Empty;
 
             var hotspots = _hud.Hotspots;
             _ui.EnsureHotspotLabels(hotspots.Count);
             for (var i = 0; i < hotspots.Count; i++)
             {
-                _ui.HotspotLabelList[i].text = hotspots[i].HotspotId + ": "
+                _ui.HotspotLabelList[i].text = HudCopy.HotspotName(hotspots[i].HotspotId) + ": "
                     + hotspots[i].Civilians.ToString(CultureInfo.InvariantCulture);
             }
+        }
+
+        /// <summary>Wireframe S3's "⏱ 0:47" shape: whole minutes, two-digit seconds, floored.</summary>
+        private static string PlanningClock(double remainingSeconds)
+        {
+            var whole = (int)Math.Max(0.0, remainingSeconds);
+            var minutes = whole / 60;
+            var seconds = whole % 60;
+            return minutes.ToString(CultureInfo.InvariantCulture)
+                + ":" + seconds.ToString("D2", CultureInfo.InvariantCulture);
         }
 
         /// <summary>
@@ -1280,36 +1416,95 @@ namespace RedHollow.Game.UI
         // ---- plumbing -------------------------------------------------------------------------
 
         /// <summary>
-        /// One representative asset entry: load the Resources copy, stand it up as a sprite. A
-        /// missing resource returns null, which the catalog answers with the resolver's fallback —
-        /// the seam stays total (R-30's delivery constraint).
+        /// One representative asset entry: load the Resources copy and stand it up. Heroes
+        /// and monsters are camera-facing upright cards (blob shadow, lantern tint) in the
+        /// 3D cavern — never XZ-flat sprites. Turret / barricade / med station stand as
+        /// cards too; floor traps stay XZ decals. The cavern-ground tile is still registered
+        /// (T21) but is not the match floor.
         /// </summary>
         private static void RegisterResourceArt(ArtCatalog catalog, string artKey, string resourcePath)
         {
-            Sprite sprite = null;
+            Texture2D texture = null;
+            var textureAttempted = false;
 
             catalog.Register(artKey, () =>
             {
-                if (sprite == null)
+                if (!textureAttempted)
                 {
-                    var texture = Resources.Load<Texture2D>(resourcePath);
-                    if (texture == null)
-                    {
-                        return null;
-                    }
-
-                    sprite = Sprite.Create(
-                        texture,
-                        new Rect(0f, 0f, texture.width, texture.height),
-                        new Vector2(0.5f, 0.5f),
-                        100f);
+                    textureAttempted = true;
+                    texture = Resources.Load<Texture2D>(resourcePath);
                 }
 
-                var go = new GameObject("art_" + artKey.Replace('/', '_'));
-                var renderer = go.AddComponent<SpriteRenderer>();
-                renderer.sprite = sprite;
-                return go;
+                if (texture == null)
+                {
+                    return null;
+                }
+
+                var name = "art_" + artKey.Replace('/', '_');
+                if (artKey == ShellArtKeys.GroundTile)
+                {
+                    var plane = GameObject.CreatePrimitive(PrimitiveType.Plane);
+                    plane.name = name;
+                    TopDownArt.Paint(plane, TopDownArt.Rust, texture, 1f);
+                    return plane;
+                }
+
+                if (IsStandingSprite(artKey))
+                {
+                    return TopDownArt.StandingCard(name, FootprintForArtKey(artKey), texture, Color.white);
+                }
+
+                return TopDownArt.QuadOnXz(name, FootprintForArtKey(artKey), texture, Color.white);
             });
+        }
+
+        private static bool IsStandingSprite(string artKey)
+        {
+            return artKey == HeroClass.Gunslinger
+                || artKey == HeroClass.Rancher
+                || artKey == HeroClass.Sawbones
+                || artKey == MonsterType.Shambler
+                || artKey == MonsterType.Ravager
+                || artKey == MonsterType.Spitter
+                || artKey == MonsterType.Burrower
+                || artKey == MonsterType.BullBehemoth
+                || artKey == PlaceableType.Barricade
+                || artKey == PlaceableType.Turret
+                || artKey == PlaceableType.MedStation;
+        }
+
+        private static float FootprintForArtKey(string artKey)
+        {
+            if (artKey == HeroClass.Gunslinger
+                || artKey == HeroClass.Rancher
+                || artKey == HeroClass.Sawbones)
+            {
+                return TopDownArt.HeroFootprint;
+            }
+
+            if (artKey == MonsterType.BullBehemoth)
+            {
+                return TopDownArt.MonsterFootprint * 1.5f;
+            }
+
+            if (artKey == MonsterType.Shambler
+                || artKey == MonsterType.Ravager
+                || artKey == MonsterType.Spitter
+                || artKey == MonsterType.Burrower)
+            {
+                return TopDownArt.MonsterFootprint;
+            }
+
+            if (artKey == PlaceableType.Barricade
+                || artKey == PlaceableType.SpikeTrap
+                || artKey == PlaceableType.DynamiteTrap
+                || artKey == PlaceableType.Turret
+                || artKey == PlaceableType.MedStation)
+            {
+                return TopDownArt.PlaceableFootprint;
+            }
+
+            return TopDownArt.HeroFootprint;
         }
 
         private static void DestroyGameObject(GameObject go)
@@ -1356,7 +1551,13 @@ namespace RedHollow.Game.UI
 
                 var tap = new SimEventTap(match.Host);
                 match.Host = tap;
-                match.Session = new MatchSession(tap, _shell._heroIntents, _shell._views);
+
+                // Ticket 030 — one session, two hands on it: the local device and the remote
+                // party feed the same intent seam, so HostLoop paces every hero identically.
+                match.Session = new MatchSession(
+                    tap,
+                    new CompositeHeroIntentSource(_shell._heroIntents, _shell._remoteParty),
+                    _shell._views);
 
                 _shell._taps[match] = tap;
                 return match;

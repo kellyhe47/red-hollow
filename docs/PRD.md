@@ -1,7 +1,7 @@
 # The Red Hollow — PRD
 
-*Country-western co-op wave defense on a terraformed underground Mars colony.*
-*Version 1.2 — 2026-08-24. Status: **Approved** (owner accepted all author proposals wholesale, DEC-024; art direction reset to "Lantern Deep", DEC-025).*
+*Co-op wave defense in a terraformed underground Mars colony (Lykos). Western only on the heroes.*
+*Version 1.3 — 2026-08-26. Status: **Approved** (DEC-024 wholesale accept; "Lantern Deep" palette/lighting DEC-025; owner art override DEC-026 — 3D Lykos cavern, tilted camera, western on characters only).*
 
 ## 0. Sources of truth
 
@@ -15,7 +15,7 @@ Line tags: `[source]` = from the owner's brief; `[decided]` = owner's explicit c
 
 ## 1. Product summary
 
-`[source]` 1–4 players are gunslinger heroes defending an underground Mars colony from waves of zombie-like monsters — former colonists and livestock mutated by a genetic virus — pouring in through breached entry tunnels. Civilians shelter in hotspots; heroes place defenses in a planning phase, then fight in real time. Survive all waves to win; lose every civilian and the colony falls.
+`[source]` 1–4 players are gunslinger heroes defending a terraformed underground Mars colony (Lykos) from waves of zombie-like monsters — former colonists and livestock mutated by a genetic virus — pouring in through breached entry tunnels. Civilians shelter in hotspots; heroes place defenses in a planning phase, then fight in real time. Survive all waves to win; lose every civilian and the colony falls. The **heroes** wear a western silhouette; the **colony** does not (DEC-026).
 
 Combat feel is modeled on League of Legends (`[decided]` DEC-016): cooldown-gated ability kits, skillshots, level-ups and skill points — but with WASD movement and mouse aim (`[decided]` DEC-017), not click-to-move.
 
@@ -41,12 +41,17 @@ Combat feel is modeled on League of Legends (`[decided]` DEC-016): cooldown-gate
 
 ## 4. Colony, hotspots, civilians
 
-- **R-10** `[decided]` One map (v1): a cavern colony with **3 hotspots** — Saloon (8 civilians), Chapel (6), Homestead (6) — total **20 civilians**, **4 breach entry tunnels** at the cavern edges, and one marked **team spawn point** near the map center where heroes enter at wave 1 and respawn (R-33).
+- **R-10** `[decided]` One map (v1): a cavern colony with **3 hotspots** — Saloon (8 civilians), Chapel (6), Homestead (6) — total **20 civilians**, **4 breach entry tunnels** at the cavern edges, and one marked **team spawn point** near the map center where heroes enter at wave 1 and respawn (R-33). Sim IDs and civilian counts are fixture-locked (`hs_saloon` / `hs_chapel` / `hs_homestead`). DEC-026: those names are lore leftovers — the 3D meshes are **Mars habitat stacks** (rusted utilitarian blocks with height), not a saloon, chapel steeple, or ranch house.
 - **R-11** `[decided]` DEC-002 — Hotspot HP *is* its civilian count. A monster hit on a hotspot kills `ceil(damage/10)` civilians, clamped at 0 (G-006, G-007). Civilians are not simulated agents and cannot be healed, moved, or restored.
 - **R-12** `[source]` Losing one hotspot does **not** end the match while civilians survive elsewhere (G-009). An emptied hotspot is visually marked lost and is no longer a valid monster target (G-002).
 - **R-13** `[decided]` Emptied hotspots stay lost for the rest of the match; there is no recapture.
 - **R-14** `[decided]` Entry tunnels are fixed map features; which subset activates varies per wave via the wave table (R-19).
-- **R-15** `[decided]` DEC-025 — Theme & art direction: **"Lantern Deep"** — an interior western town inside a colossal cavern, rendered in cinematic subterranean monochrome (full design language in `docs/comfy-prompts/00-shared-style.md`). Burnt-sienna/rust-amber palette with warm near-black shadows; zero natural light — no sun, sky, or horizon; all light artificial and sourced (saloon windows, string lights, lantern posts, an illuminated lift-shaft landmark); volumetric dust haze; matte painterly semi-realism (not photoreal, not flat-shaded low-poly). The style is carried primarily by **Unity scene lighting** (dark warm ambient, amber point lights, fog, rock-dome mesh as the sky) over painterly-matte albedo + derived normal/AO maps. The three hotspot buildings (Saloon, Chapel, Homestead) are **greybox meshes in Unity textured from the environment/props pipelines** (facade art in `docs/comfy-prompts/04-ui-props-agent.md`).
+- **R-15** `[decided]` DEC-025 + **DEC-026** (owner art override, 2026-08-26; supersedes any PRD language that described an interior western town as the LOOK of the map). Theme & art direction: **"Lantern Deep"** in a fully **3D Martian terraformed underground colony** — Lykos (Red Rising / `seed-env.webp`). Camera language (tilted isometric, real building height) matches a 3D survival-trailer read (r/DestroyMyGame 1hijaq4) — the **setting** is Lykos, not suburban apocalypse and not a western town in a cave. Full design language: `docs/comfy-prompts/00-shared-style.md`.
+  - **Mix (~70% Martian / ~30% western):** the **silhouette of the map** is Mars colony habitat — stacked utilitarian blocks, flat roofs, industrial gantries, rusted metal, carved-rock cavern walls, lantern masts, a lift shaft. First-gen art leaned too western (saloon porch, chapel steeple, ranch homestead, hitching posts) — **do not use that as the map silhouette**. The **30% western** is wood/brass/lantern **accents and wear on that Mars architecture**, plus western **2.5D heroes/monsters** (and optional UI twang, R-64).
+  - **Palette & light (DEC-025, unchanged):** burnt-sienna/rust-amber with warm near-black shadows; **zero natural light** — no sun, sky, horizon, or directional golden-hour; all light artificial and sourced (amber point lanterns, window glow, string lights, an illuminated lift-shaft landmark); volumetric dust haze; matte painterly semi-realism (not photoreal, not flat-shaded low-poly). Carried primarily by **Unity scene lighting** (dark warm ambient, amber point lights, fog, rock-dome mesh as the sky) over painterly-matte albedo + derived normal/AO maps.
+  - **Camera:** tilted 3D top-down / isometric, **~60–70° down**, so buildings show **side walls and roof edges** with real height — not straight bird's-eye (that flattens 3D into roofs).
+  - **Characters (v1, 2.5D):** heroes and monsters are **2D painted sheets** rendered as **camera-facing upright billboards** with a **blob shadow** under the feet, sitting in lantern tint and cavern haze. **Not** XZ-flat floor sprites. **Not** 8-direction sprite cycles. **Do not** sculpt 3D character meshes for v1. A later 3D hero **swaps the view mesh only**.
+  - **Environment art:** Comfy tiles are **albedo / normal / AO for 3D mesh UVs** (ground, cavern walls, rusted habitat plate), not a flat 2D tilemap. Hotspot buildings are **Lykos habitat stacks** in Unity (R-10 names unchanged) with window glow, gantries, and cave-mouth breaches. Turret / barricade / med station are camera-facing cards; spike and dynamite traps are floor decals. Destroyed placeables stay gone (rebuy).
 
 ## 5. Monsters & AI
 
@@ -127,7 +132,7 @@ Authoritative sketch: `docs/ui-wireframes.html` (S1–S7 + cross-cutting states)
 - **R-61** `[decided]` Persistent HUD (combat): wave n/10, monsters remaining, per-hotspot civilian counts, shared scrip, own HP/cooldowns/XP/level, unspent-skill-point badge.
 - **R-62** `[decided]` Level-up choice UI is a **non-blocking overlay** (hotkey L or badge click); the sim never pauses for it.
 - **R-63** `[decided]` Planning UI: shop bar with ghost-preview placement, sell-on-click (50% tooltip), active entry points pulse red, ready 2/4 indicator + timer.
-- **R-64** `[decided]` Feel targets: basic attacks land with hit-flash + knockback nudge; wave start/end stingers; western-twang UI audio. (Not fixture-testable; playtest criteria.)
+- **R-64** `[decided]` Feel targets: basic attacks land with hit-flash + knockback nudge; wave start/end stingers; western-twang UI audio (character/UI side — not environment scenery). (Not fixture-testable; playtest criteria.)
 
 ## 11. Non-goals (v1)
 
@@ -163,8 +168,9 @@ Authoritative sketch: `docs/ui-wireframes.html` (S1–S7 + cross-cutting states)
 | DEC-021 | No boss in v1 (5-type roster chosen over 5+boss) |
 | DEC-022 | 2–4 player co-op required from v1 (owner, platform question); solo supported as a 1-player lobby |
 | DEC-023 | Placeable combat-effects catalog (author proposal accepted at spec review; fixture-locked G-027..G-029) |
-| DEC-025 | "Lantern Deep" art direction (owner, 2026-08-24, from reference image): cinematic subterranean monochrome burnt-sienna, all-artificial sourced light, volumetric haze, matte painterly semi-realism; supersedes the low-poly orange-and-teal flat-shaded direction; contract in `docs/comfy-prompts/00-shared-style.md` |
+| DEC-025 | "Lantern Deep" art direction (owner, 2026-08-24, from reference image): cinematic subterranean monochrome burnt-sienna, all-artificial sourced light, volumetric haze, matte painterly semi-realism; supersedes the low-poly orange-and-teal flat-shaded direction; contract in `docs/comfy-prompts/00-shared-style.md`. Palette and lighting still hold; setting/presentation updated by DEC-026. |
 | DEC-024 | Owner accepted ALL remaining author proposals wholesale (2026-08-24): rematch R-07, map/civilians R-10, stat tables, cooldowns, netcode stack R-50, GameSim seam R-51, passwordless callsign accounts R-44, UX §10, and all other former [proposal] lines |
+| DEC-026 | Owner art override (2026-08-26): ship **2.5D characters in a fully 3D environment**. Look = tilted isometric with real building height (DestroyMyGame-style camera), **setting** = terraformed Mars underground colony (Lykos / `seed-env.webp`) — not suburban apocalypse, not a western town in a cave. Mix **~70% Martian / ~30% western**: map silhouette is stacked utilitarian habitats, flat roofs, gantries, rusted metal, carved-rock walls, lantern masts, lift shaft; **do not** use saloon porch / chapel steeple / ranch homestead / hitching posts as the silhouette. 30% western = wood/brass/lantern accents and wear **on** that Mars architecture, plus western 2.5D heroes/monsters (and optional UI twang). Camera ~60–70° down; **no sun**; amber lanterns + haze. Characters: camera-facing upright billboards + blob shadows — not 3D meshes, not XZ-flat sprites, not 8-dir cycles; a later 3D hero swaps the view mesh only. Hotspot sim IDs Saloon/Chapel/Homestead unchanged. Environment Comfy tiles = albedo/normal/AO for 3D meshes. |
 
 ### Evidence registry (referenced by fixtures' `traces_to` and requirement tags)
 

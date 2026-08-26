@@ -86,5 +86,18 @@ namespace RedHollow.Game.Host
         public WaveSpawnResult SpawnWave(int waveNumber) => _sim.SpawnWave(waveNumber);
 
         public PlanningPhaseResult BeginPlanningPhase() => _sim.BeginPlanningPhase();
+
+        public double PlaceableFootprintRadius => _sim.PlaceableFootprintRadius;
+
+        public TurretTickResult TurretTick(string turretId) => _sim.TurretTick(turretId);
+
+        public ISimResult TriggerPlaceable(string placeableId, string monsterId) =>
+            _sim.TriggerPlaceable(placeableId, monsterId);
+
+        public MonsterKillResult RecordMonsterKill(MonsterKillRequest request) =>
+            _sim.RecordMonsterKill(request);
+
+        public XpAwardResult AwardKillXp(MonsterKillRequest kill, string accountId) =>
+            _sim.AwardKillXp(kill, accountId);
     }
 }

@@ -98,8 +98,13 @@ namespace RedHollow.Game.Host
                 }
 
                 // See the class doc: the sim's arrival clamp is what makes this a derived reach
-                // rather than an invented one.
-                if (monster.Pos.DistanceTo(targetPos) > monster.CurrentSpeed * deltaSeconds)
+                // rather than an invented one — plus the archetype's own attack range (R-17),
+                // which is zero for melee and the PRD's 10 for the Spitter's acid. Movement holds
+                // a ranged monster at that line, so without adding it here a Spitter would stand
+                // at its reach forever and never be offered a swing.
+                var reach = (monster.AttackRange > 0.0 ? monster.AttackRange : 0.0)
+                            + (monster.CurrentSpeed * deltaSeconds);
+                if (monster.Pos.DistanceTo(targetPos) > reach)
                 {
                     continue;
                 }

@@ -122,10 +122,11 @@ namespace RedHollow.Game.View
         }
 
         /// <summary>
-        /// A visible primitive for the class. <see cref="GameObject.CreatePrimitive"/> is the happy
-        /// path; the catch is not defensive habit but the seam's contract — this method has no
-        /// permission to fail, so an engine that refuses a primitive still has to yield something
-        /// with a <see cref="Renderer"/> on it.
+        /// A visible primitive for the class. Heroes and monsters are the same 2.5D
+        /// camera-facing cards the catalog uses (no texture → tinted placeholder).
+        /// Hotspots are an industrial lantern pylon (not a western sign). Ground is unused
+        /// in the match (the cavern is <see cref="CavernEnvironment"/>). Shape is presentation
+        /// — T16 pins a Renderer, not a mesh.
         /// </summary>
         private static GameObject CreatePlaceholder(VisualClass visualClass)
         {
@@ -133,55 +134,35 @@ namespace RedHollow.Game.View
 
             try
             {
-                var primitive = GameObject.CreatePrimitive(PrimitiveFor(visualClass));
-                primitive.name = name;
-                primitive.transform.localPosition = StandingOffsetFor(visualClass);
-                return primitive;
+                if (visualClass == VisualClass.Ground)
+                {
+                    return TopDownArt.BlockToken(name, 4f, 0.6f, TopDownArt.Rust);
+                }
+
+                if (visualClass == VisualClass.Hotspot)
+                {
+                    return TopDownArt.LanternPylon(name);
+                }
+
+                if (visualClass == VisualClass.Hero)
+                {
+                    return TopDownArt.StandingCard(
+                        name, TopDownArt.HeroFootprint, null, TopDownArt.Amber);
+                }
+
+                if (visualClass == VisualClass.Monster)
+                {
+                    return TopDownArt.StandingCard(
+                        name, TopDownArt.MonsterFootprint, null, TopDownArt.HostileGreen);
+                }
+
+                return TopDownArt.BlockToken(name, 2.6f, 0.32f, TopDownArt.Brass);
             }
             catch (Exception)
             {
-                return BareRenderable(name);
-            }
-        }
-
-        private static PrimitiveType PrimitiveFor(VisualClass visualClass)
-        {
-            switch (visualClass)
-            {
-                case VisualClass.Ground:
-                    return PrimitiveType.Plane;
-
-                case VisualClass.Hero:
-                case VisualClass.Monster:
-                    return PrimitiveType.Capsule;
-
-                case VisualClass.Hotspot:
-                    return PrimitiveType.Cylinder;
-
-                default:
-                    return PrimitiveType.Cube;
-            }
-        }
-
-        /// <summary>
-        /// How far up the primitive sits so it stands on the floor instead of sinking half into it.
-        /// Presentation only — every position assertion in this ticket is horizontal, and the
-        /// vertical axis is the one <see cref="SimSpace"/> leaves free for exactly this.
-        /// </summary>
-        private static Vector3 StandingOffsetFor(VisualClass visualClass)
-        {
-            switch (visualClass)
-            {
-                case VisualClass.Ground:
-                    return Vector3.zero;
-
-                case VisualClass.Hero:
-                case VisualClass.Monster:
-                case VisualClass.Hotspot:
-                    return new Vector3(0f, 1f, 0f);
-
-                default:
-                    return new Vector3(0f, 0.5f, 0f);
+                var bare = BareRenderable(name);
+                TopDownArt.Paint(bare, TopDownArt.ColorFor(visualClass));
+                return bare;
             }
         }
 

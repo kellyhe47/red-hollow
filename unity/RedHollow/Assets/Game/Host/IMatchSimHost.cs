@@ -48,5 +48,39 @@ namespace RedHollow.Game.Host
         /// nowhere else, which is what makes this the hinge of wave progression.
         /// </summary>
         PlanningPhaseResult BeginPlanningPhase();
+
+        /// <summary>
+        /// R-24 / R-23 — the live footprint a standing placeable occupies, the same radius planning
+        /// uses to pick and to reject overlaps. Trap crossings in combat read this rather than a
+        /// second guessed number, so a retuned sim moves the trigger volume with the ghost.
+        /// </summary>
+        double PlaceableFootprintRadius { get; }
+
+        /// <summary>
+        /// R-23 / G-028 — one turret's firing tick: nearest living monster in range takes the
+        /// catalog damage. The host rate-limits this to 1 Hz so Damage 20 is 20 DPS; the command
+        /// itself has no cooldown.
+        /// </summary>
+        TurretTickResult TurretTick(string turretId);
+
+        /// <summary>
+        /// R-23 / G-027 / G-029 — a monster crossed a spike trap or dynamite. Edge-triggered by the
+        /// host (enter the footprint, not occupy it), or a monster standing on spikes would spend
+        /// every trigger in as many frames.
+        /// </summary>
+        ISimResult TriggerPlaceable(string placeableId, string monsterId);
+
+        /// <summary>
+        /// R-02 / R-20 / R-40 — the kill command: roster, bounty, wave complete. Placeable damage
+        /// flips <c>alive</c> at 0 HP but does not itself count the kill, so a live match that never
+        /// asks this leaves turret and trap victims on the wave forever.
+        /// </summary>
+        MonsterKillResult RecordMonsterKill(MonsterKillRequest request);
+
+        /// <summary>
+        /// R-40 — XP equal to the bounty, to the credited account. Turret (and other placeable)
+        /// kills credit the placer; the host resolves that account before calling.
+        /// </summary>
+        XpAwardResult AwardKillXp(MonsterKillRequest kill, string accountId);
     }
 }

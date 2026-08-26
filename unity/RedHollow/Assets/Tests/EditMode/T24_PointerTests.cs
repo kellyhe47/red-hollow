@@ -100,7 +100,7 @@ namespace RedHollow.Tests.EditMode
         /// <summary>
         /// The round trip on the REAL top-down rig: a sim ground point, projected to the screen by
         /// the same camera <see cref="MatchSceneBuilder"/> builds for play (orthographic, over the
-        /// play-area centre, looking straight down), must come back as the same sim point through
+        /// play-area, steep top-down tilt), must come back as the same sim point through
         /// <see cref="PointerProjection.TryScreenToGround"/>. This is the exact path a play-mode
         /// cursor takes to become a <see cref="Vec2"/> for the T23 seam, and it must agree with
         /// <see cref="SimSpace"/> or the ghost follows a cursor into the wrong coordinates.

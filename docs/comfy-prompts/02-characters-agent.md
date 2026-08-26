@@ -1,7 +1,14 @@
 # Agent 2 — Characters pipeline (Comfy Cloud)
 
 ## Mission
-Build and commit a ComfyUI (cloud.comfy.org) pipeline producing **character art for The Red Hollow**: the 3 hero classes and 5 monster types — lobby/HUD portraits and full-body turnaround reference sheets (used for 3D modeling reference and marketing). Read `docs/comfy-prompts/00-shared-style.md` first; obey its style tail ("Lantern Deep", DEC-025), sampler locks, and process rules. Characters render as lantern-lit figures in the burnt-sienna monochrome: color keys below are *value/material* distinctions within that palette (charcoal, brass, oxblood, bone all sit inside it); the Spitter's acid-green is the sanctioned gameplay-alarm accent. Full character specs: `docs/PRD.md` §7 (heroes) and §5 (monsters).
+Build and commit a ComfyUI (cloud.comfy.org) pipeline producing **character art for The Red Hollow**: the 3 hero classes and 5 monster types — lobby/HUD portraits and full-body sheets. Read `docs/comfy-prompts/00-shared-style.md` first; obey its style tail ("Lantern Deep", DEC-025), sampler locks, and process rules. Characters render as lantern-lit figures in the burnt-sienna monochrome: color keys below are *value/material* distinctions within that palette (charcoal, brass, oxblood, bone all sit inside it); the Spitter's acid-green is the sanctioned gameplay-alarm accent. Full character specs: `docs/PRD.md` §7 (heroes) and §5 (monsters).
+
+**v1 presentation (DEC-026):** Unity renders **one canon painted sheet** per character as a **camera-facing upright billboard** (plus a blob shadow) in a **3D Lykos Mars cavern**. Heroes keep **western silhouettes** — that is the 30% western on a 70% Mars stage.
+
+- **Do not** convert heroes or monsters to sculpted 3D meshes for v1.
+- **Do not** author 8-direction walk cycles or in-engine sprite sheets for v1 — that is over-investing. A later 3D hero **swaps the view mesh only**.
+- Turnaround sheets lock identity (and serve marketing). They are not a 3D-model brief and not an 8-dir cycle brief.
+- The engine card uses the **canon full-body** (front 3/4). Portraits stay HUD/lobby.
 
 ## Failure mode you own (from the art plan)
 **Same face in every image.** Identity drift across poses/angles is your defect class — measured on the walk-cycle demo as 13.9% scale drift and 11px baseline wander from prompt-only generation. Prompt-only is NOT acceptable here; you must climb the control ladder.
@@ -18,7 +25,7 @@ Heroes (human, western silhouettes, distinct color keys):
 2. **Rancher** — stocky, shotgun, coiled lasso on hip; color key: oxblood + rope-tan
 3. **Sawbones** — broad tank build, heavy apron-armor, bone-saw sword; color key: bone-white + rust
 
-Monsters (virus-mutated colonists/livestock, zombie-western horror, readable at top-down distance):
+Monsters (virus-mutated colonists/livestock, zombie-western horror, readable as a single camera-facing upright card at tilted-isometric distance):
 4. **Shambler** — mutated colonist, tattered settler clothes
 5. **Ravager** — mutated cattle-dog, fast quadruped
 6. **Spitter** — bloated colonist, acid-green throat sacs
