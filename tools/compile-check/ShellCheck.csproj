@@ -52,9 +52,11 @@
     <Compile Include="../../unity/RedHollow/Assets/Game/Net/NgoNetTransport.cs" />
     <Compile Include="../../unity/RedHollow/Assets/Game/Net/UgsServices.cs" />
 
-    <!-- The EditMode test files that are sim/net-pure (Unity touched only through Time.timeScale
-         and Debug.Log, stubbed above). These RUN here: `dotnet test tools/compile-check` executes
-         the real T11 session suite and the T14 timing/non-goal suites headlessly. -->
+    <!-- The EditMode test files that are sim/net/model-pure (Unity touched only through
+         Time.timeScale and Debug.Log, stubbed above). These RUN here: `dotnet test
+         tools/compile-check` executes the real T11 session, T12 screens/HUD, T14 timing/non-goal
+         and T20 transport suites headlessly. Everything uGUI-facing (T16, T19, T21-T27, T10's
+         Cecil scan) still needs the Unity editor. -->
     <Compile Include="../../unity/RedHollow/Assets/Tests/EditMode/T11_SessionTests.cs" />
     <Compile Include="../../unity/RedHollow/Assets/Tests/EditMode/T14_TimingTests.cs" />
     <Compile Include="../../unity/RedHollow/Assets/Tests/EditMode/T14_NonGoalTests.cs" />

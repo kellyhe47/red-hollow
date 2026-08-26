@@ -526,6 +526,8 @@ namespace RedHollow.Tests.EditMode
 
             var victim = FirstLiving(match.State);
             Isolate(match.State, victim);
+            victim.CurrentSpeed = 0.0;
+            victim.BaseSpeed = 0.0;
             var hpBefore = victim.Hp;
             PlaceTurret(match.State, at: victim.Pos);
 

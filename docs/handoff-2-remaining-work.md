@@ -19,7 +19,7 @@ Working WITHOUT a Unity editor (cloud agents)? Three headless commands cover mos
 
 ```bash
 dotnet test sim/GameSim.Tests/GameSim.Tests.csproj --nologo   # the sim suite (.slnx needs SDK 9+; this doesn't)
-dotnet test tools/compile-check/ShellCheck.csproj --nologo    # compiles Host/Net layers; RUNS T11 + T14 for real
+dotnet test tools/compile-check/ShellCheck.csproj --nologo    # compiles Host/Net/UI-model layers; RUNS T11+T12+T14+T20
 dotnet run --project tools/balance-probe/BalanceProbe.csproj  # plays scripted campaigns at shipped numbers
 ```
 
