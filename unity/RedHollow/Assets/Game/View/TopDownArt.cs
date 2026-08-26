@@ -73,20 +73,18 @@ namespace RedHollow.Game.View
         }
 
         /// <summary>
-        /// 2.5D sprite card: leaned toward the camera so a y-down view still reads the art,
-        /// while the quad occupies vertical space among the 3D colony (not a floor sticker).
-        /// Parent Y-rotation (hero facing) turns the lean with the aim.
+        /// 2.5D sprite card standing in the cavern: an upright quad that billboards toward
+        /// the match camera so a 65° tilt still reads the art (not an edge, not a floor sticker).
         /// </summary>
         internal static GameObject StandingCard(string name, float footprint, Texture texture, Color tint)
         {
             var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
             go.name = name;
             StripCollider(go);
-            // -58° from identity: mostly facing +Y (readable from above), a bit of height.
-            go.transform.localRotation = Quaternion.Euler(-58f, 0f, 0f);
-            go.transform.localScale = new Vector3(footprint, footprint * 1.2f, 1f);
-            go.transform.localPosition = new Vector3(0f, footprint * 0.38f, 0f);
+            go.transform.localScale = new Vector3(footprint, footprint * 1.35f, 1f);
+            go.transform.localPosition = new Vector3(0f, footprint * 0.55f, 0f);
             Paint(go, tint, texture, 1f);
+            go.AddComponent<SpriteBillboard>();
             return go;
         }
 

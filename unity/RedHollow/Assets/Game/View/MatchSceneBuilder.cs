@@ -49,6 +49,13 @@ namespace RedHollow.Game.View
         /// <summary>How far above the colony floor the camera sits. Not a PRD number; see below.</summary>
         private const float CameraHeight = 60f;
 
+        /// <summary>
+        /// Pitch from the horizon, degrees. 90 is bird's-eye (roofs only); 0 is the horizon.
+        /// Owner (2026-08-26): ~60–70° down so building sides and roof edges read. 65° sits
+        /// in that band and still keeps the eye over the play area.
+        /// </summary>
+        private const float CameraPitchFromHorizon = 65f;
+
         /// <summary>World units of breathing room around the colony, so nothing sits on the frame edge.</summary>
         private const float ViewMargin = 4f;
 
@@ -134,13 +141,13 @@ namespace RedHollow.Game.View
         }
 
         /// <summary>
-        /// R-30 — genuinely top-down: the camera is placed over the middle of the play area and
-        /// aimed straight down the world's vertical axis, not merely tilted steeply.
+        /// R-30 / Lykos: a steep top-down camera over the play area — 65° down from the
+        /// horizon, looking north into the cavern. Bird's-eye (straight −Y) flattens the
+        /// 3D colony into roofs; this pitch shows building sides and roof edges. Still
+        /// orthographic so relative distance across the colony does not warp.
         ///
-        /// Orthographic, sized from the map, because a top-down colony-defence read is about
-        /// relative distance — which shelter a wave is closer to — and perspective makes the same
-        /// gap read differently at the edge of the frame than at the centre. Height, field of view
-        /// and projection are all free of the PRD; what is pinned is the direction of the look.
+        /// Height, field of view and projection remain free of the PRD. The look is no
+        /// longer "straight down the vertical axis" — owner override vs the Lykos seed.
         /// </summary>
         private static Camera BuildCamera(Transform root, Bounds playArea)
         {
@@ -149,9 +156,10 @@ namespace RedHollow.Game.View
 
             var camera = go.AddComponent<Camera>();
             camera.orthographic = true;
-            camera.orthographicSize = Mathf.Max(playArea.extents.x, playArea.extents.z) + ViewMargin;
+            camera.orthographicSize =
+                (Mathf.Max(playArea.extents.x, playArea.extents.z) + ViewMargin) * 1.2f;
             camera.nearClipPlane = 0.1f;
-            camera.farClipPlane = CameraHeight * 2f;
+            camera.farClipPlane = 280f;
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = CavernClear;
             camera.depth = 10;
@@ -176,12 +184,13 @@ namespace RedHollow.Game.View
                 // make the Game view playable if the component cannot be added here.
             }
 
-            go.transform.position = new Vector3(
-                playArea.center.x, SimSpace.GroundHeight + CameraHeight, playArea.center.z);
-
-            // LookRotation rather than an Euler triple: this states the forward vector the test
-            // asserts on directly, instead of an angle that happens to produce it.
-            go.transform.rotation = Quaternion.LookRotation(Vector3.down, Vector3.forward);
+            var lookTarget = new Vector3(
+                playArea.center.x, SimSpace.GroundHeight, playArea.center.z);
+            var pitch = CameraPitchFromHorizon * Mathf.Deg2Rad;
+            var look = new Vector3(0f, -Mathf.Sin(pitch), Mathf.Cos(pitch)).normalized;
+            var distance = CameraHeight / Mathf.Sin(pitch);
+            go.transform.position = lookTarget - (look * distance);
+            go.transform.rotation = Quaternion.LookRotation(look, Vector3.up);
 
             return camera;
         }
