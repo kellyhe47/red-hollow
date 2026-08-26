@@ -86,9 +86,6 @@ namespace RedHollow.Game.View
             // and casts a shadow. Cream/Unlit/emissive cards were the glowing
             // cube around the hat.
             var bodyMat = ViewLook.Lit(bodyColor, albedo, smoothness: 0.10f, emit: false);
-            var cardMat = albedo != null
-                ? ViewLook.LitCutout(Color.white, albedo, emit: false)
-                : bodyMat;
 
             var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             body.name = "body";
@@ -134,17 +131,6 @@ namespace RedHollow.Game.View
                 ViewLook.StripCollider(crown);
                 ViewLook.Paint(crown, ViewLook.Lit(new Color(0.14f, 0.08f, 0.05f), smoothness: 0.08f, emit: false), castShadows: true);
             }
-
-            // Front + back canon cards only. Left/right quads closed a glowing
-            // box around the hat. Cutout albedo + no emission = a person.
-            PlaceCard(root.transform, "billboard", cardMat,
-                new Vector3(0f, height * 0.5f, depth * 0.52f),
-                Quaternion.identity,
-                new Vector3(width, height, 1f));
-            PlaceCard(root.transform, "card_back", cardMat,
-                new Vector3(0f, height * 0.5f, -depth * 0.52f),
-                Quaternion.Euler(0f, 180f, 0f),
-                new Vector3(width, height, 1f));
 
             AttachBlobShadow(root.transform, Mathf.Max(0.7f, width * 0.85f));
             return root;

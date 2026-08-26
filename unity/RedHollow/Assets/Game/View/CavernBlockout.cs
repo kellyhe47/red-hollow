@@ -38,7 +38,7 @@ namespace RedHollow.Game.View
         private static readonly Color Brass = new Color(0.72f, 0.48f, 0.18f);
         private static readonly Color WoodTrim = new Color(0.40f, 0.26f, 0.14f);
         private static readonly Color CeilingDark = new Color(0.06f, 0.035f, 0.02f);
-        private static readonly Color AmberGlow = new Color(1.0f, 0.72f, 0.32f);
+        private static readonly Color AmberGlow = new Color(0.62f, 0.38f, 0.12f);
         private static readonly Color LostTint = new Color(0.18f, 0.10f, 0.06f);
         private static readonly Color LiveTint = Color.white;
         // Lit albedo tints: lanterns do the shading. Roof stays darker than walls so
@@ -754,25 +754,16 @@ namespace RedHollow.Game.View
             // Wall slabs are 0.62 thick centered on ±half; panes must sit proud of
             // the OUTER face or they vanish inside the Lit wall.
             const float wallT = 0.62f;
-            var southZ = -(half + (wallT * 0.5f) + 0.28f);
-            var eastX = half + (wallT * 0.5f) + 0.28f;
-            var westX = -eastX;
+            var southZ = -(half + (wallT * 0.5f) + 0.18f);
             for (var s = 0; s < stories; s++)
             {
                 var y = DeckSurface + (s * storey) + 2.45f;
                 Box(hab, "Window_SL_" + s,
-                    new Vector3(-1.7f, y, southZ),
-                    new Vector3(2.35f, 1.85f, 0.36f), glow);
+                    new Vector3(-1.55f, y, southZ),
+                    new Vector3(1.45f, 1.15f, 0.14f), glow);
                 Box(hab, "Window_SR_" + s,
                     new Vector3(1.7f, y, southZ),
-                    new Vector3(2.35f, 1.85f, 0.36f), glow);
-                // Street-inner sides — the 55° cam reads these as the hab walls.
-                Box(hab, "Window_EL_" + s,
-                    new Vector3(eastX, y, -1.15f),
-                    new Vector3(0.36f, 1.85f, 2.35f), glow);
-                Box(hab, "Window_WL_" + s,
-                    new Vector3(westX, y, -1.15f),
-                    new Vector3(0.36f, 1.85f, 2.35f), glow);
+                    new Vector3(1.45f, 1.15f, 0.14f), glow);
                 PointLamp(hab, "WindowLamp_" + s,
                     new Vector3(0f, y, southZ - 0.4f), 5f, 5f);
             }
@@ -837,7 +828,7 @@ namespace RedHollow.Game.View
                     bulb.name = "StringGlobe_" + i + "_" + b;
                     bulb.transform.SetParent(parent, false);
                     bulb.transform.position = bulbPos;
-                    bulb.transform.localScale = new Vector3(0.42f, 0.50f, 0.42f);
+                    bulb.transform.localScale = new Vector3(0.28f, 0.34f, 0.28f);
                     ViewLook.StripCollider(bulb);
                     if (glow != null)
                     {

@@ -114,7 +114,7 @@ namespace RedHollow.Game.View
                 if (emit)
                 {
                     material.EnableKeyword("_EMISSION");
-                    material.SetColor("_EmissionColor", new Color(0.08f, 0.048f, 0.020f));
+                    material.SetColor("_EmissionColor", new Color(0.045f, 0.028f, 0.012f));
                     if (material.HasProperty("_EmissionMap"))
                     {
                         material.SetTexture("_EmissionMap", Texture2D.whiteTexture);
