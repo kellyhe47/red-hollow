@@ -49,6 +49,15 @@ namespace RedHollow.Sim
         public double BaseSpeed;
         public double CurrentSpeed;
         public string TargetId;
+
+        /// <summary>
+        /// R-17 — the reach this monster attacks from, copied off its catalog row at spawn the way
+        /// <see cref="Hp"/> and <see cref="BaseSpeed"/> are. Zero is melee (arrival). Movement
+        /// holds the monster at this distance from its target; the host's contact source treats
+        /// anything inside it as in reach.
+        /// </summary>
+        public double AttackRange;
+
         public readonly List<StatusEffect> StatusEffects = new List<StatusEffect>();
 
         /// <summary>DEC-007 / G-005: Burrowers tunnel — barricades and heroes are invisible to them.</summary>

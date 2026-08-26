@@ -40,7 +40,7 @@ namespace RedHollow.Game.UI
         internal static readonly Color GhostInvalidTint = new Color(0.85f, 0.18f, 0.12f, 0.55f);
 
         private static Font _font;
-        private static Sprite _buttonSprite;
+        private static readonly Dictionary<string, Sprite> SpriteCache = new Dictionary<string, Sprite>();
 
         /// <summary>
         /// The explicit runtime font. LegacyRuntime.ttf is the built-in that exists in play mode
@@ -64,25 +64,35 @@ namespace RedHollow.Game.UI
         /// plain texture — spriteMode 0 — so it is wrapped here, same as the art catalog does).
         /// Null when the resource is missing; callers fall back to a solid face.
         /// </summary>
-        internal static Sprite ButtonSprite
-        {
-            get
-            {
-                if (_buttonSprite == null)
-                {
-                    var texture = Resources.Load<Texture2D>("RedHollowArt/button-normal");
-                    if (texture != null)
-                    {
-                        _buttonSprite = Sprite.Create(
-                            texture,
-                            new Rect(0f, 0f, texture.width, texture.height),
-                            new Vector2(0.5f, 0.5f),
-                            100f);
-                    }
-                }
+        internal static Sprite ButtonSprite => LoadSprite("RedHollowArt/button-normal");
 
-                return _buttonSprite;
+        internal static Sprite LoadSprite(string resourcePath)
+        {
+            if (string.IsNullOrEmpty(resourcePath))
+            {
+                return null;
             }
+
+            Sprite cached;
+            if (SpriteCache.TryGetValue(resourcePath, out cached))
+            {
+                return cached;
+            }
+
+            var texture = Resources.Load<Texture2D>(resourcePath);
+            if (texture == null)
+            {
+                SpriteCache[resourcePath] = null;
+                return null;
+            }
+
+            var sprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f),
+                100f);
+            SpriteCache[resourcePath] = sprite;
+            return sprite;
         }
 
         /// <summary>Explicit font, size, color, centered — everything a Text needs to render.</summary>
@@ -147,6 +157,12 @@ namespace RedHollow.Game.UI
         /// <summary>R-61 — shows the own hero's HP off <see cref="CombatHudModel.Hp"/>.</summary>
         public Text HpLabel;
 
+        /// <summary>R-61 — Q slot face (locked / cooldown / ready). Presentation copy.</summary>
+        public Text QLabel;
+
+        /// <summary>R-61 — E slot face (locked / cooldown / ready). Presentation copy.</summary>
+        public Text ELabel;
+
         /// <summary>R-61 — shows <see cref="CombatHudModel.MonstersRemaining"/>.</summary>
         public Text MonstersRemainingLabel;
 
@@ -155,6 +171,27 @@ namespace RedHollow.Game.UI
         /// shelter's civilian count. Order matches the model's readout order.
         /// </summary>
         public IReadOnlyList<Text> HotspotLabels;
+
+        /// <summary>
+        /// R-63 — the planning countdown (wireframe S3's "⏱ 0:47"), off
+        /// <see cref="PlanningScreenModel.TimerRemainingSeconds"/>. Empty outside planning: the
+        /// combat top bar has no clock to show.
+        /// </summary>
+        public Text PlanningTimerLabel;
+
+        /// <summary>
+        /// R-63 — the ready fraction ("1/2 ready", denominator = connected players), off
+        /// <see cref="PlanningScreenModel.ReadyCount"/> / <see cref="PlanningScreenModel.ConnectedCount"/>.
+        /// Empty outside planning.
+        /// </summary>
+        public Text ReadyLabel;
+
+        /// <summary>
+        /// R-61 — account level and lifetime XP (wireframe S4's "XP bar + account level"), off
+        /// <see cref="CombatHudModel.Level"/> / <see cref="CombatHudModel.LifetimeXp"/>. The model
+        /// carried both since T-12; nothing rendered them.
+        /// </summary>
+        public Text XpLabel;
 
         /// <summary>
         /// The panel the HUD labels hang under, kept so the bootstrap can grow the per-hotspot
@@ -215,41 +252,38 @@ namespace RedHollow.Game.UI
 
             foreach (UiScreen screen in Enum.GetValues(typeof(UiScreen)))
             {
-                var screenGo = new GameObject(
-                    "Screen_" + screen, typeof(RectTransform), typeof(CanvasGroup));
+                var screenGo = new GameObject("Screen_" + screen, typeof(RectTransform));
                 screenGo.transform.SetParent(canvasGo.transform, false);
                 UiStyle.Stretch((RectTransform)screenGo.transform);
                 screenGo.SetActive(false);
-                var group = screenGo.GetComponent<CanvasGroup>();
-                group.alpha = 0f;
-                group.interactable = false;
-                group.blocksRaycasts = false;
                 ui._screenRoots[screen] = screenGo;
             }
 
             // T-27 — the HUD splits into the wireframes' regions: TOP BAR (wave · scrip ·
             // monsters · shelters) hangs from the top edge; the SELF bar (HP) sits in the bottom
-            // band, above the planning shop bar's strip. Hidden on S1/S2 — combat chrome.
-            ui.HudPanel = new GameObject("HUD_TopBar", typeof(RectTransform), typeof(CanvasGroup));
+            // band, above the planning shop bar's strip.
+            ui.HudPanel = new GameObject("HUD_TopBar", typeof(RectTransform));
             ui.HudPanel.transform.SetParent(canvasGo.transform, false);
             UiStyle.Anchor((RectTransform)ui.HudPanel.transform, 0f, 0.93f, 1f, 1f);
-            var hudFace = ui.HudPanel.AddComponent<Image>();
-            hudFace.color = UiStyle.PanelDark;
-            hudFace.raycastTarget = false;
+            DressPanel(ui.HudPanel, "RedHollowArt/hud-topbar");
 
-            ui.SelfBar = new GameObject("HUD_SelfBar", typeof(RectTransform), typeof(CanvasGroup));
+            ui.SelfBar = new GameObject("HUD_SelfBar", typeof(RectTransform));
             ui.SelfBar.transform.SetParent(canvasGo.transform, false);
-            UiStyle.Anchor((RectTransform)ui.SelfBar.transform, 0.01f, 0.17f, 0.2f, 0.25f);
-            var selfFace = ui.SelfBar.AddComponent<Image>();
-            selfFace.color = UiStyle.PanelDark;
-            selfFace.raycastTarget = false;
+            UiStyle.Anchor((RectTransform)ui.SelfBar.transform, 0.01f, 0.16f, 0.22f, 0.32f);
+            DressPanel(ui.SelfBar, "RedHollowArt/dialog-panel");
 
             ui.WaveLabel = NewLabel(ui.HudPanel, "WaveLabel", 18);
+            ui.PlanningTimerLabel = NewLabel(ui.HudPanel, "PlanningTimerLabel", 18);
+            ui.ReadyLabel = NewLabel(ui.HudPanel, "ReadyLabel", 18);
             ui.ScripLabel = NewLabel(ui.HudPanel, "ScripLabel", 18);
             ui.HpLabel = NewLabel(ui.SelfBar, "HpLabel", 20);
+            ui.QLabel = NewLabel(ui.SelfBar, "QLabel", 16);
+            ui.ELabel = NewLabel(ui.SelfBar, "ELabel", 16);
+            ui.XpLabel = NewLabel(ui.SelfBar, "XpLabel", 16);
             ui.MonstersRemainingLabel = NewLabel(ui.HudPanel, "MonstersRemainingLabel", 18);
             ui.HotspotLabels = ui.HotspotLabelList;
             ui.ArrangeTopBar();
+            ui.ArrangeSelfBar();
 
             // T-27 — the S5/S6/S7 center-band banners (wireframes: a big verdict mid-screen).
             // Copy is presentation; existence, font, banner size and the center band are contract.
@@ -292,60 +326,51 @@ namespace RedHollow.Game.UI
             }
         }
 
-        /// <summary>
-        /// R-60 — exactly the routed screen's root is active; everything else is off.
-        /// Also culls CanvasRenderers and zeros CanvasGroup alpha on the hidden roots:
-        /// ScreenSpaceOverlay dumps that park the canvas on a camera still batch inactive
-        /// children, which stacked S1 HOST GAME / callsign chrome onto S2.
-        /// </summary>
+        /// <summary>Stack HP / Q / E inside the self bar so none sit on top of each other.</summary>
+        internal void ArrangeSelfBar()
+        {
+            var bar = (RectTransform)SelfBar.transform;
+            var count = bar.childCount;
+            for (var i = 0; i < count; i++)
+            {
+                var slot = bar.GetChild(i) as RectTransform;
+                if (slot != null)
+                {
+                    var yMax = 1f - (i / (float)count);
+                    var yMin = 1f - ((i + 1) / (float)count);
+                    UiStyle.Anchor(slot, 0.06f, yMin, 0.94f, yMax);
+                }
+            }
+        }
+
+        /// <summary>Paint a panel with imported chrome when the resource is present.</summary>
+        private static void DressPanel(GameObject panel, string resourcePath)
+        {
+            var sprite = UiStyle.LoadSprite(resourcePath);
+            var image = panel.GetComponent<Image>() ?? panel.AddComponent<Image>();
+            if (sprite != null)
+            {
+                image.sprite = sprite;
+                image.color = Color.white;
+                image.type = Image.Type.Simple;
+            }
+            else
+            {
+                image.color = UiStyle.PanelDark;
+            }
+
+            image.raycastTarget = false;
+        }
+
+        /// <summary>R-60 — exactly the routed screen's root is active; everything else is off.</summary>
         internal void SetActiveScreen(UiScreen active)
         {
             foreach (var pair in _screenRoots)
             {
-                ApplyScreenVisibility(pair.Value, pair.Key == active);
-            }
-
-            // HUD is S3/S4/S5 chrome (wireframes); hide the empty bars on title and lobby.
-            var hudOn = active == UiScreen.Planning
-                || active == UiScreen.Combat
-                || active == UiScreen.WaveInterstitial;
-            ApplyScreenVisibility(HudPanel, hudOn);
-            ApplyScreenVisibility(SelfBar, hudOn);
-        }
-
-        /// <summary>
-        /// Show or hide one screen (or HUD) root so both the Game view and an overlay-to-camera
-        /// dump agree. SetActive alone is not enough: Camera.Render of a ScreenSpaceCamera
-        /// canvas still paints CanvasRenderers on inactive children.
-        /// </summary>
-        private static void ApplyScreenVisibility(GameObject root, bool visible)
-        {
-            if (root == null)
-            {
-                return;
-            }
-
-            if (root.activeSelf != visible)
-            {
-                root.SetActive(visible);
-            }
-
-            var group = root.GetComponent<CanvasGroup>();
-            if (group == null)
-            {
-                group = root.AddComponent<CanvasGroup>();
-            }
-
-            group.alpha = visible ? 1f : 0f;
-            group.interactable = visible;
-            group.blocksRaycasts = visible;
-
-            var renderers = root.GetComponentsInChildren<CanvasRenderer>(true);
-            for (var i = 0; i < renderers.Length; i++)
-            {
-                if (renderers[i] != null)
+                var shouldBeActive = pair.Key == active;
+                if (pair.Value != null && pair.Value.activeSelf != shouldBeActive)
                 {
-                    renderers[i].cull = !visible;
+                    pair.Value.SetActive(shouldBeActive);
                 }
             }
         }

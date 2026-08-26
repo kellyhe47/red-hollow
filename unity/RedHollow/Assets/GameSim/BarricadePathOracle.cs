@@ -3,139 +3,165 @@ using System;
 namespace RedHollow.Sim
 {
     /// <summary>
-    /// Production <see cref="IPathOracle"/> for a match that has no NavMesh: the first standing
-    /// barricade whose footprint the mover would walk through on the way to its target (R-16 /
-    /// B-002). Goldens and editor scenarios keep <see cref="DeclaredPathOracle"/>;
-    /// <see cref="OpenPathOracle"/> stays the MatchSim default so tests that never declare a
-    /// blocker still see an open field.
+    /// The production <see cref="IPathOracle"/> (R-16 / B-002 / G-004): a standing barricade
+    /// whose footprint the mover's straight path crosses is the blocker.
     ///
-    /// Geometry, not physics. The sim is not allowed to ask UnityEngine (R-51); this answers the
-    /// same "is something in the way?" question from live <see cref="MatchState"/> positions. The
-    /// block radius is the placeable footprint (R-24 / trap occupancy) so a wall occupies the
-    /// ground it was placed on and nothing wider.
+    /// Until this existed, every factory-built match ran on <see cref="OpenPathOracle"/> —
+    /// "nothing ever blocks" — so R-16's "the barricade becomes the target until destroyed" was
+    /// live in the fixtures (which inject <see cref="DeclaredPathOracle"/>) and dead in the
+    /// shipped game: a 100-scrip wall was scenery no monster would ever attack, because only the
+    /// oracle can substitute a barricade for the target the monster picked.
     ///
-    /// B-003 lives here as well as in <see cref="MatchSim.SelectTarget"/>: a Burrower is invisible
-    /// to barricades, so the oracle must not name one even if the caller forgot the carve-out.
+    /// Geometry, not navigation: <see cref="MatchSim.TickMonsterMovement"/> walks a monster in a
+    /// straight line at its target, so "does the straight segment cross a standing barricade's
+    /// footprint" IS the honest production answer — a NavMesh would model paths the movement rule
+    /// does not take. The interface doc's "NavMesh-backed" was written before movement shipped
+    /// straight-line.
+    ///
+    /// Deterministic on purpose (R-51 — a host and a rebuilt world holding the same entities must
+    /// answer alike): the blocker is the FIRST barricade along the path (smallest projection of
+    /// its centre onto the segment), ties broken by ordinal id — the same tiebreak R-16's own
+    /// targeting uses.
+    ///
+    /// Only barricades block. The other four placeables ship with no HP column
+    /// (<see cref="MatchSim.ApplyPlaceableDamage"/> no-ops on them), so a turret returned as a
+    /// blocker would park the wave chewing an indestructible box forever. Traps are meant to be
+    /// walked over — that is what triggers them. The Burrower carve-out (DEC-007) needs nothing
+    /// here: <see cref="MatchSim.SelectTarget"/> never consults the oracle for a monster that
+    /// tunnels.
     /// </summary>
     public sealed class BarricadePathOracle : IPathOracle
     {
-        /// <summary>
-        /// Shipped <see cref="MatchSim.PlaceableFootprintRadius"/>. Kept as a default rather than
-        /// read off a sim instance so the oracle can be built before MatchSim is (the factory
-        /// constructs state, then the oracle, then the sim).
-        /// </summary>
-        public const double DefaultBlockRadius = 1.5;
-
         private readonly MatchState _state;
 
-        public BarricadePathOracle(MatchState state, double blockRadius = DefaultBlockRadius)
+        /// <summary>
+        /// How near the segment a barricade's centre must pass to block it. Mirrors
+        /// <see cref="MatchSim.PlaceableFootprintRadius"/> (the factory syncs it after building
+        /// the sim), so the wall blocks exactly the ground the placement rules say it occupies.
+        /// </summary>
+        public double BlockingRadius { get; set; } = 1.5;
+
+        public BarricadePathOracle(MatchState state)
         {
-            _state = state ?? throw new ArgumentNullException(nameof(state));
-            BlockRadius = blockRadius;
+            if (state == null)
+            {
+                throw new ArgumentNullException(nameof(state));
+            }
+
+            _state = state;
         }
 
-        /// <summary>Half-width of a barricade across a walk. Strict-less-than, matching R-24.</summary>
-        public double BlockRadius { get; }
-
+        /// <summary>
+        /// Id of the first standing barricade the straight walk from <paramref name="moverId"/>
+        /// to <paramref name="targetId"/> would cross, or null when the lane is clear. The target
+        /// itself is never its own blocker (a monster already sent at a wall keeps walking at it).
+        /// </summary>
         public string BlockerBetween(string moverId, string targetId)
         {
-            if (string.IsNullOrEmpty(moverId) || string.IsNullOrEmpty(targetId) || _state == null)
+            if (!TryResolveMover(moverId, out var from) || !TryResolveTarget(targetId, out var to))
             {
                 return null;
             }
 
-            if (!TryPosition(moverId, out var from) || !TryPosition(targetId, out var to))
-            {
-                return null;
-            }
-
-            // B-003: a Burrower tunnels. Named here so a caller that forgot the carve-out still
-            // cannot pin a wall on one.
-            if (_state.Monsters.TryGetValue(moverId, out var mover) && mover.IgnoresBarricadesAndHeroes)
-            {
-                return null;
-            }
-
-            string bestId = null;
-            var bestT = double.MaxValue;
+            string best = null;
+            var bestAlong = double.MaxValue;
 
             foreach (var placeable in _state.Placeables.Values)
             {
-                if (placeable == null
-                    || !placeable.Exists
-                    || !placeable.IsBarricade
-                    || placeable.Id == targetId)
+                if (placeable == null || !placeable.Exists || !placeable.IsBarricade)
                 {
                     continue;
                 }
 
-                var distance = DistanceToSegment(placeable.Pos, from, to, out var t);
-                if (!(distance < BlockRadius))
+                // The wall the monster was SENT AT is what it walks to, not what blocks it.
+                if (string.Equals(placeable.Id, targetId, StringComparison.Ordinal))
                 {
                     continue;
                 }
 
-                // "First" is nearest along the walk, then lowest ordinal id — the same tie the
-                // targeting rule uses, so two walls on one lane pick the same blocker on every host.
-                var better = bestId == null
-                    || t < bestT
-                    || (t == bestT && string.CompareOrdinal(placeable.Id, bestId) < 0);
+                if (!SegmentCrossesFootprint(from, to, placeable.Pos, BlockingRadius, out var along))
+                {
+                    continue;
+                }
+
+                var better = best == null
+                    || along < bestAlong
+                    || (along == bestAlong && string.CompareOrdinal(placeable.Id, best) < 0);
+
                 if (better)
                 {
-                    bestId = placeable.Id;
-                    bestT = t;
+                    best = placeable.Id;
+                    bestAlong = along;
                 }
             }
 
-            return bestId;
+            return best;
         }
 
-        private bool TryPosition(string id, out Vec2 pos)
+        /// <summary>Only monsters walk (R-17); an id that is not a live monster's has no path to ask about.</summary>
+        private bool TryResolveMover(string moverId, out Vec2 pos)
         {
-            if (_state.Monsters.TryGetValue(id, out var monster))
+            pos = new Vec2(0.0, 0.0);
+            if (moverId == null || !_state.Monsters.TryGetValue(moverId, out var monster) || monster == null)
             {
-                pos = monster.Pos;
-                return true;
+                return false;
             }
 
-            if (_state.Heroes.TryGetValue(id, out var hero))
+            pos = monster.Pos;
+            return true;
+        }
+
+        /// <summary>The three things R-16 lets a monster walk at: heroes, hotspots, placeables.</summary>
+        private bool TryResolveTarget(string targetId, out Vec2 pos)
+        {
+            pos = new Vec2(0.0, 0.0);
+            if (targetId == null)
+            {
+                return false;
+            }
+
+            if (_state.Heroes.TryGetValue(targetId, out var hero) && hero != null)
             {
                 pos = hero.Pos;
                 return true;
             }
 
-            if (_state.Hotspots.TryGetValue(id, out var hotspot))
+            if (_state.Hotspots.TryGetValue(targetId, out var hotspot) && hotspot != null)
             {
                 pos = hotspot.Pos;
                 return true;
             }
 
-            if (_state.Placeables.TryGetValue(id, out var placeable))
+            if (_state.Placeables.TryGetValue(targetId, out var placeable) && placeable != null)
             {
                 pos = placeable.Pos;
                 return true;
             }
 
-            pos = default;
             return false;
         }
 
         /// <summary>
-        /// Distance from <paramref name="point"/> to the segment <paramref name="a"/>→<paramref name="b"/>,
-        /// with <paramref name="t"/> the clamped 0..1 parameter along that walk.
+        /// Whether <paramref name="centre"/> lies within <paramref name="radius"/> of the segment
+        /// [<paramref name="from"/> → <paramref name="to"/>], and how far along the segment its
+        /// closest approach sits (the "first wall on the walk" ordering key). Inclusive at the
+        /// boundary, the convention G-019 set for every distance check in this sim.
         /// </summary>
-        private static double DistanceToSegment(Vec2 point, Vec2 a, Vec2 b, out double t)
+        private static bool SegmentCrossesFootprint(
+            Vec2 from, Vec2 to, Vec2 centre, double radius, out double along)
         {
-            var abx = b.X - a.X;
-            var aby = b.Y - a.Y;
-            var lengthSq = (abx * abx) + (aby * aby);
-            if (lengthSq <= 0.0)
+            var dx = to.X - from.X;
+            var dy = to.Y - from.Y;
+            var lengthSquared = (dx * dx) + (dy * dy);
+
+            if (lengthSquared <= 0.0)
             {
-                t = 0.0;
-                return point.DistanceTo(a);
+                // Mover standing on its target: no walk, nothing to cross.
+                along = 0.0;
+                return centre.DistanceTo(from) <= radius;
             }
 
-            t = (((point.X - a.X) * abx) + ((point.Y - a.Y) * aby)) / lengthSq;
+            var t = (((centre.X - from.X) * dx) + ((centre.Y - from.Y) * dy)) / lengthSquared;
             if (t < 0.0)
             {
                 t = 0.0;
@@ -145,8 +171,10 @@ namespace RedHollow.Sim
                 t = 1.0;
             }
 
-            var closest = new Vec2(a.X + (t * abx), a.Y + (t * aby));
-            return point.DistanceTo(closest);
+            var closest = new Vec2(from.X + (dx * t), from.Y + (dy * t));
+            along = t;
+
+            return centre.DistanceTo(closest) <= radius;
         }
     }
 }

@@ -95,12 +95,11 @@ namespace RedHollow.Game.UI
             var lobbyBanner = NewLabel(lobby, "LobbyBanner", 32);
             lobbyBanner.text = "CHOOSE YOUR HERO";
             lobbyBanner.color = UiStyle.Ember;
-            UiStyle.Anchor(lobbyBanner.rectTransform, 0.2f, 0.70f, 0.8f, 0.82f);
+            UiStyle.Anchor(lobbyBanner.rectTransform, 0.2f, 0.78f, 0.8f, 0.9f);
 
-            // Wireframe S2: "Join code: ABC123 (click to copy) — share with friends".
-            JoinCodeLabel = NewLabel(lobby, "LobbyJoinCode", 28);
-            JoinCodeLabel.color = UiStyle.Ember;
-            UiStyle.Anchor(JoinCodeLabel.rectTransform, 0.15f, 0.84f, 0.85f, 0.96f);
+            LobbyJoinCodeLabel = NewLabel(lobby, "LobbyJoinCodeLabel", 18);
+            LobbyJoinCodeLabel.color = UiStyle.Ember;
+            UiStyle.Anchor(LobbyJoinCodeLabel.rectTransform, 0.2f, 0.68f, 0.8f, 0.77f);
 
             var classes = new[] { HeroClass.Gunslinger, HeroClass.Rancher, HeroClass.Sawbones };
             for (var i = 0; i < classes.Length; i++)
@@ -109,6 +108,7 @@ namespace RedHollow.Game.UI
                 var pick = NewButton(lobby, "Pick_" + heroClass, heroClass.ToUpperInvariant());
                 UiStyle.Anchor((RectTransform)pick.transform,
                     0.13f + (i * 0.26f), 0.35f, 0.35f + (i * 0.26f), 0.65f);
+                DressHeroPortrait(pick, heroClass);
                 var picked = heroClass;
                 pick.onClick.AddListener(() => _shell.Lobby.PickClass(picked));
                 _classPicks[heroClass] = pick;
@@ -126,7 +126,17 @@ namespace RedHollow.Game.UI
             _shopBar.transform.SetParent(planning.transform, false);
             UiStyle.Anchor((RectTransform)_shopBar.transform, 0f, 0f, 1f, 0.15f);
             var shopBackdrop = _shopBar.AddComponent<Image>();
-            shopBackdrop.color = UiStyle.PanelDark;
+            var shopSprite = UiStyle.LoadSprite("RedHollowArt/shop-bar");
+            if (shopSprite != null)
+            {
+                shopBackdrop.sprite = shopSprite;
+                shopBackdrop.color = Color.white;
+            }
+            else
+            {
+                shopBackdrop.color = UiStyle.PanelDark;
+            }
+
             shopBackdrop.raycastTarget = false;
 
             PlanningReadyButton = NewButton(planning, "PlanningReadyButton", "READY UP");
@@ -172,6 +182,19 @@ namespace RedHollow.Game.UI
             _pickerPanel = new GameObject("LevelUpPicker", typeof(RectTransform));
             _pickerPanel.transform.SetParent(combat.transform, false);
             UiStyle.Anchor((RectTransform)_pickerPanel.transform, 0.2f, 0.32f, 0.8f, 0.68f);
+            var pickerFace = _pickerPanel.AddComponent<Image>();
+            var pickerSprite = UiStyle.LoadSprite("RedHollowArt/dialog-panel");
+            if (pickerSprite != null)
+            {
+                pickerFace.sprite = pickerSprite;
+                pickerFace.color = Color.white;
+            }
+            else
+            {
+                pickerFace.color = UiStyle.PanelDark;
+            }
+
+            pickerFace.raycastTarget = false;
             _pickerPanel.SetActive(false);
 
             // ---- the ESC overlay — an OVERLAY, not a screen (R-55): it hangs beside the screen
@@ -248,8 +271,11 @@ namespace RedHollow.Game.UI
         /// <summary>S2 — READY (LobbyScreenModel.SetReady; all-ready auto-starts the match).</summary>
         public Button LobbyReadyButton { get; }
 
-        /// <summary>S2 — the join code to share (R-07). Empty until HOST GAME brings the lobby up.</summary>
-        public Text JoinCodeLabel { get; }
+        /// <summary>
+        /// S2 — the join code to share (wireframe: HOST GAME shows it; waiting-alone hints
+        /// "share code"). Mirrored from <see cref="LobbyScreenModel.JoinCode"/> each refresh.
+        /// </summary>
+        public Text LobbyJoinCodeLabel { get; }
 
         // ---- S3 · Planning --------------------------------------------------------------------
 
@@ -380,21 +406,7 @@ namespace RedHollow.Game.UI
         {
             JoinErrorLabel.text = _shell.Title.JoinError ?? string.Empty;
 
-            var lobby = _shell.Lobby;
-            var code = lobby != null ? lobby.JoinCode : null;
-            if (string.IsNullOrEmpty(code))
-            {
-                JoinCodeLabel.text = string.Empty;
-            }
-            else if (lobby.WaitingAlone)
-            {
-                JoinCodeLabel.text = "Join code: " + code + " — share with friends";
-            }
-            else
-            {
-                JoinCodeLabel.text = "Join code: " + code;
-            }
-
+            RefreshLobbyJoinCode();
             RefreshGhostVisual();
             RefreshShopBar();
             RefreshBadgeAndPicker();
@@ -414,6 +426,31 @@ namespace RedHollow.Game.UI
                     pair.Value.interactable = canRematch;
                 }
             }
+        }
+
+        /// <summary>
+        /// S2 — the code on screen is the session's (T-12's model already held it; this is the
+        /// label the wireframe's "share code" state needs). Empty while there is no lobby.
+        /// </summary>
+        private void RefreshLobbyJoinCode()
+        {
+            var lobby = _shell.Lobby;
+            if (lobby == null)
+            {
+                LobbyJoinCodeLabel.text = string.Empty;
+                return;
+            }
+
+            var code = lobby.JoinCode;
+            if (string.IsNullOrEmpty(code))
+            {
+                LobbyJoinCodeLabel.text = string.Empty;
+                return;
+            }
+
+            LobbyJoinCodeLabel.text = lobby.WaitingAlone
+                ? "SHARE CODE  " + code
+                : "JOIN CODE  " + code;
         }
 
         /// <summary>
@@ -457,7 +494,7 @@ namespace RedHollow.Game.UI
                 if (!_shopButtons.TryGetValue(item.Type, out button))
                 {
                     button = NewButton(_shopBar, "Shop_" + item.Type,
-                        item.Type + "  ·  " + item.Cost);
+                        HudCopy.PlaceableName(item.Type) + "  ·  " + item.Cost);
                     var type = item.Type;
                     button.onClick.AddListener(() =>
                     {
@@ -504,16 +541,13 @@ namespace RedHollow.Game.UI
                 LevelUpBadgeButton.gameObject.SetActive(badgeOn);
             }
 
-            if (_pickerPanel != null)
+            var pickerOn = hud != null && hud.PickerOpen;
+            if (_pickerPanel.activeSelf != pickerOn)
             {
-                var pickerOn = hud != null && hud.PickerOpen;
-                if (_pickerPanel.activeSelf != pickerOn)
-                {
-                    _pickerPanel.SetActive(pickerOn);
-                }
+                _pickerPanel.SetActive(pickerOn);
             }
 
-            var choices = hud == null || hud.PickerOpen == false
+            var choices = hud == null || !hud.PickerOpen
                 ? (IReadOnlyList<LevelUpChoice>)new LevelUpChoice[0]
                 : hud.PickerChoices;
 
@@ -545,7 +579,7 @@ namespace RedHollow.Game.UI
                         (i + 0.04f) / choices.Count, 0f, (i + 0.96f) / choices.Count, 1f);
                 }
 
-                SetCaption(button, choice);
+                SetCaption(button, HudCopy.SkillChoice(choice));
 
                 button.onClick.RemoveAllListeners();
                 button.onClick.AddListener(() =>
@@ -560,6 +594,34 @@ namespace RedHollow.Game.UI
         }
 
         // ---- headless control construction ------------------------------------------------------
+
+        /// <summary>
+        /// S2 — a class-card portrait from the delivered keepers (canon is for the match view;
+        /// lobby uses the portrait crop). Missing art is a blank card, never a throw.
+        /// </summary>
+        private static void DressHeroPortrait(Button pick, string heroClass)
+        {
+            var sprite = UiStyle.LoadSprite("RedHollowArt/" + heroClass + "-portrait");
+            if (sprite == null)
+            {
+                return;
+            }
+
+            var portrait = new GameObject("Portrait", typeof(RectTransform));
+            portrait.transform.SetParent(pick.transform, false);
+            UiStyle.Anchor((RectTransform)portrait.transform, 0.08f, 0.28f, 0.92f, 0.94f);
+            var image = portrait.AddComponent<Image>();
+            image.sprite = sprite;
+            image.preserveAspect = true;
+            image.raycastTarget = false;
+            image.color = Color.white;
+
+            var label = pick.GetComponentInChildren<Text>(true);
+            if (label != null)
+            {
+                UiStyle.Anchor(label.rectTransform, 0.04f, 0.02f, 0.96f, 0.26f);
+            }
+        }
 
         /// <summary>
         /// T-27 — a Button the player can SEE and HIT: an enabled raycastable Image background

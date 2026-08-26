@@ -285,6 +285,211 @@ namespace RedHollow.Tests.EditMode
                 + "RETRY lives");
         }
 
+        /// <summary>
+        /// R-16 / B-002 in a FACTORY-BUILT match: a barricade across wave 1's lane redirects the
+        /// whole wave onto itself, is chewed down, and its collapse releases the lane. G-004 locks
+        /// the sim rule through <see cref="DeclaredPathOracle"/>; what nothing locked was the
+        /// production answerer, so <see cref="ColonyMatchFactory"/> ran on
+        /// <see cref="OpenPathOracle"/> and a purchased wall was scenery no monster ever attacked.
+        /// This is the pin that the shipped composition actually blocks.
+        /// </summary>
+        [Test]
+        public void A_barricade_across_the_lane_redirects_the_wave_until_it_falls()
+        {
+            var lobby = NewTwoPlayerLoopbackLobby();
+            Assert.That(lobby.Session.TryStartMatch(HostPeerId), Is.True, "the host starts the match");
+            var match = lobby.Session.Match;
+
+            // Wave 1 pours out of breach 0; its nearest valid target is the saloon (the heroes at
+            // team spawn stand further). The wall sits mid-lane, seeded directly because R-21
+            // gates purchases to planning and what is under test is the block, not the buy.
+            var mouth = ColonyMap.V1().EntryTunnels[0];
+            var shelter = match.State.Hotspots["hs_saloon"].Pos;
+            match.State.Placeables["wall"] = new Placeable
+            {
+                Id = "wall",
+                Type = PlaceableType.Barricade,
+                Pos = new Vec2((mouth.X + shelter.X) / 2.0, (mouth.Y + shelter.Y) / 2.0),
+                OwnerPlayerId = match.State.Players[0].Id,
+                PurchaseCost = 100,
+                Hp = 300.0,
+                Exists = true,
+            };
+
+            lobby.Session.Step(Step60Hz);
+
+            var living = match.State.Monsters.Values.Where(m => m.Alive).ToList();
+            Assert.That(living, Is.Not.Empty, "sanity (R-19): wave 1 is in the colony");
+            foreach (var monster in living)
+            {
+                Assert.That(monster.TargetId, Is.EqualTo("wall"),
+                    "R-16/B-002: the wall across the lane IS the target — with OpenPathOracle "
+                    + "(the pre-028 wiring) every monster walks past it at the shelter");
+            }
+
+            // The wave walks to the wall and chews it down (~10s at six shamblers): R-16's
+            // "until destroyed" through the real contact gate and ApplyPlaceableDamage.
+            var wall = match.State.Placeables["wall"];
+            var fell = DriveUntil(
+                lobby.Session, match.Clock, () => !wall.Exists, budgetSeconds: 40.0);
+
+            Assert.That(fell, Is.True,
+                "R-16/R-23: the redirected wave must actually destroy the wall — walking to it "
+                + "and standing politely means the contact gate never routed a placeable hit");
+
+            // The collapse releases the lane: the survivors' next retarget answers the shelter.
+            var survivor = match.State.Monsters.Values.FirstOrDefault(m => m.Alive);
+            Assert.That(survivor, Is.Not.Null,
+                "sanity: a 300 HP wall does not outlive six shamblers' patience with none dying");
+
+            lobby.Session.Step(Step60Hz);
+            Assert.That(survivor.TargetId, Is.EqualTo("hs_saloon"),
+                "R-16 'until destroyed': rubble blocks nothing, so the wave resumes its walk at "
+                + "the shelter behind it");
+        }
+
+        /// <summary>
+        /// The wave-stall bug, pinned dead (owner playtest, 2026-08-26): <c>MatchSim.TurretTick</c>
+        /// flips <c>Alive</c> at 0 HP but deliberately leaves R-40's accounting to its caller —
+        /// so a session that never reaps a turret LAST-HIT leaves the corpse on
+        /// <see cref="WaveState.LivingMonsterIds"/> and the campaign stalls forever: no
+        /// wave_complete, no planning, no wave 2. The fix is <see cref="MatchSession"/>'s
+        /// placeable reap; this is its end-to-end pin through <see cref="NetSession.Step"/> —
+        /// roster cleared, bounty paid (R-20), the PLACER's account credited (R-40), and the
+        /// campaign actually moving on (R-03), which is the symptom the playtest saw.
+        /// </summary>
+        [Test]
+        public void A_turret_last_hit_clears_the_wave_and_the_campaign_moves_on()
+        {
+            var lobby = NewTwoPlayerLoopbackLobby();
+            Assert.That(lobby.Session.TryStartMatch(HostPeerId), Is.True, "the host starts the match");
+            var match = lobby.Session.Match;
+
+            // Whittle wave 1 to one survivor, standing at exactly one turret tick of HP.
+            var roster = match.State.Wave.LivingMonsterIds.ToList();
+            foreach (var id in roster.Take(roster.Count - 1))
+            {
+                match.Sim.RecordMonsterKill(new MonsterKillRequest
+                {
+                    MonsterId = id,
+                    MonsterType = match.State.Monsters[id].Type,
+                    Bounty = 0,
+                });
+            }
+
+            var survivorId = roster[roster.Count - 1];
+            var survivor = match.State.Monsters[survivorId];
+            var turretStats = match.Sim.Config.Placeables.StatsFor(PlaceableType.Turret);
+            survivor.Hp = turretStats.Damage;
+
+            var ownerSlot = match.State.Players[0].Id;
+            match.State.Placeables["turret_pin"] = new Placeable
+            {
+                Id = "turret_pin",
+                Type = PlaceableType.Turret,
+                Pos = survivor.Pos,
+                OwnerPlayerId = ownerSlot,
+                Exists = true,
+                Damage = turretStats.Damage,
+                Range = turretStats.Range,
+            };
+
+            var scripBefore = match.State.Team.Scrip;
+            var ownerAccount = match.State.Players[0].AccountId;
+            var xpBefore = lobby.Profiles.Load(ownerAccount).LifetimeXp;
+            var bounty = match.Sim.Config.Monsters.StatsFor(survivor.Type).Bounty;
+
+            lobby.Session.Step(Step60Hz);
+
+            Assert.That(survivor.Alive, Is.False,
+                "sanity (R-23/G-028): the tick emptied the survivor's HP and flagged the corpse");
+            Assert.That(match.State.Wave.LivingMonsterIds, Does.Not.Contain(survivorId),
+                "THE BUG: a turret last-hit must be reaped through RecordMonsterKill — a corpse "
+                + "left on the roster is a wave that never completes and a match that stalls");
+            Assert.That(match.State.Team.Scrip, Is.EqualTo(scripBefore + bounty),
+                "R-20: the kill pays its catalog bounty into the shared pool");
+            Assert.That(lobby.Profiles.Load(ownerAccount).LifetimeXp,
+                Is.EqualTo(xpBefore + bounty).Within(SimTolerance),
+                "R-40: a turret kill credits the PLACER's account");
+
+            // The symptom the playtest saw was the campaign freezing — so the pin is the campaign
+            // MOVING: planning opens for wave 2, both players ready, and wave 2's monsters arrive.
+            var partyReady = new Action(() =>
+            {
+                if (match.State.Phase == MatchPhase.Planning)
+                {
+                    foreach (var player in match.State.Players)
+                    {
+                        match.Sim.SetPlayerReady(player.Id);
+                    }
+                }
+            });
+
+            var arrived = DriveUntil(
+                lobby.Session, match.Clock,
+                () => match.State.Wave.Number == 2 && match.State.Wave.LivingMonsterIds.Count > 0,
+                budgetSeconds: 10.0,
+                beforeEachStep: partyReady);
+
+            Assert.That(arrived, Is.True,
+                "R-03/R-19: the turret-cleared wave must be followed by wave 2 — the stalled "
+                + "campaign is exactly the bug this test exists to keep dead");
+        }
+
+        /// <summary>
+        /// R-17's "ranged acid, range 10" through the REAL driven session (ticket 029): a Spitter
+        /// walks to its line, holds there, and drains the shelter from range — movement's
+        /// hold-at-reach, the contact source's widened reach, the R-18 gate and R-11's civilian
+        /// arithmetic, all in one pass. Before 029 a Spitter walked into hugging distance like
+        /// every melee archetype, and nothing anywhere exercised the row's one distinguishing
+        /// column.
+        /// </summary>
+        [Test]
+        public void A_spitter_drains_a_shelter_from_its_acid_line()
+        {
+            var lobby = NewTwoPlayerLoopbackLobby();
+            Assert.That(lobby.Session.TryStartMatch(HostPeerId), Is.True, "the host starts the match");
+            var match = lobby.Session.Match;
+
+            // Seeded by the chapel, far from wave 1's saloon-bound shamblers, with no target so
+            // the session's own R-16 pass picks the shelter. Stats come off the shipped row.
+            var stats = match.Sim.Config.Monsters.StatsFor(MonsterType.Spitter);
+            var chapel = match.State.Hotspots["hs_chapel"];
+            match.State.Monsters["m_spit"] = new Monster
+            {
+                Id = "m_spit",
+                Type = MonsterType.Spitter,
+                Pos = new Vec2(chapel.Pos.X, chapel.Pos.Y + 20.0),
+                Hp = stats.MaxHp,
+                BaseSpeed = stats.MoveSpeed,
+                CurrentSpeed = stats.MoveSpeed,
+                AttackRange = stats.AttackRange,
+                Alive = true,
+            };
+
+            var civiliansBefore = chapel.Civilians;
+            Assert.That(civiliansBefore, Is.GreaterThan(0), "sanity: the chapel is sheltering people");
+
+            var spitter = match.State.Monsters["m_spit"];
+            var drained = DriveUntil(
+                lobby.Session, match.Clock,
+                () => chapel.Civilians < civiliansBefore, budgetSeconds: 15.0);
+
+            Assert.That(drained, Is.True,
+                "R-17/R-11: the Spitter must hurt the shelter — walk in (10 units of ground at "
+                + "speed 2), hold its line, clear the R-18 gate, land acid");
+            Assert.That(spitter.Alive, Is.True, "nothing fought back; the spitter is still working");
+
+            // The first acid can land from one step outside the line ("arrived this tick", the
+            // same allowance melee contact has always had). A couple more steps settle the walk
+            // exactly onto the line, where it holds for the rest of the match.
+            lobby.Session.Step(Step60Hz);
+            lobby.Session.Step(Step60Hz);
+            Assert.That(spitter.Pos.DistanceTo(chapel.Pos), Is.EqualTo(stats.AttackRange).Within(1e-6),
+                "R-17: the spitter works FROM its line — one standing on the shelter is the "
+                + "pre-029 melee walk wearing a ranged monster's name");
+        }
+
         // ==========================================================================================
         //  AC3 — rematch (R-07)
         // ==========================================================================================

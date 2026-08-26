@@ -417,6 +417,14 @@ namespace RedHollow.Game.UI
         public IInputSource Input => _input;
 
         /// <summary>
+        /// R-43 / R-44 — the profile store this shell was composed with (the in-memory default
+        /// when none was). The same accessor-pin shape as <see cref="Input"/>: the entry composes
+        /// a persistent store, and the test that keeps launched XP surviving a restart reads it
+        /// back here.
+        /// </summary>
+        public IProfileStore Profiles => _profiles;
+
+        /// <summary>
         /// Ticket 025 (T-25) — the combat action tunables this shell routes SPACE/Q/E with:
         /// the <see cref="ShellBootstrapOptions.CombatActions"/> it was composed with, or the
         /// shipped defaults when none was.
@@ -531,7 +539,10 @@ namespace RedHollow.Game.UI
             _session.StartHost(new NetPeer
             {
                 PeerId = _localPeerId,
-                AccountId = _title.Callsign,
+                AccountId = string.IsNullOrEmpty(_title.Callsign) ? _accountId : _title.Callsign,
+                // Default kit so HOST → READY without a card pick still seats a hero (KitFor
+                // throws on a null class). Lobby PICK still overwrites this before start.
+                HeroClass = HeroClass.Gunslinger,
                 IsHost = true,
             });
         }
@@ -688,13 +699,12 @@ namespace RedHollow.Game.UI
         }
 
         /// <summary>
-        /// R-15 — the default catalog: the four imported representative assets
-        /// (Assets/Game/Art/{Textures,Characters,Icons,UI}/, the exact files T13's seam tests pin)
-        /// registered under the <see cref="ShellArtKeys"/> spellings, each with a factory that
-        /// instantiates a renderable GameObject carrying that asset. Loaded through Resources
-        /// copies (Assets/Game/UI/Resources/RedHollowArt/) — a mechanism that works in EditMode
-        /// AND a build, never AssetDatabase; T13's imported originals stay untouched where its
-        /// locked tests read them.
+        /// R-15 — the default catalog: the four T-13 representative assets plus the delivered
+        /// keepers bound to the keys the views actually resolve (HeroClass / MonsterType /
+        /// PlaceableType literals). Hotspot markers are industrial lantern pylons on Mars
+        /// habitat stacks — western facade art is for characters, not the environment. Resources
+        /// copies live under Assets/Game/UI/Resources/RedHollowArt/; T13's AssetDatabase originals
+        /// stay put.
         /// </summary>
         public static ArtCatalog LoadRepresentativeArt()
         {
@@ -706,6 +716,21 @@ namespace RedHollow.Game.UI
             RegisterResourceArt(catalog, HeroClass.Sawbones, "RedHollowArt/sawbones");
             RegisterResourceArt(catalog, ShellArtKeys.RevolverShotIcon, "RedHollowArt/gs-revolver-shot");
             RegisterResourceArt(catalog, ShellArtKeys.ButtonFrame, "RedHollowArt/button-normal");
+
+            RegisterResourceArt(catalog, HeroClass.Rancher, "RedHollowArt/rancher");
+            RegisterResourceArt(catalog, HeroClass.Sawbones, "RedHollowArt/sawbones");
+
+            RegisterResourceArt(catalog, MonsterType.Shambler, "RedHollowArt/shambler");
+            RegisterResourceArt(catalog, MonsterType.Ravager, "RedHollowArt/ravager");
+            RegisterResourceArt(catalog, MonsterType.Spitter, "RedHollowArt/spitter");
+            RegisterResourceArt(catalog, MonsterType.Burrower, "RedHollowArt/burrower");
+            RegisterResourceArt(catalog, MonsterType.BullBehemoth, "RedHollowArt/bull-behemoth");
+
+            RegisterResourceArt(catalog, PlaceableType.Barricade, "RedHollowArt/barricade");
+            RegisterResourceArt(catalog, PlaceableType.SpikeTrap, "RedHollowArt/spike-trap");
+            RegisterResourceArt(catalog, PlaceableType.DynamiteTrap, "RedHollowArt/dynamite-trap");
+            RegisterResourceArt(catalog, PlaceableType.Turret, "RedHollowArt/turret");
+            RegisterResourceArt(catalog, PlaceableType.MedStation, "RedHollowArt/med-station");
 
             return catalog;
         }
@@ -1327,6 +1352,11 @@ namespace RedHollow.Game.UI
                 _ui.WaveLabel.text = string.Empty;
                 _ui.ScripLabel.text = string.Empty;
                 _ui.HpLabel.text = string.Empty;
+                _ui.QLabel.text = string.Empty;
+                _ui.ELabel.text = string.Empty;
+                _ui.XpLabel.text = string.Empty;
+                _ui.PlanningTimerLabel.text = string.Empty;
+                _ui.ReadyLabel.text = string.Empty;
                 _ui.MonstersRemainingLabel.text = string.Empty;
                 _ui.EnsureHotspotLabels(0);
                 return;
@@ -1335,21 +1365,47 @@ namespace RedHollow.Game.UI
             _ui.WaveLabel.text = "Wave "
                 + _hud.WaveNumber.ToString(CultureInfo.InvariantCulture)
                 + "/" + _hud.TotalWaves.ToString(CultureInfo.InvariantCulture);
-            _ui.ScripLabel.text = "Scrip "
-                + _hud.Scrip.ToString(CultureInfo.InvariantCulture)
-                + "  Civ "
-                + _hud.Civilians.ToString(CultureInfo.InvariantCulture);
-            _ui.HpLabel.text = "HP " + ((int)_hud.Hp).ToString(CultureInfo.InvariantCulture);
-            _ui.MonstersRemainingLabel.text = "Left "
-                + _hud.MonstersRemaining.ToString(CultureInfo.InvariantCulture);
+
+            _ui.ScripLabel.text = _hud.Scrip.ToString(CultureInfo.InvariantCulture) + " scrip";
+            _ui.HpLabel.text = ((int)_hud.Hp).ToString(CultureInfo.InvariantCulture) + " HP";
+            _ui.MonstersRemainingLabel.text =
+                _hud.MonstersRemaining.ToString(CultureInfo.InvariantCulture) + " left";
+            _ui.QLabel.text = HudCopy.SlotFace(_hud.SlotFor(AbilitySlot.Q));
+            _ui.ELabel.text = HudCopy.SlotFace(_hud.SlotFor(AbilitySlot.E));
+
+            // R-61 — level + lifetime XP (the model carried both since T-12; nothing showed them).
+            _ui.XpLabel.text = "Lv " + _hud.Level.ToString(CultureInfo.InvariantCulture)
+                + " · " + ((int)_hud.LifetimeXp).ToString(CultureInfo.InvariantCulture) + " xp";
+
+            // R-63 — the planning clock and the ready fraction, live exactly while the sim is in
+            // its planning phase; the combat top bar has neither to show.
+            var planningLive = _planning != null && _boundMatch != null
+                && _boundMatch.State != null && _boundMatch.State.Phase == MatchPhase.Planning;
+            _ui.PlanningTimerLabel.text = planningLive
+                ? PlanningClock(_planning.TimerRemainingSeconds)
+                : string.Empty;
+            _ui.ReadyLabel.text = planningLive
+                ? _planning.ReadyCount.ToString(CultureInfo.InvariantCulture)
+                  + "/" + _planning.ConnectedCount.ToString(CultureInfo.InvariantCulture) + " ready"
+                : string.Empty;
 
             var hotspots = _hud.Hotspots;
             _ui.EnsureHotspotLabels(hotspots.Count);
             for (var i = 0; i < hotspots.Count; i++)
             {
-                _ui.HotspotLabelList[i].text = hotspots[i].HotspotId + ": "
+                _ui.HotspotLabelList[i].text = HudCopy.HotspotName(hotspots[i].HotspotId) + ": "
                     + hotspots[i].Civilians.ToString(CultureInfo.InvariantCulture);
             }
+        }
+
+        /// <summary>Wireframe S3's "⏱ 0:47" shape: whole minutes, two-digit seconds, floored.</summary>
+        private static string PlanningClock(double remainingSeconds)
+        {
+            var whole = (int)Math.Max(0.0, remainingSeconds);
+            var minutes = whole / 60;
+            var seconds = whole % 60;
+            return minutes.ToString(CultureInfo.InvariantCulture)
+                + ":" + seconds.ToString("D2", CultureInfo.InvariantCulture);
         }
 
         /// <summary>
@@ -1392,89 +1448,96 @@ namespace RedHollow.Game.UI
         // ---- plumbing -------------------------------------------------------------------------
 
         /// <summary>
-        /// One representative asset entry: load the Resources copy, stand it up as a sprite. A
-        /// missing resource returns null, which the catalog answers with the resolver's fallback —
-        /// the seam stays total (R-30's delivery constraint).
+        /// One representative asset entry: load the Resources copy and stand it up. Heroes
+        /// and monsters are camera-facing upright cards (blob shadow, lantern tint) in the
+        /// 3D cavern — never XZ-flat sprites. Turret / barricade / med station stand as
+        /// cards too; floor traps stay XZ decals. The cavern-ground tile is still registered
+        /// (T21) but is not the match floor.
         /// </summary>
         private static void RegisterResourceArt(ArtCatalog catalog, string artKey, string resourcePath)
         {
-            Sprite sprite = null;
+            Texture2D texture = null;
+            var textureAttempted = false;
 
             catalog.Register(artKey, () =>
             {
+
+                if (!textureAttempted)
+                {
+                    textureAttempted = true;
+                    texture = Resources.Load<Texture2D>(resourcePath);
+                }
+
+                if (texture == null)
+                {
+                    return null;
+                }
+
+                var name = "art_" + artKey.Replace('/', '_');
                 if (artKey == ShellArtKeys.GroundTile)
                 {
-                    // A SpriteRenderer is Unlit and has no world-space normals — lanterns
-                    // cannot shade it. A Plane + URP Lit is the same albedo, real 3D lighting.
-                    var groundTex = Resources.Load<Texture2D>(resourcePath);
-                    if (groundTex == null)
-                    {
-                        return null;
-                    }
-
                     var plane = GameObject.CreatePrimitive(PrimitiveType.Plane);
-                    plane.name = "art_" + artKey.Replace('/', '_');
-                    ViewLook.StripCollider(plane);
-                    var groundMat = ViewLook.Lit(new Color(0.82f, 0.58f, 0.38f), groundTex,
-                        ViewLook.LoadTexture(resourcePath + "_normal"),
-                        smoothness: 0.12f);
-                    if (groundMat != null)
-                    {
-                        ViewLook.SetTiling(groundMat, new Vector2(8f, 8f));
-                        ViewLook.Paint(plane, groundMat);
-                    }
-
+                    plane.name = name;
+                    TopDownArt.Paint(plane, TopDownArt.Rust, texture, 1f);
                     return plane;
                 }
 
-                if (sprite == null)
+                if (IsStandingSprite(artKey))
                 {
-                    var texture = Resources.Load<Texture2D>(resourcePath);
-                    if (texture == null)
-                    {
-                        return null;
-                    }
-
-                    var standing = artKey != ShellArtKeys.RevolverShotIcon
-                        && artKey != ShellArtKeys.ButtonFrame;
-                    sprite = standing
-                        ? ViewLook.CreateStandingSprite(texture)
-                        : Sprite.Create(
-                            texture,
-                            new Rect(0f, 0f, texture.width, texture.height),
-                            new Vector2(0.5f, 0.5f),
-                            100f);
-                    if (sprite == null)
-                    {
-                        return null;
-                    }
+                    return TopDownArt.StandingCard(name, FootprintForArtKey(artKey), texture, Color.white);
                 }
 
-                var go = new GameObject("art_" + artKey.Replace('/', '_'));
-                var renderer = go.AddComponent<SpriteRenderer>();
-                renderer.sprite = sprite;
-
-                var across = Mathf.Max(sprite.bounds.size.x, sprite.bounds.size.y);
-                const float characterSpan = 7.2f;
-                if (across > 0.0001f)
-                {
-                    var s = characterSpan / across;
-                    go.transform.localScale = new Vector3(s, s, 1f);
-                }
-
-                if (artKey == ShellArtKeys.RevolverShotIcon || artKey == ShellArtKeys.ButtonFrame)
-                {
-                    // Icons / UI frames used as world sprites stay floor-laid tokens.
-                    go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-                    return go;
-                }
-
-                // Heroes and monsters: upright camera-facing billboard + blob shadow.
-                // SpriteRenderer is already unlit (keeps canon alpha); do not swap to
-                // opaque URP Unlit or the standing art punches a solid rectangle.
-                var height = sprite.bounds.size.y * go.transform.localScale.y;
-                return UnitBillboard.WrapStandingSprite(go, height);
+                return TopDownArt.QuadOnXz(name, FootprintForArtKey(artKey), texture, Color.white);
             });
+        }
+
+        private static bool IsStandingSprite(string artKey)
+        {
+            return artKey == HeroClass.Gunslinger
+                || artKey == HeroClass.Rancher
+                || artKey == HeroClass.Sawbones
+                || artKey == MonsterType.Shambler
+                || artKey == MonsterType.Ravager
+                || artKey == MonsterType.Spitter
+                || artKey == MonsterType.Burrower
+                || artKey == MonsterType.BullBehemoth
+                || artKey == PlaceableType.Barricade
+                || artKey == PlaceableType.Turret
+                || artKey == PlaceableType.MedStation;
+        }
+
+        private static float FootprintForArtKey(string artKey)
+        {
+            if (artKey == HeroClass.Gunslinger
+                || artKey == HeroClass.Rancher
+                || artKey == HeroClass.Sawbones)
+            {
+                return TopDownArt.HeroFootprint;
+            }
+
+            if (artKey == MonsterType.BullBehemoth)
+            {
+                return TopDownArt.MonsterFootprint * 1.5f;
+            }
+
+            if (artKey == MonsterType.Shambler
+                || artKey == MonsterType.Ravager
+                || artKey == MonsterType.Spitter
+                || artKey == MonsterType.Burrower)
+            {
+                return TopDownArt.MonsterFootprint;
+            }
+
+            if (artKey == PlaceableType.Barricade
+                || artKey == PlaceableType.SpikeTrap
+                || artKey == PlaceableType.DynamiteTrap
+                || artKey == PlaceableType.Turret
+                || artKey == PlaceableType.MedStation)
+            {
+                return TopDownArt.PlaceableFootprint;
+            }
+
+            return TopDownArt.HeroFootprint;
         }
 
         private static void DestroyGameObject(GameObject go)

@@ -21,7 +21,7 @@ namespace RedHollow.Tests.EditMode
     /// <see cref="MatchSim.SpawnWave"/> was called by nothing at all, so a running match held no
     /// monsters; and no view was ever bound to a live entity.
     ///
-    /// Six things are pinned here and nothing else, one per acceptance criterion:
+    /// Seven things are pinned here, one per acceptance criterion:
     ///
     ///  1. <b>The loop advances monster movement every step, with the delta it was given.</b>
     ///     Asserted on the world (a monster is closer to its target, by exactly speed x delta)
@@ -45,7 +45,11 @@ namespace RedHollow.Tests.EditMode
     ///     spawn -> target -> move -> gate -> damage -> defeat as a single chain, on the real
     ///     <see cref="ColonyMap.V1"/> with no defenders at all.
     ///
-    ///  6. <b>No game rule enters a MonoBehaviour.</b> T-10's Cecil scan is the enforcement and it
+    ///  6. <b>Placeable combat is driven.</b> Turrets fire at 1 Hz, traps fire on footprint entry
+    ///     (not occupancy), and a placeable kill is reaped through
+    ///     <see cref="MatchSim.RecordMonsterKill"/> so the wave roster actually shrinks (R-23 / R-02).
+    ///
+    ///  7. <b>No game rule enters a MonoBehaviour.</b> T-10's Cecil scan is the enforcement and it
     ///     is unchanged; the guard here states the shape that keeps it green.
     ///
     /// <b>What is deliberately NOT asserted</b>, because the PRD is silent and a guessed number
@@ -497,8 +501,149 @@ namespace RedHollow.Tests.EditMode
                 Assert.Fail(DescribeStalledSession(match, civiliansAtStart, steps, MaxSteps));
             }
 
+            Assert.That(match.State.Status, Is.EqualTo(MatchStatus.Defeat),
+                "R-02: defeat is the colony emptied — every shelter at zero, not a shortcut to the flag");
             Assert.That(match.State.TotalCivilians, Is.EqualTo(0),
                 "R-02: defeat is the colony emptied — every shelter at zero, not a shortcut to the flag");
+        }
+
+        // ==========================================================================================
+        //  AC7 — placeable combat is driven so a live match can use the catalog
+        // ==========================================================================================
+
+        /// <summary>
+        /// R-23 / G-028. <see cref="MatchSim.TurretTick"/> is a per-entity command T-10 left to
+        /// "ticket 016", and nothing shipped ever called it — a 250-scrip turret was scenery.
+        /// The first positive-delta combat step must fire immediately at the nearest monster in
+        /// range, for the catalog damage (20), which is what makes 20 DPS at 1 Hz.
+        /// </summary>
+        [Test]
+        public void A_turret_fires_on_the_first_combat_step_at_the_nearest_monster()
+        {
+            var match = NewMatch();
+            var session = new MatchSession(match.Host);
+            session.Start();
+
+            var victim = FirstLiving(match.State);
+            Isolate(match.State, victim);
+            victim.CurrentSpeed = 0.0;
+            victim.BaseSpeed = 0.0;
+            var hpBefore = victim.Hp;
+            PlaceTurret(match.State, at: victim.Pos);
+
+            session.Step(0.0);
+            Assert.That(victim.Hp, Is.EqualTo(hpBefore),
+                "a zero-delta pump is a refresh: it must not take a free turret shot");
+
+            session.Step(Step60Hz);
+
+            var turretDamage = match.Config.Placeables.StatsFor(PlaceableType.Turret).Damage;
+            Assert.That(victim.Hp, Is.EqualTo(hpBefore - turretDamage).Within(SimTolerance),
+                "R-23: the first combat step fires every standing turret at the nearest monster in range");
+
+            // 1 Hz, not 60 Hz: half a second more must not be a second volley, or 20 DPS becomes
+            // 1200 and the catalog row is fiction.
+            var afterFirst = victim.Hp;
+            var halfSecond = (int)Math.Round(0.5 / Step60Hz);
+            for (var i = 0; i < halfSecond; i++)
+            {
+                session.Step(Step60Hz);
+            }
+
+            Assert.That(victim.Hp, Is.EqualTo(afterFirst).Within(SimTolerance),
+                "R-23: turrets fire at 1 Hz (20 DPS); a second shot inside 0.5s is a per-frame melt");
+
+            var untilSecond = (int)Math.Round(0.6 / Step60Hz);
+            for (var i = 0; i < untilSecond; i++)
+            {
+                session.Step(Step60Hz);
+            }
+
+            Assert.That(victim.Hp, Is.EqualTo(afterFirst - turretDamage).Within(SimTolerance),
+                "R-23: the next volley lands about one sim-second after the first");
+        }
+
+        /// <summary>
+        /// R-02 / R-23 / R-40. Placeable damage flips <c>alive</c> at 0 HP without shrinking the
+        /// wave roster. A session that never calls <see cref="MatchSim.RecordMonsterKill"/> for
+        /// those corpses leaves them on <see cref="WaveState.LivingMonsterIds"/> forever — the
+        /// wave never clears, planning never returns, and a 10-wave match cannot be won by
+        /// defences. One turret tick that drops the last monster must count the kill.
+        /// </summary>
+        [Test]
+        public void A_turret_kill_is_recorded_so_the_wave_can_clear()
+        {
+            var match = NewMatch();
+            var session = new MatchSession(match.Host);
+            session.Start();
+
+            var roster = match.State.Wave.LivingMonsterIds.ToList();
+            Assert.That(roster.Count, Is.GreaterThan(1), "wave 1 has a pack, not a single probe");
+
+            var lastId = roster[roster.Count - 1];
+            KillAll(match.Sim, match.State, roster.Where(id => id != lastId));
+
+            var last = match.State.Monsters[lastId];
+            last.Hp = match.Config.Placeables.StatsFor(PlaceableType.Turret).Damage;
+            PlaceTurret(match.State, at: last.Pos, ownerPlayerId: "p_turret");
+
+            var scripBefore = match.State.Team.Scrip;
+            session.Step(Step60Hz);
+
+            Assert.That(last.Alive, Is.False, "R-23: the tick that empties HP flags the corpse");
+            Assert.That(match.State.Wave.LivingMonsterIds, Does.Not.Contain(lastId),
+                "R-02: the session must RecordMonsterKill the placeable victim or the wave never ends");
+            Assert.That(match.State.Team.Scrip, Is.EqualTo(scripBefore + match.Config.Monsters.StatsFor(last.Type).Bounty),
+                "R-20: the catalog bounty still lands in the shared pool");
+        }
+
+        /// <summary>
+        /// R-23 / G-027. Spike traps fire on footprint <i>entry</i>. Occupancy every frame would
+        /// spend all ten triggers in ten pumps while a shambler stood still, which is not the
+        /// catalog row.
+        /// </summary>
+        [Test]
+        public void A_spike_trap_triggers_on_enter_not_every_frame()
+        {
+            var match = NewMatch();
+            var session = new MatchSession(match.Host);
+            session.Start();
+
+            var victim = FirstLiving(match.State);
+            victim.CurrentSpeed = 0.0;
+            victim.BaseSpeed = 0.0;
+            Isolate(match.State, victim);
+
+            var trap = new Placeable
+            {
+                Id = "spike_probe",
+                Type = PlaceableType.SpikeTrap,
+                Pos = victim.Pos,
+                OwnerPlayerId = "p_trap",
+                Exists = true,
+                Damage = match.Config.Placeables.StatsFor(PlaceableType.SpikeTrap).Damage,
+                TriggersRemaining = match.Config.Placeables.StatsFor(PlaceableType.SpikeTrap).TriggerCount,
+            };
+            match.State.Placeables[trap.Id] = trap;
+
+            var hpBefore = victim.Hp;
+            var triggersBefore = trap.TriggersRemaining;
+
+            session.Step(Step60Hz);
+
+            Assert.That(victim.Hp, Is.EqualTo(hpBefore - trap.Damage).Within(SimTolerance),
+                "R-23: the first step a monster stands on a spike is a crossing");
+            Assert.That(trap.TriggersRemaining, Is.EqualTo(triggersBefore - 1),
+                "G-027: one crossing spends one trigger");
+
+            for (var i = 0; i < 10; i++)
+            {
+                session.Step(Step60Hz);
+            }
+
+            Assert.That(trap.TriggersRemaining, Is.EqualTo(triggersBefore - 1),
+                "a monster standing on the trap must not spend another trigger per frame");
+            Assert.That(trap.Exists, Is.True, "ten idle frames must not break a ten-trigger trap");
         }
 
         // ==========================================================================================
@@ -657,6 +802,50 @@ namespace RedHollow.Tests.EditMode
                     Bounty = 0,
                 });
             }
+        }
+
+        private static Monster FirstLiving(MatchState state)
+        {
+            foreach (var id in state.Wave.LivingMonsterIds)
+            {
+                if (state.Monsters.TryGetValue(id, out var monster) && monster != null && monster.Alive)
+                {
+                    return monster;
+                }
+            }
+
+            Assert.Fail("R-19: a started match must have a living monster to aim a turret at");
+            return null;
+        }
+
+        private static void Isolate(MatchState state, Monster keep)
+        {
+            foreach (var monster in state.Monsters.Values)
+            {
+                if (monster != null && monster.Id != keep.Id)
+                {
+                    monster.Pos = new Vec2(1000.0, 1000.0);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Drop a catalog turret onto the field without going through planning purchase — these
+        /// tests grade combat drive, and wave 1 opens in combat (ticket 011).
+        /// </summary>
+        private static void PlaceTurret(MatchState state, Vec2 at, string ownerPlayerId = "p1")
+        {
+            var stats = new SimConfig().Placeables.StatsFor(PlaceableType.Turret);
+            state.Placeables["turret_probe"] = new Placeable
+            {
+                Id = "turret_probe",
+                Type = PlaceableType.Turret,
+                Pos = at,
+                OwnerPlayerId = ownerPlayerId,
+                Exists = true,
+                Damage = stats.Damage,
+                Range = stats.Range,
+            };
         }
 
         /// <summary>

@@ -15,6 +15,18 @@ dotnet test sim/RedHollow.slnx --nologo                            # 356/356, in
 python3 run/coverage_check.py                                      # 19 tickets, 51 reqs owned
 ```
 
+Working WITHOUT a Unity editor (cloud agents)? Three headless commands cover most of the shell:
+
+```bash
+dotnet test sim/GameSim.Tests/GameSim.Tests.csproj --nologo   # the sim suite (.slnx needs SDK 9+; this doesn't)
+dotnet test tools/compile-check/ShellCheck.csproj --nologo    # compiles Host/Net/UI-model layers; RUNS T11+T12+T14+T20
+dotnet run --project tools/balance-probe/BalanceProbe.csproj  # plays scripted campaigns at shipped numbers
+```
+
+`verify_claims.py` shells out to `~/.claude/skills/product-inception/` scripts that only exist on
+the owner's machine — its diagram/validator lines failing there is environmental, not a spec break
+(`verify_fixtures.py` standalone is the substantive half).
+
 Unity EditMode suite — **70/70** (check the lock first, see §6):
 
 ```bash
@@ -85,7 +97,7 @@ config.
 | 010 | R-50, R-52 | `HostLoop`, `ISimHost`/`MatchSimHost`, `PartyRoster`, R-52 seams, **the Cecil invariant** |
 | 011 | R-07, R-53, R-55 | `NetSession`, loopback transport, 10-wave match, rematch, disconnect, non-pausing ESC |
 | 015 | R-18 | **Monster attack cadence** (`TryMonsterAttack`) |
-| 016 | R-30 | Scene, top-down camera, WASD + mouse-aim input, placeholder visuals |
+| 016 | R-30 | Scene, tilted isometric camera (~60–70° down), WASD + mouse-aim input, placeholder visuals |
 | 017 | — | **Wave spawning** (`SpawnWave`) |
 | 018 | — | **Hero and monster movement** (`TickMonsterMovement`, `MoveHero`) |
 | 019 | — | The playable bootstrap — spawn → target → move → gate → damage → defeat |
@@ -207,10 +219,15 @@ probe** for an asset before falling back — a probe is a code path that can ans
 is where blocking-on-art creeps in. **Chain a real resolver in FRONT of it**; do not teach it to
 look.
 
-R-15 "Lantern Deep" is carried primarily by **Unity scene lighting** — dark warm ambient, amber
-point lights, volumetric fog, rock-dome mesh as sky — over painterly-matte albedo. **URP 17.5.0 is
-the active pipeline** (adopted deliberately for exactly this; see the git log for 010). Read
-`docs/comfy-prompts/00-shared-style.md` before touching visuals.
+**R-15 / DEC-026 presentation:** fully **3D Lykos cavern** with **real building height** (tilted
+isometric ~60–70° down — DestroyMyGame-style camera, Mars setting). Mix **~70% Martian
+habitat / ~30% western accents**: stacked rusted utilitarian blocks, gantries, carved-rock
+walls, lantern masts, lift shaft — **not** a western town in a cave, **not** suburban
+apocalypse. 2.5D heroes/monsters = camera-facing upright billboards + blob shadows (not
+XZ-flat, not 8-dir, not sculpted meshes). Turret / barricade / med = standing cards;
+traps = floor decals. Destroyed placeables stay gone (rebuy). No sun; amber point lanterns
++ haze. Environment Comfy tiles are albedo/normal/AO for those meshes. **URP 17.5.0** is
+the active pipeline. Read `docs/comfy-prompts/00-shared-style.md` before touching visuals.
 
 R-64 feel targets hang off these sim events: `monster_damaged`, `hero_damaged`, `hero_died`,
 `hero_respawned`, `civilians_killed`, `hotspot_emptied`, `placeable_created`,

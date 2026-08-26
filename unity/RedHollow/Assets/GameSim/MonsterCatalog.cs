@@ -23,6 +23,15 @@ namespace RedHollow.Sim
         /// killing player. One number, two uses: bounty *is* XP.
         /// </summary>
         public int Bounty;
+
+        /// <summary>
+        /// R-17 — the reach of the archetype's attack, in ground units. Zero means melee: the
+        /// mover walks all the way in and the arrival clamp is its reach, exactly as every
+        /// archetype behaved before this column existed. Only the Spitter row ships a number —
+        /// the PRD's "ranged acid, range 10" — and until it did, a Spitter was a slow Shambler
+        /// that walked into hugging distance to spit.
+        /// </summary>
+        public double AttackRange;
     }
 
     /// <summary>
@@ -101,7 +110,7 @@ namespace RedHollow.Sim
             });
             Set(MonsterType.Spitter, new MonsterStats
             {
-                MaxHp = 50.0, AttackDamage = 12.0, MoveSpeed = 2.0, Bounty = 20,
+                MaxHp = 50.0, AttackDamage = 12.0, MoveSpeed = 2.0, Bounty = 20, AttackRange = 10.0,
             });
             Set(MonsterType.Burrower, new MonsterStats
             {

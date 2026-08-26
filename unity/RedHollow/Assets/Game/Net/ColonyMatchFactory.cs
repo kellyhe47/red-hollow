@@ -76,11 +76,18 @@ namespace RedHollow.Game.Net
             state.Status = MatchStatus.InProgress;
 
             var clock = new SimClock();
-            // Live barricades have to redirect the NEXT wave (R-16 / B-002). OpenPathOracle is a
-            // no-op, which is why a wall bought in planning used to be scenery: SelectTarget never
-            // heard it was in the way. Goldens keep DeclaredPathOracle via the fixture loader.
+
+            // R-16 / B-002 — the production path oracle. Null here meant OpenPathOracle ("nothing
+            // ever blocks"), which made every purchased barricade scenery: only the oracle can
+            // substitute a wall for the target a monster picked, so without one R-16's "the
+            // barricade becomes the target until destroyed" was live in the fixtures and dead in
+            // the shipped game.
             var pathOracle = new BarricadePathOracle(state);
             var sim = new MatchSim(state, _config, _profiles, clock, pathOracle) { ColonyMap = _map };
+
+            // The wall blocks exactly the ground R-24 says it occupies — one radius, read off the
+            // live sim rather than typed twice.
+            pathOracle.BlockingRadius = sim.PlaceableFootprintRadius;
 
             SeatTheParty(state, party);
 

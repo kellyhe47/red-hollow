@@ -102,15 +102,7 @@ namespace RedHollow.Game.Net
                 _networkManager.ConnectionApprovalCallback = OnConnectionApproval;
             }
 
-            var started = _networkManager.StartHost();
-            if (!started || !_networkManager.IsListening)
-            {
-                throw new InvalidOperationException(
-                    "NetworkManager.StartHost failed (started=" + started
-                    + " listening=" + _networkManager.IsListening
-                    + " singleton=" + (NetworkManager.Singleton == _networkManager)
-                    + ") — NGO needs Play mode with this NetworkManager as Singleton");
-            }
+            _networkManager.StartHost();
 
             // The host is a client of itself; its own drop never fires through this map, but the
             // roster's language is peer ids, so the local id speaks it too.
@@ -354,7 +346,7 @@ namespace RedHollow.Game.Net
                 }
                 else
                 {
-                    transport.SetConnectionData(local.Address, local.Port, local.Address);
+                    transport.SetConnectionData(local.Address, local.Port);
                 }
 
                 return;

@@ -193,6 +193,8 @@ namespace RedHollow.Game.UI
             return result;
         }
 
+        public double PlaceableFootprintRadius => _inner.PlaceableFootprintRadius;
+
         public TurretTickResult TurretTick(string turretId)
         {
             var result = _inner.TurretTick(turretId);
@@ -206,8 +208,6 @@ namespace RedHollow.Game.UI
             Drain();
             return result;
         }
-
-        public double PlaceableFootprintRadius => _inner.PlaceableFootprintRadius;
 
         public MonsterKillResult RecordMonsterKill(MonsterKillRequest request)
         {

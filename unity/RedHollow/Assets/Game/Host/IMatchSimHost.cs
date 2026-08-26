@@ -50,37 +50,36 @@ namespace RedHollow.Game.Host
         PlanningPhaseResult BeginPlanningPhase();
 
         /// <summary>
-        /// R-23 / G-028 — one turret's damage tick. Per-entity (takes the turret id), so it is not
-        /// one of T-10's parameterless Tick* net; the host loop walks standing turrets and issues
-        /// this command for each. The sim owns nearest-in-range targeting; the host owns the 1 Hz
-        /// schedule that makes catalog Damage 20 equal R-23's 20 DPS.
-        /// </summary>
-        TurretTickResult TurretTick(string turretId);
-
-        /// <summary>
-        /// R-23 / G-027 / G-029 — a monster crossed a trap. Contact is geometry the sim does not
-        /// own, so the host detects the enter and issues this; the sim owns the spike countdown
-        /// and the dynamite blast.
-        /// </summary>
-        ISimResult TriggerPlaceable(string placeableId, string monsterId);
-
-        /// <summary>
-        /// R-24 — the existing placeable occupancy radius on MatchSim. Trap crossings use this
-        /// rather than a second number invented in the shell.
+        /// R-24 / R-23 — the live footprint a standing placeable occupies, the same radius planning
+        /// uses to pick and to reject overlaps. Trap crossings in combat read this rather than a
+        /// second guessed number, so a retuned sim moves the trigger volume with the ghost.
         /// </summary>
         double PlaceableFootprintRadius { get; }
 
         /// <summary>
-        /// R-02 / R-20 / R-40 — the kill command. TurretTick and TriggerPlaceable drop HP (and
-        /// may flip <c>alive</c> so a corpse is not hit twice — G-029), but wave roster, bounty
-        /// and XP still run through this, the same path hero last-hits use. The host issues it
-        /// after a placeable last-hit; a duplicate (already off the living roster) is a no-op.
+        /// R-23 / G-028 — one turret's firing tick: nearest living monster in range takes the
+        /// catalog damage. The host rate-limits this to 1 Hz so Damage 20 is 20 DPS; the command
+        /// itself has no cooldown.
+        /// </summary>
+        TurretTickResult TurretTick(string turretId);
+
+        /// <summary>
+        /// R-23 / G-027 / G-029 — a monster crossed a spike trap or dynamite. Edge-triggered by the
+        /// host (enter the footprint, not occupy it), or a monster standing on spikes would spend
+        /// every trigger in as many frames.
+        /// </summary>
+        ISimResult TriggerPlaceable(string placeableId, string monsterId);
+
+        /// <summary>
+        /// R-02 / R-20 / R-40 — the kill command: roster, bounty, wave complete. Placeable damage
+        /// flips <c>alive</c> at 0 HP but does not itself count the kill, so a live match that never
+        /// asks this leaves turret and trap victims on the wave forever.
         /// </summary>
         MonsterKillResult RecordMonsterKill(MonsterKillRequest request);
 
         /// <summary>
-        /// R-40 — credit the kill's XP. Turret/trap last-hits credit the placer's account
-        /// (the shell answers "who owns the placeable" before this is called).
+        /// R-40 — XP equal to the bounty, to the credited account. Turret (and other placeable)
+        /// kills credit the placer; the host resolves that account before calling.
         /// </summary>
         XpAwardResult AwardKillXp(MonsterKillRequest kill, string accountId);
     }
