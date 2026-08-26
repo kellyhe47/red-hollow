@@ -238,14 +238,17 @@ namespace RedHollow.Game.View
                 return;
             }
 
-            var mat = ViewLook.Unlit(Color.white, tex);
-            var front = rot * new Vector3(0.2f, 0f, -6.9f);
+            var mat = ViewLook.UnlitCutout(Color.white, tex);
+            // South wing Body occupies ~z=-7.3..-4.1; stand the card just outside that
+            // face so the 62°-down camera (south of the colony) sees the painted front
+            // instead of hab-block cladding. Missing art is already a no-op above (R-15).
+            var front = rot * new Vector3(0f, 0f, -8.4f);
             var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
             quad.name = "Facade";
             quad.transform.SetParent(hab, false);
-            quad.transform.localPosition = new Vector3(front.x, 4.6f, front.z);
+            quad.transform.localPosition = new Vector3(front.x, 5.6f, front.z);
             quad.transform.localRotation = rot * Quaternion.Euler(0f, 180f, 0f);
-            quad.transform.localScale = new Vector3(10f, 9f, 1f);
+            quad.transform.localScale = new Vector3(12.5f, 11.0f, 1f);
             ViewLook.StripCollider(quad);
             ViewLook.Paint(quad, mat);
         }
@@ -307,6 +310,13 @@ namespace RedHollow.Game.View
                         offset = new Vector3(-offset.x, 0f, offset.z);
                     }
 
+                    // Camera sits south looking north: a packed cube on the south rim
+                    // swallows the authored hab facade. Leave that front open.
+                    if (offset.z < -3.5f)
+                    {
+                        continue;
+                    }
+
                     var pos = origin + offset;
                     var size = sizes[(i + n) % sizes.Length];
                     RaiseHab(settlement.transform, "Hab_" + spec.Id + "_" + i, pos, size, metal, roof,
@@ -345,7 +355,15 @@ namespace RedHollow.Game.View
                         }
 
                         var hp = SimSpace.ToWorld(spec.Pos);
-                        if ((pos - hp).sqrMagnitude < 5.5f * 5.5f)
+                        var delta = pos - hp;
+                        if (delta.sqrMagnitude < 5.5f * 5.5f)
+                        {
+                            tooClose = true;
+                            break;
+                        }
+
+                        // Keep the camera-facing (south) apron clear so hab facades read.
+                        if (delta.z < 0f && delta.z > -10f && Mathf.Abs(delta.x) < 7f)
                         {
                             tooClose = true;
                             break;

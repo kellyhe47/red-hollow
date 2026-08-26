@@ -42,6 +42,39 @@ namespace RedHollow.Game.View
             return material;
         }
 
+        /// <summary>
+        /// Unlit with alpha clip so authored PNG silhouettes (hab facades) punch out the
+        /// transparent backdrop instead of drawing a black rectangle.
+        /// </summary>
+        public static Material UnlitCutout(Color color, Texture texture)
+        {
+            var material = Unlit(color, texture);
+            if (material == null)
+            {
+                return null;
+            }
+
+            if (texture != null)
+            {
+                texture.wrapMode = TextureWrapMode.Clamp;
+            }
+
+            if (material.HasProperty("_Cutoff"))
+            {
+                material.SetFloat("_Cutoff", 0.35f);
+            }
+
+            if (material.HasProperty("_AlphaClip"))
+            {
+                material.SetFloat("_AlphaClip", 1f);
+            }
+
+            material.EnableKeyword("_ALPHATEST_ON");
+            material.SetOverrideTag("RenderType", "TransparentCutout");
+            material.renderQueue = 2450;
+            return material;
+        }
+
         public static void Tint(Material material, Color color)
         {
             if (material == null)

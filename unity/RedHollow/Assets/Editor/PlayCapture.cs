@@ -35,6 +35,7 @@ namespace RedHollow.EditorTools
         private const string TurretShotPath = "/workspace/unity/shots/turret-shot.png";
         private const string TurretLastHitPath = "/workspace/unity/shots/turret-lasthit.png";
         private const string EndShotPath = "/workspace/unity/shots/wave10-end.png";
+        private const string HotspotFrontsPath = "/workspace/unity/shots/hotspot-fronts.png";
         private const double MatchTimeoutSeconds = 240.0;
 
         private static double _enteredAt;
@@ -62,6 +63,8 @@ namespace RedHollow.EditorTools
         private static double _holdFireSince;
         private static readonly List<string> PurchaseLog = new List<string>();
         private static readonly StringBuilder Logs = new StringBuilder();
+        private static bool _hotspotFrontsCaptured;
+        private static string _playMode = "full";
 
         static PlayCapture()
         {
@@ -90,9 +93,11 @@ namespace RedHollow.EditorTools
             {
                 try
                 {
+                    var body = File.ReadAllText(RequestPath).Trim();
                     File.Delete(RequestPath);
-                    File.WriteAllText(ArmedPath, "1");
-                    File.WriteAllText(StatusPath, "entering-play\n");
+                    _playMode = string.IsNullOrEmpty(body) ? "full" : body;
+                    File.WriteAllText(ArmedPath, _playMode);
+                    File.WriteAllText(StatusPath, "entering-play mode=" + _playMode + "\n");
                 }
                 catch (Exception)
                 {
@@ -126,6 +131,7 @@ namespace RedHollow.EditorTools
                 _livingAtHold = 0;
                 _holdFireSince = 0;
                 PurchaseLog.Clear();
+                _hotspotFrontsCaptured = false;
                 const string MatchScene = "Assets/Scenes/RedHollow.unity";
                 if (SceneManager.GetActiveScene().path != MatchScene)
                 {
@@ -141,6 +147,18 @@ namespace RedHollow.EditorTools
                 return;
             }
 
+            try
+            {
+                var disk = File.ReadAllText(ArmedPath).Trim();
+                if (!string.IsNullOrEmpty(disk))
+                {
+                    _playMode = disk;
+                }
+            }
+            catch (Exception)
+            {
+            }
+
             if (_enteredAt < 1.0)
             {
                 _enteredAt = EditorApplication.timeSinceStartup;
@@ -150,12 +168,16 @@ namespace RedHollow.EditorTools
             var elapsed = EditorApplication.timeSinceStartup - _enteredAt;
             DriveCombatInput();
             DriveWaveProgression();
+            TryCaptureHotspotFronts(elapsed);
 
             var timedOut = elapsed >= MatchTimeoutSeconds;
             var matchOver = MatchIsOver();
+            var frontsOnlyDone = _playMode == "fronts" && _hotspotFrontsCaptured;
             // Turret last-hit is already proven. Stay in Play until victory, defeat, or timeout
             // so autoplay can finish a 10-wave run (or dump the leak if it cannot).
-            if (!timedOut && !matchOver)
+            // "fronts" mode exits after the hotspot-front dump so art wiring can be checked
+            // without another 10-wave campaign.
+            if (!timedOut && !matchOver && !frontsOnlyDone)
             {
                 return;
             }
@@ -865,6 +887,8 @@ namespace RedHollow.EditorTools
 
             var match = GameObject.Find("RedHollow_Match");
             sb.Append("match=").Append(match != null).Append('\n');
+            sb.Append("playMode=").Append(_playMode).Append('\n');
+            DumpFacades(sb);
             var views = GameObject.Find("RedHollow_MatchViews");
             sb.Append("views=").Append(views != null);
             if (views != null)
@@ -1218,6 +1242,64 @@ namespace RedHollow.EditorTools
             File.WriteAllBytes(path, dst.EncodeToPNG());
             UnityEngine.Object.DestroyImmediate(src);
             UnityEngine.Object.DestroyImmediate(dst);
+        }
+
+        private static void TryCaptureHotspotFronts(double elapsed)
+        {
+            if (_hotspotFrontsCaptured || elapsed < 1.6)
+            {
+                return;
+            }
+
+            var match = LiveMatch();
+            if (match == null || match.State == null)
+            {
+                return;
+            }
+
+            DumpCamera(Camera.main, HotspotFrontsPath);
+            _hotspotFrontsCaptured = true;
+            PurchaseLog.Add("hotspot-fronts shot elapsed=" + elapsed.ToString("0.00")
+                + " phase=" + match.State.Phase
+                + " wave=" + (match.State.Wave != null ? match.State.Wave.Number : 0));
+        }
+
+        private static void DumpFacades(StringBuilder sb)
+        {
+            var n = 0;
+            var markers = UnityEngine.Object.FindObjectsByType<HotspotMarkerView>(FindObjectsSortMode.None);
+            for (var i = 0; i < markers.Length; i++)
+            {
+                var marker = markers[i];
+                if (marker == null)
+                {
+                    continue;
+                }
+
+                var facade = marker.transform.Find("Habitat/Facade");
+                sb.Append("facade ").Append(marker.HotspotId)
+                    .Append(" present=").Append(facade != null);
+                if (facade != null)
+                {
+                    n++;
+                    var renderer = facade.GetComponent<Renderer>();
+                    Texture tex = null;
+                    if (renderer != null && renderer.sharedMaterial != null)
+                    {
+                        tex = renderer.sharedMaterial.mainTexture;
+                    }
+
+                    sb.Append(" pos=").Append(facade.position)
+                        .Append(" scale=").Append(facade.lossyScale)
+                        .Append(" tex=").Append(tex != null ? tex.name : "null");
+                }
+
+                sb.Append('\n');
+            }
+
+            sb.Append("facadeCount=").Append(n).Append('\n');
+            sb.Append("hotspotFrontsShot=").Append(HotspotFrontsPath)
+                .Append(" exists=").Append(File.Exists(HotspotFrontsPath)).Append('\n');
         }
 
         private static void DumpCamera(Camera camera, string path)
