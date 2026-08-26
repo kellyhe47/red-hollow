@@ -1,5 +1,3 @@
-using System;
-
 namespace RedHollow.Game.Net
 {
     /// <summary>
@@ -21,7 +19,14 @@ namespace RedHollow.Game.Net
         /// the services seam is not called until a host start or client join asks for it.
         /// </summary>
         public static INetTransport Create(
-            NetSessionConfig config, IUgsServices services, INetWire wire) =>
-            throw new NotImplementedException("ticket 020");
+            NetSessionConfig config, IUgsServices services, INetWire wire)
+        {
+            if (config == null || string.IsNullOrEmpty(config.UgsProjectId))
+            {
+                return new LoopbackNetTransport();
+            }
+
+            return new NgoNetTransport(services, wire);
+        }
     }
 }
