@@ -480,7 +480,10 @@ namespace RedHollow.Game.UI
             _session.StartHost(new NetPeer
             {
                 PeerId = _localPeerId,
-                AccountId = _title.Callsign,
+                AccountId = string.IsNullOrEmpty(_title.Callsign) ? _accountId : _title.Callsign,
+                // Default kit so HOST → READY without a card pick still seats a hero (KitFor
+                // throws on a null class). Lobby PICK still overwrites this before start.
+                HeroClass = HeroClass.Gunslinger,
                 IsHost = true,
             });
         }
