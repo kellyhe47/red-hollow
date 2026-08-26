@@ -1,10 +1,10 @@
 ---
 id: 013
 title: Asset seam validation and feel pass
-status: pending
+status: green
 depends_on: [010]
 touches: [unity/RedHollow/Assets/Game/Art/, unity/RedHollow/Assets/Game/Scenes/]
-iterations: 0
+iterations: 1
 test_files:
   - unity/RedHollow/Assets/Tests/EditMode/T13_ArtSeamTests.cs
   - unity/RedHollow/Assets/Tests/EditMode/T13_LightingTests.cs
@@ -21,9 +21,9 @@ Swappable asset references throughout; wire one representative asset per class (
 
 ## Acceptance criteria
 
-- [ ] placeholder-art build is shippable
-- [ ] no code path blocks on an asset existing
-- [ ] generated art drops in as a pure asset swap
+- [x] placeholder-art build is shippable
+- [x] no code path blocks on an asset existing
+- [x] generated art drops in as a pure asset swap
 
 ## Test plan
 
@@ -93,6 +93,8 @@ representative files are copied in.
   icons that's an art-pipeline change, not this ticket's.
 
 ## Attempt log
+
+- 2026-08-25 green. Red verified 25/26 failing (21 NotImplementedException, 4 missing assets; 1 structural guard green by design). One locked-test fix routed through the test-writer: representative UI asset re-targeted (defective all-opaque source alpha; seam test caught it — escalated to UI-props pipeline). Green verified by orchestrator: EditMode 135/135, dotnet 356/356.
 
 - 2026-08-25 (test-writer, orchestrator-directed) — re-targeted the representative UI asset from
   `art/ui/hp-bar-frame_v1_320x32.png` to `art/ui/button-normal_v1_320x96.png`. The original is
