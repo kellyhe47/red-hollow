@@ -586,6 +586,10 @@ namespace RedHollow.Game.UI
 
             // 6 — presentation feel on top of the authoritative sync (transform only, T-10).
             ApplyFeel();
+
+            // R-30 — face the cursor, not the feet. Views just synced from replicated state;
+            // this is the one presentation pose that does not come from the sim.
+            ApplyLocalHeroFacing();
         }
 
         /// <summary>
@@ -1268,6 +1272,31 @@ namespace RedHollow.Game.UI
         }
 
         /// <summary>
+        /// R-30 — turn the local hero's view toward this frame's aim point. Presentation only:
+        /// <see cref="HeroView.Apply"/> writes the view's facing/rotation, never sim state.
+        /// </summary>
+        private void ApplyLocalHeroFacing()
+        {
+            var intent = _heroIntents != null ? _heroIntents.LastIntent : null;
+            if (intent == null || _views == null)
+            {
+                return;
+            }
+
+            var hero = LocalHeroOf(_boundMatch == null ? null : _boundMatch.State);
+            if (hero == null)
+            {
+                return;
+            }
+
+            var view = _views.HeroViewFor(hero.Id);
+            if (view != null)
+            {
+                view.Apply(intent);
+            }
+        }
+
+        /// <summary>
         /// R-64 — <see cref="FeelRig.Apply"/> per bound monster view, on top of the position the
         /// binder's sync wrote. The nudge lands on the TRANSFORM only; sim state is never written.
         /// </summary>
@@ -1421,6 +1450,12 @@ namespace RedHollow.Game.UI
 
             private readonly List<HeroIntentCommand> _commands = new List<HeroIntentCommand>(1);
 
+            /// <summary>
+            /// The intent resolved on the most recent host step, or null when none was. The pump
+            /// reads this to face the local hero at the cursor (R-30) after views sync.
+            /// </summary>
+            public HeroIntent LastIntent { get; private set; }
+
             public LocalHeroIntentSource(ShellBootstrap shell)
             {
                 _shell = shell;
@@ -1431,17 +1466,20 @@ namespace RedHollow.Game.UI
                 var source = _shell._input;
                 if (source == null || sim == null)
                 {
+                    LastIntent = null;
                     return null;
                 }
 
                 var hero = LocalHero(sim.State);
                 if (hero == null)
                 {
+                    LastIntent = null;
                     return null;
                 }
 
                 _command.HeroId = hero.Id;
                 _command.Intent = _map.Resolve(source.Sample());
+                LastIntent = _command.Intent;
 
                 _commands.Clear();
                 _commands.Add(_command);

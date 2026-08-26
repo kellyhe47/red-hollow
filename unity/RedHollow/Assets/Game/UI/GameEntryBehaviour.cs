@@ -66,7 +66,7 @@ namespace RedHollow.Game.UI
             {
                 LocalPeerId = LocalPeerId,
                 LocalAccountId = LocalAccountId,
-                InputSource = new LegacyDeviceInputSource(null),
+                InputSource = new OverlayInputSource(new LegacyDeviceInputSource(null)),
             });
 
             EnsureEventSystem();

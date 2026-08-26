@@ -2,8 +2,11 @@
 using System;
 using System.IO;
 using System.Text;
+using RedHollow.Game.Input;
+using RedHollow.Game.Net;
 using RedHollow.Game.UI;
 using RedHollow.Game.View;
+using RedHollow.Sim;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -22,8 +25,10 @@ namespace RedHollow.EditorTools
         private const string ArmedPath = "/workspace/unity/playtest.armed";
         private const string StatusPath = "/workspace/unity/playtest.status";
         private const string ShotPath = "/workspace/unity/shots/game-view.png";
+        private const string ProofPath = "/workspace/unity/shots/combat-proof.png";
 
         private static double _enteredAt;
+        private static bool _driving;
         private static readonly StringBuilder Logs = new StringBuilder();
 
         static PlayCapture()
@@ -63,8 +68,10 @@ namespace RedHollow.EditorTools
                 }
 
                 Directory.CreateDirectory(Path.GetDirectoryName(ShotPath));
+                OverlayInputSource.Clear();
                 Logs.Clear();
                 _enteredAt = 0;
+                _driving = false;
                 EditorApplication.isPlaying = true;
                 return;
             }
@@ -80,12 +87,20 @@ namespace RedHollow.EditorTools
                 return;
             }
 
-            if (EditorApplication.timeSinceStartup - _enteredAt < 8.0)
+            var elapsed = EditorApplication.timeSinceStartup - _enteredAt;
+            DriveCombatInput();
+
+            var proof = CombatProofReady();
+            var timedOut = elapsed >= 12.0;
+            // Hold the walk/fire long enough that the Game view shows the gunslinger
+            // clearly off spawn (4 u/s * 2.5s ≈ 10 units) rather than a 0.2s twitch.
+            if ((!proof || elapsed < 2.5) && !timedOut)
             {
                 return;
             }
 
             Capture();
+            OverlayInputSource.Clear();
             try
             {
                 File.Delete(ArmedPath);
@@ -95,6 +110,104 @@ namespace RedHollow.EditorTools
             }
 
             EditorApplication.isPlaying = false;
+        }
+
+        /// <summary>
+        /// Hold A+W (west + forward toward wave-1 shamblers), aim at a living shambler, and
+        /// fire SPACE plus a Q/E press so the live input map, not a sim cheat, drives combat.
+        /// </summary>
+        private static void DriveCombatInput()
+        {
+            var match = LiveMatch();
+            if (match == null || match.State == null || match.State.Phase != MatchPhase.Combat)
+            {
+                return;
+            }
+
+            if (!_driving)
+            {
+                _driving = true;
+                OverlayInputSource.ExtraHeld.Clear();
+                OverlayInputSource.ExtraHeld.Add(PlayerKey.A);
+                OverlayInputSource.ExtraHeld.Add(PlayerKey.W);
+                OverlayInputSource.ExtraHeld.Add(PlayerKey.Space);
+                OverlayInputSource.ExtraHeld.Add(PlayerKey.Q);
+                OverlayInputSource.ExtraHeld.Add(PlayerKey.E);
+            }
+
+            OverlayInputSource.CursorOverride = AimAtLivingShambler(match.State);
+        }
+
+        private static Vector2 AimAtLivingShambler(MatchState state)
+        {
+            foreach (var monster in state.Monsters.Values)
+            {
+                if (monster != null && monster.Alive)
+                {
+                    return new Vector2((float)monster.Pos.X, (float)monster.Pos.Y);
+                }
+            }
+
+            return new Vector2(-12f, 6f);
+        }
+
+        private static bool CombatProofReady()
+        {
+            var match = LiveMatch();
+            if (match == null || match.State == null)
+            {
+                return false;
+            }
+
+            var moved = false;
+            foreach (var hero in match.State.Heroes.Values)
+            {
+                if (hero == null)
+                {
+                    continue;
+                }
+
+                var dist = Math.Sqrt((hero.Pos.X * hero.Pos.X) + (hero.Pos.Y * hero.Pos.Y));
+                if (dist >= 5.0)
+                {
+                    moved = true;
+                    break;
+                }
+            }
+
+            var damaged = false;
+            var living = 0;
+            foreach (var monster in match.State.Monsters.Values)
+            {
+                if (monster == null || !monster.Alive)
+                {
+                    continue;
+                }
+
+                living++;
+                if (monster.Hp < 59.9)
+                {
+                    damaged = true;
+                }
+            }
+
+            if (match.State.Wave != null && match.State.Wave.LivingMonsterIds.Count < 6)
+            {
+                damaged = true;
+            }
+
+            return moved && (damaged || living == 0);
+        }
+
+        private static HostedMatch LiveMatch()
+        {
+            var entry = UnityEngine.Object.FindFirstObjectByType<GameEntryBehaviour>();
+            if (entry == null || entry.Shell == null || entry.Shell.Session == null)
+            {
+                return null;
+            }
+
+            return entry.Shell.Session.Match;
         }
 
         private static void Capture()
@@ -115,6 +228,15 @@ namespace RedHollow.EditorTools
                 sb.Append("ortho=").Append(cam.orthographic).Append(" size=").Append(cam.orthographicSize).Append('\n');
                 DumpCamera(cam, ShotPath);
                 sb.Append("shot=").Append(ShotPath).Append('\n');
+                try
+                {
+                    CropHeroProof(cam, ProofPath);
+                    sb.Append("proof=").Append(ProofPath).Append('\n');
+                }
+                catch (Exception ex)
+                {
+                    sb.Append("proofError=").Append(ex.Message).Append('\n');
+                }
             }
 
             var match = GameObject.Find("RedHollow_Match");
@@ -153,6 +275,7 @@ namespace RedHollow.EditorTools
 
             DumpSim(sb);
             DumpViews(sb, views);
+            DumpProof(sb);
 
             sb.Append("--- console ---\n");
             sb.Append(Logs);
@@ -249,6 +372,124 @@ namespace RedHollow.EditorTools
                 sb.Append("view ").Append(child.name)
                     .Append(" pos=").Append(child.position).Append('\n');
             }
+        }
+
+        private static void DumpProof(StringBuilder sb)
+        {
+            sb.Append("overlayHeld=");
+            if (OverlayInputSource.ExtraHeld.Count == 0)
+            {
+                sb.Append("(none)");
+            }
+            else
+            {
+                var first = true;
+                foreach (var key in OverlayInputSource.ExtraHeld)
+                {
+                    if (!first)
+                    {
+                        sb.Append(",");
+                    }
+
+                    sb.Append(key);
+                    first = false;
+                }
+            }
+
+            sb.Append(" cursor=");
+            sb.Append(OverlayInputSource.CursorOverride.HasValue
+                ? OverlayInputSource.CursorOverride.Value.ToString()
+                : "null");
+            sb.Append('\n');
+
+            var entry = UnityEngine.Object.FindFirstObjectByType<GameEntryBehaviour>();
+            var shell = entry != null ? entry.Shell : null;
+            if (shell != null && shell.LastAbilityOutcome != null)
+            {
+                var o = shell.LastAbilityOutcome;
+                sb.Append("ability slot=").Append(o.Slot)
+                    .Append(" accepted=").Append(o.Accepted)
+                    .Append(" reason=").Append(o.RejectionReason ?? "")
+                    .Append(" dmg=").Append(o.TotalDamage.ToString("0.0"))
+                    .Append('\n');
+            }
+
+            foreach (var id in shell != null && shell.Views != null
+                ? shell.Views.BoundHeroIds
+                : System.Array.Empty<string>())
+            {
+                var view = shell.Views.HeroViewFor(id);
+                if (view == null)
+                {
+                    continue;
+                }
+
+                sb.Append("heroView ").Append(id)
+                    .Append(" world=").Append(view.WorldPosition)
+                    .Append(" facing=").Append(view.Facing)
+                    .Append('\n');
+            }
+
+            sb.Append("proofReady=").Append(CombatProofReady()).Append('\n');
+        }
+
+        private static void CropHeroProof(Camera camera, string path)
+        {
+            var match = LiveMatch();
+            if (match == null || match.State == null || camera == null)
+            {
+                return;
+            }
+
+            Hero hero = null;
+            foreach (var h in match.State.Heroes.Values)
+            {
+                if (h != null && h.Alive)
+                {
+                    hero = h;
+                    break;
+                }
+            }
+
+            if (hero == null)
+            {
+                return;
+            }
+
+            var world = SimSpace.ToWorld(hero.Pos);
+            var viewport = camera.WorldToViewportPoint(world);
+            if (viewport.z < 0f)
+            {
+                return;
+            }
+
+            const int width = 1920;
+            const int height = 1080;
+            var cx = Mathf.Clamp(Mathf.RoundToInt(viewport.x * width), 0, width - 1);
+            var cy = Mathf.Clamp(Mathf.RoundToInt((1f - viewport.y) * height), 0, height - 1);
+            const int crop = 720;
+            var x = Mathf.Clamp(cx - (crop / 2), 0, width - crop);
+            var y = Mathf.Clamp(cy - (crop / 2), 0, height - crop);
+
+            if (!File.Exists(ShotPath))
+            {
+                return;
+            }
+
+            var bytes = File.ReadAllBytes(ShotPath);
+            var src = new Texture2D(2, 2, TextureFormat.RGB24, false);
+            if (!src.LoadImage(bytes))
+            {
+                UnityEngine.Object.DestroyImmediate(src);
+                return;
+            }
+
+            var dst = new Texture2D(crop, crop, TextureFormat.RGB24, false);
+            dst.SetPixels(src.GetPixels(x, src.height - y - crop, crop, crop));
+            dst.Apply();
+            File.WriteAllBytes(path, dst.EncodeToPNG());
+            UnityEngine.Object.DestroyImmediate(src);
+            UnityEngine.Object.DestroyImmediate(dst);
         }
 
         private static void DumpCamera(Camera camera, string path)
