@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using RedHollow.Game.Art;
 using RedHollow.Game.Host;
+using RedHollow.Game.Input;
 using RedHollow.Game.Net;
 using RedHollow.Game.View;
 using RedHollow.Sim;
@@ -45,6 +46,16 @@ namespace RedHollow.Game.UI
         /// a launched shell resolves real art by default rather than opting into it.
         /// </summary>
         public ArtCatalog ArtCatalog;
+
+        /// <summary>
+        /// Ticket 022 (T-22) — R-30: where the local player's raw input comes from. The shell
+        /// resolves each sampled <see cref="InputSnapshot"/> through the shipped
+        /// <see cref="DefaultHeroInputMap"/> and feeds the resulting intent to the LOCAL hero
+        /// (the one whose <c>AccountId</c> is <see cref="LocalAccountId"/>) of whatever match the
+        /// session holds — the <see cref="RedHollow.Game.Host.IHeroIntentSource"/> hole that
+        /// ticket 021 left null. Null means no local input (a headless shell / most tests).
+        /// </summary>
+        public IInputSource InputSource;
     }
 
     /// <summary>
@@ -196,6 +207,14 @@ namespace RedHollow.Game.UI
 
         /// <summary>The artKey→asset table behind <see cref="Visuals"/>.</summary>
         public ArtCatalog Art => _catalog;
+
+        /// <summary>
+        /// Ticket 022 (T-22) — the input source this shell samples for the local hero, exactly as
+        /// supplied via <see cref="ShellBootstrapOptions.InputSource"/> (null when none was: input
+        /// is the one option with no offline default, because only a scene entry owns a device).
+        /// </summary>
+        public IInputSource Input =>
+            throw new NotImplementedException("T-22: expose and wire ShellBootstrapOptions.InputSource");
 
         /// <summary>
         /// R-61 — the combat HUD model for the local account. Null until a match is live; rebuilt
