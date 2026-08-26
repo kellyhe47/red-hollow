@@ -15,6 +15,18 @@ dotnet test sim/RedHollow.slnx --nologo                            # 356/356, in
 python3 run/coverage_check.py                                      # 19 tickets, 51 reqs owned
 ```
 
+Working WITHOUT a Unity editor (cloud agents)? Three headless commands cover most of the shell:
+
+```bash
+dotnet test sim/GameSim.Tests/GameSim.Tests.csproj --nologo   # the sim suite (.slnx needs SDK 9+; this doesn't)
+dotnet test tools/compile-check/ShellCheck.csproj --nologo    # compiles Host/Net layers; RUNS T11 + T14 for real
+dotnet run --project tools/balance-probe/BalanceProbe.csproj  # plays scripted campaigns at shipped numbers
+```
+
+`verify_claims.py` shells out to `~/.claude/skills/product-inception/` scripts that only exist on
+the owner's machine — its diagram/validator lines failing there is environmental, not a spec break
+(`verify_fixtures.py` standalone is the substantive half).
+
 Unity EditMode suite — **70/70** (check the lock first, see §6):
 
 ```bash
