@@ -1,7 +1,7 @@
 {
     "name": "RedHollow.Tests.EditMode",
     "rootNamespace": "RedHollow.Tests",
-    "references": ["UnityEngine.TestRunner", "UnityEditor.TestRunner", "GameSim", "RedHollow.Game"],
+    "references": ["UnityEngine.TestRunner", "UnityEditor.TestRunner", "GameSim", "RedHollow.Game", "UnityEngine.UI"],
     "includePlatforms": ["Editor"],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

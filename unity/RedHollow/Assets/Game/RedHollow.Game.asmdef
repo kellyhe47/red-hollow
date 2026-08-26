@@ -1,7 +1,7 @@
 {
     "name": "RedHollow.Game",
     "rootNamespace": "RedHollow.Game",
-    "references": ["GameSim"],
+    "references": ["GameSim", "UnityEngine.UI"],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
