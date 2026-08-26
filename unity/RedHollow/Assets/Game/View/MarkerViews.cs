@@ -13,21 +13,28 @@ namespace RedHollow.Game.View
     public sealed class EntryTunnelMarkerView : MonoBehaviour
     {
         /// <summary>The index into <see cref="RedHollow.Sim.ColonyMap.EntryTunnels"/> this marker stands on.</summary>
-        public int TunnelIndex
-        {
-            get { throw new System.NotImplementedException("T26: entry tunnel markers"); }
-        }
+        public int TunnelIndex { get; private set; }
 
         /// <summary>S3 — true while the planning preview names this tunnel as activating.</summary>
-        public bool Pulsing
-        {
-            get { throw new System.NotImplementedException("T26: entry tunnel markers"); }
-        }
+        public bool Pulsing { get; private set; }
 
         /// <summary>S4 — true while the HUD's entry flare names this tunnel.</summary>
-        public bool Flaring
+        public bool Flaring { get; private set; }
+
+        /// <summary>Ties this marker to the tunnel index the models speak in. Builder-time only.</summary>
+        public void Bind(int tunnelIndex)
         {
-            get { throw new System.NotImplementedException("T26: entry tunnel markers"); }
+            TunnelIndex = tunnelIndex;
+        }
+
+        /// <summary>
+        /// The shell pump's write: both states in one call because they are one decision — the
+        /// models drive them, this component only remembers what it was told (a mirror, T-10).
+        /// </summary>
+        public void SetStates(bool pulsing, bool flaring)
+        {
+            Pulsing = pulsing;
+            Flaring = flaring;
         }
     }
 
@@ -39,15 +46,21 @@ namespace RedHollow.Game.View
     public sealed class HotspotMarkerView : MonoBehaviour
     {
         /// <summary>The sim's own hotspot id this marker stands for.</summary>
-        public string HotspotId
-        {
-            get { throw new System.NotImplementedException("T26: hotspot marker state"); }
-        }
+        public string HotspotId { get; private set; }
 
         /// <summary>R-12/R-13 — true exactly when the shelter it stands for is emptied.</summary>
-        public bool Lost
+        public bool Lost { get; private set; }
+
+        /// <summary>Ties this marker to the sim's own hotspot id. Builder-time only.</summary>
+        public void Bind(string hotspotId)
         {
-            get { throw new System.NotImplementedException("T26: hotspot marker state"); }
+            HotspotId = hotspotId;
+        }
+
+        /// <summary>The shell pump's write — the sim's emptied answer, mirrored, never decided here.</summary>
+        public void SetLost(bool lost)
+        {
+            Lost = lost;
         }
     }
 }

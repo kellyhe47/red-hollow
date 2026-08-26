@@ -96,8 +96,28 @@ namespace RedHollow.Game.View
                     continue;
                 }
 
-                scene.HotspotMarkers[spec.Id] = Marker(
+                var hotspotMarker = Marker(
                     scene.Root.transform, resolver, VisualClass.Hotspot, "Hotspot_" + spec.Id, spec.Pos);
+
+                // T-26 / S4 — the observable lost-state component, named by the sim's own id.
+                // Not lost at build: the colony starts with everyone alive; the shell pump mirrors
+                // the sim's emptied answer onto it later.
+                hotspotMarker.AddComponent<HotspotMarkerView>().Bind(spec.Id);
+
+                scene.HotspotMarkers[spec.Id] = hotspotMarker;
+            }
+
+            // T-26 / R-14 — one marker per entry tunnel, keyed by the tunnel's INDEX in the map's
+            // list (the spelling the wave preview's ActiveEntryTunnels and the HUD's EntryFlares
+            // both use, so a marker and the tunnel it stands for cannot be matched up wrongly).
+            // Freshly built markers pulse and flare nothing — the models drive those states.
+            for (var i = 0; i < map.EntryTunnels.Count; i++)
+            {
+                var tunnelMarker = Marker(
+                    scene.Root.transform, resolver, VisualClass.Hotspot, "EntryTunnel_" + i,
+                    map.EntryTunnels[i]);
+                tunnelMarker.AddComponent<EntryTunnelMarkerView>().Bind(i);
+                scene.EntryTunnelMarkers[i] = tunnelMarker;
             }
 
             return scene;

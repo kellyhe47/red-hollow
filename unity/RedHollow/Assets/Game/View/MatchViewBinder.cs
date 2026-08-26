@@ -27,6 +27,9 @@ namespace RedHollow.Game.View
         private readonly Dictionary<string, HeroView> _heroViews =
             new Dictionary<string, HeroView>(System.StringComparer.Ordinal);
 
+        private readonly Dictionary<string, PlaceableView> _placeableViews =
+            new Dictionary<string, PlaceableView>(System.StringComparer.Ordinal);
+
         /// <summary>
         /// Scratch list for the ids leaving the binding this step. Reused because
         /// <see cref="Sync"/> runs sixty times a second, and because a dictionary cannot be edited
@@ -59,25 +62,23 @@ namespace RedHollow.Game.View
         /// T-26 — the standing placeable ids that currently have a view. Follows the world:
         /// one view per placeable with <see cref="Placeable.Exists"/>, released when it flips.
         /// </summary>
-        public IReadOnlyCollection<string> BoundPlaceableIds
-        {
-            get { throw new System.NotImplementedException("T26: placeable view binding"); }
-        }
+        public IReadOnlyCollection<string> BoundPlaceableIds => _placeableViews.Keys;
 
         /// <summary>
         /// T-26 — the R-23 catalog the barricade damage readout takes its full-HP denominator
         /// from. Null is allowed (a binder must never block on config any more than on art) and
         /// means no denominator is known.
         /// </summary>
-        public PlaceableCatalog PlaceableCatalog
-        {
-            get { throw new System.NotImplementedException("T26: placeable view binding"); }
-            set { throw new System.NotImplementedException("T26: placeable view binding"); }
-        }
+        public PlaceableCatalog PlaceableCatalog { get; set; }
 
         public PlaceableView PlaceableViewFor(string placeableId)
         {
-            throw new System.NotImplementedException("T26: placeable view binding");
+            if (placeableId == null)
+            {
+                return null;
+            }
+
+            return _placeableViews.TryGetValue(placeableId, out var view) ? view : null;
         }
 
         public MonsterView MonsterViewFor(string monsterId)
@@ -124,6 +125,7 @@ namespace RedHollow.Game.View
 
             SyncMonsters(state);
             SyncHeroes(state);
+            SyncPlaceables(state);
         }
 
         // ---- reconciliation ----------------------------------------------------------------------
@@ -218,6 +220,73 @@ namespace RedHollow.Game.View
             {
                 view.RenderFrom(state);
             }
+        }
+
+        /// <summary>
+        /// T-26 — one view per standing placeable, on exactly the monsters' rule with
+        /// <see cref="Placeable.Exists"/> as the one predicate: the sim flips it for sold, broken
+        /// and destroyed alike (R-22/R-23/R-16), and whatever flipped it, the next refresh
+        /// releases the view. The art key IS the sim's <see cref="Placeable.Type"/> constant —
+        /// the same key-equals-the-type rule the hero binding uses, so the art pipeline and the
+        /// binder can never drift on spelling.
+        /// </summary>
+        private void SyncPlaceables(MatchState state)
+        {
+            foreach (var placeable in state.Placeables.Values)
+            {
+                if (placeable == null || string.IsNullOrEmpty(placeable.Id) || !placeable.Exists)
+                {
+                    continue;
+                }
+
+                if (!_placeableViews.ContainsKey(placeable.Id))
+                {
+                    var view = NewView<PlaceableView>("PlaceableView_" + placeable.Id);
+                    view.Bind(
+                        placeable.Id,
+                        _visuals.Resolve(VisualClass.Placeable, placeable.Type),
+                        FullHpFor(placeable.Type));
+                    _placeableViews[placeable.Id] = view;
+                }
+            }
+
+            _released.Clear();
+            foreach (var pair in _placeableViews)
+            {
+                if (!state.Placeables.TryGetValue(pair.Key, out var placeable)
+                    || placeable == null || !placeable.Exists)
+                {
+                    _released.Add(pair.Key);
+                }
+            }
+
+            for (var i = 0; i < _released.Count; i++)
+            {
+                var id = _released[i];
+                Release(_placeableViews[id] == null ? null : _placeableViews[id].gameObject);
+                _placeableViews.Remove(id);
+            }
+
+            foreach (var view in _placeableViews.Values)
+            {
+                view.RenderFrom(state);
+            }
+        }
+
+        /// <summary>
+        /// The R-23 catalog MaxHp for one row — the same number the sim damages against, never a
+        /// second copy typed here. No catalog (or no row) answers 0.0, which the view reads as
+        /// "no denominator known" and shows no indicator over: a binder never blocks on config.
+        /// </summary>
+        private double FullHpFor(string placeableType)
+        {
+            if (PlaceableCatalog == null || string.IsNullOrEmpty(placeableType))
+            {
+                return 0.0;
+            }
+
+            var stats = PlaceableCatalog.TryGet(placeableType);
+            return stats == null ? 0.0 : stats.MaxHp;
         }
 
         // ---- GameObject plumbing -----------------------------------------------------------------

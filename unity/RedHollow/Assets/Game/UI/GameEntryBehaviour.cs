@@ -1,5 +1,7 @@
 using System;
 using RedHollow.Game.Input;
+using RedHollow.Game.View;
+using RedHollow.Sim;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
@@ -38,6 +40,9 @@ namespace RedHollow.Game.UI
         private ShellBootstrap _shell;
         private Func<double> _deltaSource = ReadFrameDelta;
 
+        /// <summary>T-26 — the colony scene this entry composed and owns (the shell only reads it).</summary>
+        private MatchScene _matchScene;
+
         /// <summary>The shell this entry constructed on Awake. Readable, never assignable.</summary>
         public ShellBootstrap Shell => _shell;
 
@@ -65,6 +70,20 @@ namespace RedHollow.Game.UI
             });
 
             EnsureEventSystem();
+
+            // T-26 — compose the colony scene through the shell's real art seam and hand it over,
+            // so the wireframe marker states (S3 pulse, S4 flare, S4 lost/dark) are live in real
+            // Play. The baked colony saved in the .unity file (SceneBuilder's placeholder-resolved
+            // copy, which predates the marker components) is replaced by this fresh build — two
+            // colonies would mean two cameras and markers no pump refreshes.
+            var baked = GameObject.Find("RedHollow_Match");
+            if (baked != null)
+            {
+                DestroyGameObjectCompat(baked);
+            }
+
+            _matchScene = MatchSceneBuilder.Build(ColonyMap.V1(), _shell.Visuals);
+            _shell.AttachScene(_matchScene);
         }
 
         private void Update()
@@ -85,6 +104,33 @@ namespace RedHollow.Game.UI
             if (shell != null)
             {
                 shell.TearDown();
+            }
+
+            // T-26 — scene ownership stays with the entry: it composed the colony, it removes it.
+            var scene = _matchScene;
+            _matchScene = null;
+
+            if (scene != null && scene.Root != null)
+            {
+                DestroyGameObjectCompat(scene.Root);
+            }
+        }
+
+        /// <summary>Destroy that works in both worlds: deferred in play, immediate in EditMode.</summary>
+        private static void DestroyGameObjectCompat(GameObject go)
+        {
+            if (go == null)
+            {
+                return;
+            }
+
+            if (Application.isPlaying)
+            {
+                Destroy(go);
+            }
+            else
+            {
+                DestroyImmediate(go);
             }
         }
 

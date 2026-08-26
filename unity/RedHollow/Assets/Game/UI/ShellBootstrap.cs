@@ -232,6 +232,9 @@ namespace RedHollow.Game.UI
         /// <summary>T-24 — the client-side R-24 mirror for the bound match (null without one).</summary>
         private PlacementZoneOracle _zoneOracle;
 
+        /// <summary>T-26 — the attached colony scene (null until the entry hands one over).</summary>
+        private MatchScene _scene;
+
         /// <summary>
         /// T-24 — was MouseLeft held on the PREVIOUS pump? <see cref="InputSnapshot.Pressed"/> is
         /// held-this-frame, so a press EDGE (one click per press, never one per pump) needs the
@@ -312,10 +315,7 @@ namespace RedHollow.Game.UI
         public NetSession Session => _session;
 
         /// <summary>T-26 — the colony scene this shell refreshes marker state on (null until attached).</summary>
-        public MatchScene Scene
-        {
-            get { throw new NotImplementedException("T26: scene marker state"); }
-        }
+        public MatchScene Scene => _scene;
 
         /// <summary>
         /// T-26 — hand this shell the built <see cref="MatchScene"/> so the pump can refresh the
@@ -327,7 +327,11 @@ namespace RedHollow.Game.UI
         /// </summary>
         public void AttachScene(MatchScene scene)
         {
-            throw new NotImplementedException("T26: scene marker state");
+            _scene = scene;
+
+            // Mirror the current model answers immediately: an attach between pumps must not show
+            // a frame of stale (or default) marker state before the next pump happens to run.
+            RefreshSceneMarkers();
         }
 
         /// <summary>R-60 — the screen router the UI activation follows.</summary>
@@ -682,6 +686,10 @@ namespace RedHollow.Game.UI
             _hud = new CombatHudModel(match, _accountId, _profiles);
             _planning = new PlanningScreenModel(match, PlayerSlotIdFor(match, _accountId));
             _stats = new MatchStatsTracker(match.Sim.Config.Placeables);
+
+            // T-26 / R-23 — the barricade damage readout divides by the SIM'S catalog MaxHp, so
+            // the binder is handed the live match's own rows (never a second copy of the numbers).
+            _views.PlaceableCatalog = match.Sim.Config.Placeables;
             _postMatch = new PostMatchModel(
                 _session, _localPeerId, _stats, match.State.TotalCivilians);
         }
@@ -1110,6 +1118,16 @@ namespace RedHollow.Game.UI
                 _planning.Refresh();
             }
 
+            // T-26 / DEC-018 — `wave_spawned` names no tunnels, so the HUD's entry flare targets
+            // are the entries the planning preview named, carried across the phase change: every
+            // planning refresh re-arms the HUD with the current preview, and the spawn event that
+            // arrives after the phase flips reads the last planning answer.
+            if (_planning != null && _hud != null && _boundMatch != null
+                && _boundMatch.State != null && _boundMatch.State.Phase == MatchPhase.Planning)
+            {
+                _hud.SetExpectedEntryTunnels(_planning.PulsingEntryTunnels);
+            }
+
             RefreshLabels();
 
             if (_controls != null)
@@ -1118,6 +1136,100 @@ namespace RedHollow.Game.UI
             }
 
             _ui.SetActiveScreen(_router.Screen);
+
+            RefreshSceneMarkers();
+        }
+
+        /// <summary>
+        /// T-26 — mirror the models onto the attached scene's marker components (wireframe S3/S4):
+        ///
+        ///  * <b>pulse</b> — a tunnel marker pulses exactly while the sim is in its PLANNING phase
+        ///    and <see cref="PlanningScreenModel.PulsingEntryTunnels"/> names it (the model itself
+        ///    already answers empty outside planning, so the phase gate here is what keeps the
+        ///    pulse from leaking into combat even across a stale refresh);
+        ///  * <b>flare</b> — a tunnel marker flares exactly while the sim is in COMBAT and
+        ///    <see cref="CombatHudModel.EntryFlares"/> names it; riding the phase means the flare
+        ///    has always cleared by the next planning screen (the pinned deadline) without this
+        ///    class inventing a timer;
+        ///  * <b>lost</b> — a hotspot marker is dark exactly when the sim's own count answers
+        ///    emptied (Civilians == 0), read straight off replicated state.
+        ///
+        /// Everything here READS models/state and WRITES marker components — no sim state is ever
+        /// touched (T-10), and no marker decides anything for itself.
+        /// </summary>
+        private void RefreshSceneMarkers()
+        {
+            if (_scene == null)
+            {
+                return;
+            }
+
+            var state = _boundMatch == null ? null : _boundMatch.State;
+            var planningPhase = state != null && state.Phase == MatchPhase.Planning;
+            var combatPhase = state != null && state.Phase == MatchPhase.Combat;
+
+            foreach (var pair in _scene.EntryTunnelMarkers)
+            {
+                if (pair.Value == null)
+                {
+                    continue;
+                }
+
+                var view = pair.Value.GetComponent<EntryTunnelMarkerView>();
+                if (view == null)
+                {
+                    continue;
+                }
+
+                var pulsing = planningPhase && _planning != null
+                    && Names(_planning.PulsingEntryTunnels, pair.Key);
+                var flaring = combatPhase && _hud != null
+                    && Names(_hud.EntryFlares, pair.Key);
+
+                view.SetStates(pulsing, flaring);
+            }
+
+            foreach (var pair in _scene.HotspotMarkers)
+            {
+                if (pair.Value == null)
+                {
+                    continue;
+                }
+
+                var view = pair.Value.GetComponent<HotspotMarkerView>();
+                if (view == null)
+                {
+                    continue;
+                }
+
+                var lost = false;
+                if (state != null && state.Hotspots.TryGetValue(pair.Key, out var hotspot)
+                    && hotspot != null)
+                {
+                    lost = hotspot.Civilians <= 0;
+                }
+
+                view.SetLost(lost);
+            }
+        }
+
+        /// <summary>Does the model's tunnel list name this index? (No LINQ — this runs per pump.)</summary>
+        private static bool Names(IReadOnlyList<int> tunnels, int index)
+        {
+            if (tunnels == null)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < tunnels.Count; i++)
+            {
+                if (tunnels[i] == index)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
