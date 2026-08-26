@@ -208,5 +208,19 @@ namespace RedHollow.Game.UI
         }
 
         public double PlaceableFootprintRadius => _inner.PlaceableFootprintRadius;
+
+        public MonsterKillResult RecordMonsterKill(MonsterKillRequest request)
+        {
+            var result = _inner.RecordMonsterKill(request);
+            Drain();
+            return result;
+        }
+
+        public XpAwardResult AwardKillXp(MonsterKillRequest kill, string accountId)
+        {
+            var result = _inner.AwardKillXp(kill, accountId);
+            Drain();
+            return result;
+        }
     }
 }

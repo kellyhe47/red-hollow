@@ -507,6 +507,138 @@ namespace RedHollow.Tests.EditMode
         }
 
         // ==========================================================================================
+        //  R-23 / R-02 / R-20 — placeable last-hits reaped through RecordMonsterKill
+        // ==========================================================================================
+
+        /// <summary>
+        /// TurretTick (G-028) drops HP and DamageMonster flips <c>alive</c> so a corpse is not
+        /// shot twice, but wave roster and bounty still run through RecordMonsterKill — the same
+        /// command hero last-hits use. A host that never issues it after a turret last-hit leaves
+        /// a dead monster on the living roster and the wave stalls.
+        /// </summary>
+        [Test]
+        public void A_turret_last_hit_is_reaped_through_RecordMonsterKill()
+        {
+            var state = NewState();
+            var monster = state.Monsters["m1"];
+            monster.Hp = 20.0;
+            monster.Pos = new Vec2(4.0, 0.0);
+            monster.CurrentSpeed = 0.0;
+            monster.BaseSpeed = 0.0;
+
+            state.Placeables["t1"] = new Placeable
+            {
+                Id = "t1",
+                Type = PlaceableType.Turret,
+                Pos = new Vec2(0.0, 0.0),
+                OwnerPlayerId = "p1",
+                PurchaseCost = 250,
+                Damage = 20.0,
+                Range = 8.0,
+                Exists = true,
+            };
+
+            var scripBefore = state.Team.Scrip;
+            var bounty = new SimConfig().Monsters.StatsFor(monster.Type).Bounty;
+            var clock = new SimClock();
+            var loop = LoopOver(state, new SimConfig(), clock);
+
+            StepUntil(loop, clock, 1.0);
+
+            Assert.That(monster.Hp, Is.EqualTo(0.0).Within(Tolerance),
+                "R-23: one 20-damage turret tick emptied a 20 HP monster");
+            Assert.That(monster.Alive, Is.False,
+                "G-029's convention: a placeable last-hit flips alive so the corpse is not hit twice");
+            Assert.That(state.Wave.LivingMonsterIds, Does.Not.Contain("m1"),
+                "R-02: the host reaped the last-hit through RecordMonsterKill, so the roster shrank");
+            Assert.That(state.Team.Scrip, Is.EqualTo(scripBefore + bounty),
+                "R-20: the kill paid its catalog bounty into the shared pool exactly once");
+            Assert.That(state.Phase, Is.EqualTo(MatchPhase.Planning),
+                "R-02: the last living monster's turret last-hit completed the wave");
+        }
+
+        /// <summary>
+        /// Same gap for traps: TriggerPlaceable (G-027 / G-029) can empty a body without ever
+        /// calling RecordMonsterKill. The host detects the enter and must reap the last-hit.
+        /// </summary>
+        [Test]
+        public void A_trap_last_hit_is_reaped_through_RecordMonsterKill()
+        {
+            var state = NewState();
+            var monster = state.Monsters["m1"];
+            monster.Hp = 30.0;
+            monster.Pos = new Vec2(3.0, 0.0);
+            monster.CurrentSpeed = 0.0;
+            monster.BaseSpeed = 0.0;
+
+            state.Placeables["trap1"] = new Placeable
+            {
+                Id = "trap1",
+                Type = PlaceableType.SpikeTrap,
+                Pos = new Vec2(3.0, 0.0),
+                OwnerPlayerId = "p1",
+                PurchaseCost = 75,
+                Damage = 30.0,
+                TriggersRemaining = 10,
+                Exists = true,
+            };
+
+            var scripBefore = state.Team.Scrip;
+            var bounty = new SimConfig().Monsters.StatsFor(monster.Type).Bounty;
+            var clock = new SimClock();
+            var loop = LoopOver(state, new SimConfig(), clock);
+
+            loop.Step(Step60Hz);
+
+            Assert.That(monster.Hp, Is.EqualTo(0.0).Within(Tolerance),
+                "R-23: the spike's 30 damage emptied a 30 HP monster on the crossing");
+            Assert.That(monster.Alive, Is.False);
+            Assert.That(state.Wave.LivingMonsterIds, Does.Not.Contain("m1"),
+                "R-02: a trap last-hit is reaped through RecordMonsterKill, same as a turret");
+            Assert.That(state.Team.Scrip, Is.EqualTo(scripBefore + bounty),
+                "R-20: the trap last-hit paid bounty once");
+        }
+
+        /// <summary>
+        /// A turret tick that does not kill must not reap: G-028 is a 40→20 ravager, still alive
+        /// and still on the roster. Reaping a wounded body would complete the wave with walkers.
+        /// </summary>
+        [Test]
+        public void A_turret_tick_that_does_not_kill_leaves_the_roster_alone()
+        {
+            var state = NewState();
+            var monster = state.Monsters["m1"];
+            monster.Hp = 40.0;
+            monster.Pos = new Vec2(4.0, 0.0);
+            monster.CurrentSpeed = 0.0;
+            monster.BaseSpeed = 0.0;
+
+            state.Placeables["t1"] = new Placeable
+            {
+                Id = "t1",
+                Type = PlaceableType.Turret,
+                Pos = new Vec2(0.0, 0.0),
+                OwnerPlayerId = "p1",
+                Damage = 20.0,
+                Range = 8.0,
+                Exists = true,
+            };
+
+            var scripBefore = state.Team.Scrip;
+            var clock = new SimClock();
+            var loop = LoopOver(state, new SimConfig(), clock);
+
+            StepUntil(loop, clock, 1.0);
+
+            Assert.That(monster.Hp, Is.EqualTo(20.0).Within(Tolerance));
+            Assert.That(monster.Alive, Is.True);
+            Assert.That(state.Wave.LivingMonsterIds, Does.Contain("m1"));
+            Assert.That(state.Team.Scrip, Is.EqualTo(scripBefore),
+                "a non-killing tick pays no bounty");
+            Assert.That(state.Phase, Is.EqualTo(MatchPhase.Combat));
+        }
+
+        // ==========================================================================================
         //  R-52 — client interpolation and host reconciliation seams (shape and direction only)
         // ==========================================================================================
 

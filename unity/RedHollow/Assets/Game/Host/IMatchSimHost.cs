@@ -69,5 +69,19 @@ namespace RedHollow.Game.Host
         /// rather than a second number invented in the shell.
         /// </summary>
         double PlaceableFootprintRadius { get; }
+
+        /// <summary>
+        /// R-02 / R-20 / R-40 — the kill command. TurretTick and TriggerPlaceable drop HP (and
+        /// may flip <c>alive</c> so a corpse is not hit twice — G-029), but wave roster, bounty
+        /// and XP still run through this, the same path hero last-hits use. The host issues it
+        /// after a placeable last-hit; a duplicate (already off the living roster) is a no-op.
+        /// </summary>
+        MonsterKillResult RecordMonsterKill(MonsterKillRequest request);
+
+        /// <summary>
+        /// R-40 — credit the kill's XP. Turret/trap last-hits credit the placer's account
+        /// (the shell answers "who owns the placeable" before this is called).
+        /// </summary>
+        XpAwardResult AwardKillXp(MonsterKillRequest kill, string accountId);
     }
 }

@@ -29,7 +29,7 @@ namespace RedHollow.Tests.EditMode
     ///     T-24's click), holding re-fires once per window, planning fires nothing — with
     ///     <c>Damage</c> read from the hero-kit catalog (per-pellet for the Rancher, DEC-RUN-8),
     ///     and a monster at 0 HP actually DIES through the pump path (kill accounting: `alive`,
-    ///     roster, bounty — nothing else in the shipped shell calls <c>RecordMonsterKill</c>).
+    ///     roster, bounty — HostLoop issues the same command after a turret/trap last-hit).
     ///  3. <b>Abilities</b> (R-31/R-32): Q/E issue ONE <c>HeroAbilityRequest</c> per press-edge
     ///     for the mapped slot; sim-side rejections (ability_locked / ability_cooling) surface on
     ///     <see cref="ShellBootstrap.LastAbilityOutcome"/> without breaking the loop; a second

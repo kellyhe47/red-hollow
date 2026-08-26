@@ -1042,7 +1042,7 @@ namespace RedHollow.Game.UI
             {
                 var monsterId = _reapScratch[i];
                 if (!state.Monsters.TryGetValue(monsterId, out var monster)
-                    || monster == null || !monster.Alive || monster.Hp > 0.0)
+                    || monster == null || monster.Hp > 0.0)
                 {
                     continue;
                 }

@@ -93,5 +93,11 @@ namespace RedHollow.Game.Host
             _sim.TriggerPlaceable(placeableId, monsterId);
 
         public double PlaceableFootprintRadius => _sim.PlaceableFootprintRadius;
+
+        public MonsterKillResult RecordMonsterKill(MonsterKillRequest request) =>
+            _sim.RecordMonsterKill(request);
+
+        public XpAwardResult AwardKillXp(MonsterKillRequest kill, string accountId) =>
+            _sim.AwardKillXp(kill, accountId);
     }
 }

@@ -9,6 +9,7 @@ using RedHollow.Game.UI;
 using RedHollow.Game.View;
 using RedHollow.Sim;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -32,6 +33,7 @@ namespace RedHollow.EditorTools
         private const string Wave2Path = "/workspace/unity/shots/wave2.png";
         private const string ShopPath = "/workspace/unity/shots/shop.png";
         private const string TurretShotPath = "/workspace/unity/shots/turret-shot.png";
+        private const string TurretLastHitPath = "/workspace/unity/shots/turret-lasthit.png";
 
         private static double _enteredAt;
         private static bool _driving;
@@ -49,6 +51,11 @@ namespace RedHollow.EditorTools
         private static double _wave2CombatSince;
         private static readonly Dictionary<string, double> Wave2HpAtHold = new Dictionary<string, double>();
         private static string _turretProofLine = "";
+        private static bool _turretLastHitCaptured;
+        private static string _turretLastHitLine = "";
+        private static int _scripAtHold;
+        private static int _livingAtHold;
+        private static double _holdFireSince;
         private static readonly List<string> PurchaseLog = new List<string>();
         private static readonly StringBuilder Logs = new StringBuilder();
 
@@ -107,7 +114,18 @@ namespace RedHollow.EditorTools
                 _wave2CombatSince = 0;
                 Wave2HpAtHold.Clear();
                 _turretProofLine = "";
+                _turretLastHitCaptured = false;
+                _turretLastHitLine = "";
+                _scripAtHold = 0;
+                _livingAtHold = 0;
+                _holdFireSince = 0;
                 PurchaseLog.Clear();
+                const string MatchScene = "Assets/Scenes/RedHollow.unity";
+                if (SceneManager.GetActiveScene().path != MatchScene)
+                {
+                    EditorSceneManager.OpenScene(MatchScene);
+                }
+
                 EditorApplication.isPlaying = true;
                 return;
             }
@@ -127,15 +145,16 @@ namespace RedHollow.EditorTools
             DriveCombatInput();
             DriveWaveProgression();
 
-            var timedOut = elapsed >= 75.0;
-            // Stay in Play until a turret shot is proven (HP drop with SPACE released)
-            // or we time out. Linger after that so autoplay Ready-Up can open wave 3.
+            var timedOut = elapsed >= 95.0;
+            // Stay in Play until a turret LAST-HIT is reaped (HP to 0 + roster/bounty)
+            // with SPACE released, or we time out. Linger after that so autoplay can
+            // keep Ready-up / SPACE through later waves.
             if (!timedOut && !_proofPhaseDone)
             {
                 return;
             }
 
-            if (!timedOut && elapsed < 55.0)
+            if (!timedOut && elapsed < 80.0)
             {
                 return;
             }
@@ -288,17 +307,42 @@ namespace RedHollow.EditorTools
                 _wave2Captured = true;
                 _holdFire = true;
                 _wave2CombatSince = EditorApplication.timeSinceStartup;
+                _holdFireSince = EditorApplication.timeSinceStartup;
                 SnapshotLivingHp(match.State);
             }
 
-            if (_holdFire && !_turretProofCaptured && match.State.Phase == MatchPhase.Combat)
+            if (_holdFire && match.State.Phase == MatchPhase.Combat)
             {
-                TryCaptureTurretProof(match);
-                var waited = _wave2CombatSince > 0
-                    && (EditorApplication.timeSinceStartup - _wave2CombatSince) >= 14.0;
-                if (waited && !_turretProofCaptured)
+                if (!_turretProofCaptured)
                 {
-                    _turretProofLine = "turretProof=False timeout after 14s of wave-2 hold-fire";
+                    TryCaptureTurretProof(match);
+                }
+
+                if (!_turretLastHitCaptured)
+                {
+                    TryCaptureTurretLastHit(match);
+                }
+
+                var waited = _holdFireSince > 0
+                    && (EditorApplication.timeSinceStartup - _holdFireSince) >= 18.0;
+                if (waited && !_turretLastHitCaptured)
+                {
+                    if (!_turretProofCaptured)
+                    {
+                        _turretProofLine = "turretProof=False timeout after 18s of wave-2 hold-fire";
+                    }
+
+                    _turretLastHitLine = "turretLastHit=False timeout after 18s of hold-fire"
+                        + " living=" + match.State.Wave.LivingMonsterIds.Count
+                        + " scrip=" + match.State.Team.Scrip
+                        + " scripAtHold=" + _scripAtHold;
+                    PurchaseLog.Add(_turretLastHitLine);
+                    _holdFire = false;
+                    _proofPhaseDone = true;
+                }
+
+                if (_turretLastHitCaptured)
+                {
                     _holdFire = false;
                     _proofPhaseDone = true;
                 }
@@ -360,6 +404,9 @@ namespace RedHollow.EditorTools
                     Wave2HpAtHold[monster.Id] = monster.Hp;
                 }
             }
+
+            _scripAtHold = state.Team != null ? state.Team.Scrip : 0;
+            _livingAtHold = state.Wave != null ? state.Wave.LivingMonsterIds.Count : 0;
         }
 
         /// <summary>
@@ -388,8 +435,6 @@ namespace RedHollow.EditorTools
                 }
 
                 _turretProofCaptured = true;
-                _proofPhaseDone = true;
-                _holdFire = false;
                 _turretProofLine = "turretProof=True monster=" + monster.Id
                     + " type=" + monster.Type
                     + " hp=" + before.ToString("0.0") + "->" + monster.Hp.ToString("0.0")
@@ -397,6 +442,53 @@ namespace RedHollow.EditorTools
                     + " spaceHeld=False";
                 DumpCamera(Camera.main, TurretShotPath);
                 PurchaseLog.Add(_turretProofLine);
+                return;
+            }
+        }
+
+        /// <summary>
+        /// A turret last-hit is 20 dmg emptying a body (R-23) PLUS the kill command
+        /// (RecordMonsterKill): the monster leaves the living roster and the bounty is paid.
+        /// SPACE is still released, so a reap here cannot be the gunslinger.
+        /// </summary>
+        private static void TryCaptureTurretLastHit(HostedMatch match)
+        {
+            var living = match.State.Wave.LivingMonsterIds;
+            foreach (var monster in match.State.Monsters.Values)
+            {
+                if (monster == null)
+                {
+                    continue;
+                }
+
+                double before;
+                if (!Wave2HpAtHold.TryGetValue(monster.Id, out before))
+                {
+                    continue;
+                }
+
+                var emptied = monster.Hp <= 0.0;
+                var offRoster = !living.Contains(monster.Id);
+                if (!emptied || !offRoster)
+                {
+                    continue;
+                }
+
+                var scripNow = match.State.Team.Scrip;
+                _turretLastHitCaptured = true;
+                _turretLastHitLine = "turretLastHit=True monster=" + monster.Id
+                    + " type=" + monster.Type
+                    + " hp=" + before.ToString("0.0") + "->" + monster.Hp.ToString("0.0")
+                    + " alive=" + monster.Alive
+                    + " offRoster=True"
+                    + " livingAtHold=" + _livingAtHold
+                    + " livingNow=" + living.Count
+                    + " scripAtHold=" + _scripAtHold
+                    + " scripNow=" + scripNow
+                    + " bountyDelta=" + (scripNow - _scripAtHold)
+                    + " spaceHeld=False";
+                DumpCamera(Camera.main, TurretLastHitPath);
+                PurchaseLog.Add(_turretLastHitLine);
                 return;
             }
         }
@@ -675,6 +767,8 @@ namespace RedHollow.EditorTools
                     .Append(" exists=").Append(File.Exists(ShopPath)).Append('\n');
                 sb.Append("turretShot=").Append(TurretShotPath)
                     .Append(" exists=").Append(File.Exists(TurretShotPath)).Append('\n');
+                sb.Append("turretLastHitShot=").Append(TurretLastHitPath)
+                    .Append(" exists=").Append(File.Exists(TurretLastHitPath)).Append('\n');
                 try
                 {
                     CropHeroProof(cam, ProofPath);
@@ -756,6 +850,17 @@ namespace RedHollow.EditorTools
                 .Append(" wave2Captured=").Append(_wave2Captured)
                 .Append(" shopAttempted=").Append(_shopAttempted)
                 .Append(" shopShot=").Append(_shopShot).Append('\n');
+            var deadInSim = 0;
+            foreach (var m in state.Monsters.Values)
+            {
+                if (m != null && !m.Alive)
+                {
+                    deadInSim++;
+                }
+            }
+            sb.Append("deadInSim=").Append(deadInSim)
+                .Append(" livingRoster=").Append(state.Wave.LivingMonsterIds.Count)
+                .Append(" scripAtHold=").Append(_scripAtHold).Append('\n');
             for (var i = 0; i < PurchaseLog.Count; i++)
             {
                 sb.Append(PurchaseLog[i]).Append('\n');
@@ -939,10 +1044,15 @@ namespace RedHollow.EditorTools
                 .Append(" wave2Live=").Append(_wave2Captured)
                 .Append(" shopPlaced=").Append(_shopAttempted)
                 .Append(" turretProof=").Append(_turretProofCaptured)
+                .Append(" turretLastHit=").Append(_turretLastHitCaptured)
                 .Append(" wave3Live=").Append(_wave3Captured).Append('\n');
             if (!string.IsNullOrEmpty(_turretProofLine))
             {
                 sb.Append(_turretProofLine).Append('\n');
+            }
+            if (!string.IsNullOrEmpty(_turretLastHitLine))
+            {
+                sb.Append(_turretLastHitLine).Append('\n');
             }
         }
 
