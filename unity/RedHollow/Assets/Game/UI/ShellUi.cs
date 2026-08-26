@@ -6,6 +6,113 @@ using UnityEngine.UI;
 namespace RedHollow.Game.UI
 {
     /// <summary>
+    /// Ticket 027 (T-27) — the one place the shell's presentation constants live: the explicit
+    /// runtime font (Unity 6 has NO implicit default — a Text built in play mode with a null font
+    /// renders nothing, which is exactly the bug the owner's Play test hit; EditMode masks it
+    /// because <c>Text.Reset()</c> is editor-only), the Lantern Deep palette
+    /// (docs/comfy-prompts/00-shared-style.md: warm darks, amber lantern light), the imported
+    /// button chrome, and the anchor helpers every screen lays out through.
+    /// </summary>
+    internal static class UiStyle
+    {
+        /// <summary>Warm parchment — body text over dark ground (high value contrast).</summary>
+        internal static readonly Color Parchment = new Color(0.93f, 0.87f, 0.74f, 1f);
+
+        /// <summary>Lantern amber — banners and accents.</summary>
+        internal static readonly Color Ember = new Color(1f, 0.76f, 0.38f, 1f);
+
+        /// <summary>Warm near-black — panel and input grounds.</summary>
+        internal static readonly Color PanelDark = new Color(0.09f, 0.06f, 0.05f, 0.88f);
+
+        /// <summary>Input-field well — a shade lighter than the panel ground.</summary>
+        internal static readonly Color InputWell = new Color(0.16f, 0.11f, 0.08f, 0.95f);
+
+        /// <summary>The inline-error tint (S1's join error).</summary>
+        internal static readonly Color ErrorTint = new Color(0.95f, 0.45f, 0.33f, 1f);
+
+        /// <summary>Solid button face when the imported chrome is unavailable.</summary>
+        internal static readonly Color ButtonFace = new Color(0.62f, 0.42f, 0.2f, 1f);
+
+        /// <summary>T-27 — the placement ghost over a VALID zone: translucent lantern amber.</summary>
+        internal static readonly Color GhostValid = new Color(1f, 0.8f, 0.35f, 0.45f);
+
+        /// <summary>T-27 — the ghost over an INVALID zone: the wireframe's red tint.</summary>
+        internal static readonly Color GhostInvalidTint = new Color(0.85f, 0.18f, 0.12f, 0.55f);
+
+        private static Font _font;
+        private static Sprite _buttonSprite;
+
+        /// <summary>
+        /// The explicit runtime font. LegacyRuntime.ttf is the built-in that exists in play mode
+        /// and builds — relying on <c>Text.Reset()</c>'s editor-only auto-assign is the T-27 bug.
+        /// </summary>
+        internal static Font Font
+        {
+            get
+            {
+                if (_font == null)
+                {
+                    _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                }
+
+                return _font;
+            }
+        }
+
+        /// <summary>
+        /// The imported button chrome (Assets/Game/UI/Resources/RedHollowArt/button-normal, a
+        /// plain texture — spriteMode 0 — so it is wrapped here, same as the art catalog does).
+        /// Null when the resource is missing; callers fall back to a solid face.
+        /// </summary>
+        internal static Sprite ButtonSprite
+        {
+            get
+            {
+                if (_buttonSprite == null)
+                {
+                    var texture = Resources.Load<Texture2D>("RedHollowArt/button-normal");
+                    if (texture != null)
+                    {
+                        _buttonSprite = Sprite.Create(
+                            texture,
+                            new Rect(0f, 0f, texture.width, texture.height),
+                            new Vector2(0.5f, 0.5f),
+                            100f);
+                    }
+                }
+
+                return _buttonSprite;
+            }
+        }
+
+        /// <summary>Explicit font, size, color, centered — everything a Text needs to render.</summary>
+        internal static void StyleLabel(Text label, int size = 16)
+        {
+            label.font = Font;
+            label.fontSize = size;
+            label.color = Parchment;
+            label.alignment = TextAnchor.MiddleCenter;
+            label.horizontalOverflow = HorizontalWrapMode.Overflow;
+            label.verticalOverflow = VerticalWrapMode.Overflow;
+        }
+
+        /// <summary>Anchor the rect to a normalized region of its parent, edges flush.</summary>
+        internal static void Anchor(RectTransform rt, float xMin, float yMin, float xMax, float yMax)
+        {
+            rt.anchorMin = new Vector2(xMin, yMin);
+            rt.anchorMax = new Vector2(xMax, yMax);
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+        }
+
+        /// <summary>Full-stretch over the parent.</summary>
+        internal static void Stretch(RectTransform rt)
+        {
+            Anchor(rt, 0f, 0f, 1f, 1f);
+        }
+    }
+
+    /// <summary>
     /// Ticket 021 (T-21) — the built uGUI hierarchy: one Canvas, one root GameObject per
     /// <see cref="UiScreen"/> (S1–S7), and the combat HUD's bound labels. This is a HANDLE object,
     /// not a presenter: every value a label shows comes out of the ticket-012 models
@@ -51,9 +158,18 @@ namespace RedHollow.Game.UI
 
         /// <summary>
         /// The panel the HUD labels hang under, kept so the bootstrap can grow the per-hotspot
-        /// label row to match the live colony without rebuilding the shell.
+        /// label row to match the live colony without rebuilding the shell. Since T-27 this is
+        /// the HUD's TOP BAR (wave · scrip · monsters · shelters), anchored to the top band of
+        /// the screen per the wireframes; the HP readout lives in <see cref="SelfBar"/> instead.
         /// </summary>
         internal GameObject HudPanel;
+
+        /// <summary>
+        /// T-27 — the SELF bar (wireframe S4: the own hero's readout), anchored to the bottom
+        /// band. Holds <see cref="HpLabel"/>, split out of the old shared HUD panel so the top
+        /// and bottom regions can be pinned separately.
+        /// </summary>
+        internal GameObject SelfBar;
 
         /// <summary>The writable list behind <see cref="HotspotLabels"/>.</summary>
         internal readonly List<Text> HotspotLabelList = new List<Text>();
@@ -87,24 +203,82 @@ namespace RedHollow.Game.UI
             canvasGo.transform.SetParent(ui.Root.transform, false);
             ui.Canvas = canvasGo.AddComponent<Canvas>();
 
+            // T-27 — the canvas actually renders on a display: screen-space overlay, scaled with
+            // the screen so QHD and 1080p lay out the same regions, and a raycaster so the
+            // buttons' Graphics can be hit at all in play mode.
+            ui.Canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            var scaler = canvasGo.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.matchWidthOrHeight = 0.5f;
+            canvasGo.AddComponent<GraphicRaycaster>();
+
             foreach (UiScreen screen in Enum.GetValues(typeof(UiScreen)))
             {
-                var screenGo = new GameObject("Screen_" + screen);
+                var screenGo = new GameObject("Screen_" + screen, typeof(RectTransform));
                 screenGo.transform.SetParent(canvasGo.transform, false);
+                UiStyle.Stretch((RectTransform)screenGo.transform);
                 screenGo.SetActive(false);
                 ui._screenRoots[screen] = screenGo;
             }
 
-            ui.HudPanel = new GameObject("HUD");
+            // T-27 — the HUD splits into the wireframes' regions: TOP BAR (wave · scrip ·
+            // monsters · shelters) hangs from the top edge; the SELF bar (HP) sits in the bottom
+            // band, above the planning shop bar's strip.
+            ui.HudPanel = new GameObject("HUD_TopBar", typeof(RectTransform));
             ui.HudPanel.transform.SetParent(canvasGo.transform, false);
+            UiStyle.Anchor((RectTransform)ui.HudPanel.transform, 0f, 0.93f, 1f, 1f);
 
-            ui.WaveLabel = NewLabel(ui.HudPanel, "WaveLabel");
-            ui.ScripLabel = NewLabel(ui.HudPanel, "ScripLabel");
-            ui.HpLabel = NewLabel(ui.HudPanel, "HpLabel");
-            ui.MonstersRemainingLabel = NewLabel(ui.HudPanel, "MonstersRemainingLabel");
+            ui.SelfBar = new GameObject("HUD_SelfBar", typeof(RectTransform));
+            ui.SelfBar.transform.SetParent(canvasGo.transform, false);
+            UiStyle.Anchor((RectTransform)ui.SelfBar.transform, 0.01f, 0.17f, 0.2f, 0.25f);
+
+            ui.WaveLabel = NewLabel(ui.HudPanel, "WaveLabel", 18);
+            ui.ScripLabel = NewLabel(ui.HudPanel, "ScripLabel", 18);
+            ui.HpLabel = NewLabel(ui.SelfBar, "HpLabel", 20);
+            ui.MonstersRemainingLabel = NewLabel(ui.HudPanel, "MonstersRemainingLabel", 18);
             ui.HotspotLabels = ui.HotspotLabelList;
+            ui.ArrangeTopBar();
+
+            // T-27 — the S5/S6/S7 center-band banners (wireframes: a big verdict mid-screen).
+            // Copy is presentation; existence, font, banner size and the center band are contract.
+            NewBanner(ui._screenRoots[UiScreen.WaveInterstitial], "WaveBanner", "WAVE CLEARED");
+            NewBanner(ui._screenRoots[UiScreen.Victory], "VictoryBanner", "THE HOLLOW HOLDS");
+            NewBanner(ui._screenRoots[UiScreen.Defeat], "DefeatBanner", "THE COLONY IS LOST");
 
             return ui;
+        }
+
+        /// <summary>
+        /// T-27 — one center-band banner Text: banner-sized (>= 24pt), lantern amber, its bar (a
+        /// direct child of the full-screen root) anchored mid-screen.
+        /// </summary>
+        private static Text NewBanner(GameObject screenRoot, string name, string copy)
+        {
+            var banner = NewLabel(screenRoot, name, 44);
+            banner.text = copy;
+            banner.color = UiStyle.Ember;
+            UiStyle.Anchor(banner.rectTransform, 0.2f, 0.45f, 0.8f, 0.72f);
+            return banner;
+        }
+
+        /// <summary>
+        /// T-27 — spread the top bar's labels evenly across its width, so each has stretch
+        /// anchors (renderable at any resolution) and its own slice. Re-run whenever the
+        /// per-hotspot row grows or shrinks.
+        /// </summary>
+        internal void ArrangeTopBar()
+        {
+            var bar = (RectTransform)HudPanel.transform;
+            var count = bar.childCount;
+            for (var i = 0; i < count; i++)
+            {
+                var slot = bar.GetChild(i) as RectTransform;
+                if (slot != null)
+                {
+                    UiStyle.Anchor(slot, (i + 0.02f) / count, 0f, (i + 0.98f) / count, 1f);
+                }
+            }
         }
 
         /// <summary>R-60 — exactly the routed screen's root is active; everything else is off.</summary>
@@ -126,9 +300,13 @@ namespace RedHollow.Game.UI
         /// </summary>
         internal void EnsureHotspotLabels(int count)
         {
+            var changed = false;
+
             while (HotspotLabelList.Count < count)
             {
-                HotspotLabelList.Add(NewLabel(HudPanel, "HotspotLabel_" + HotspotLabelList.Count));
+                HotspotLabelList.Add(
+                    NewLabel(HudPanel, "HotspotLabel_" + HotspotLabelList.Count, 18));
+                changed = true;
             }
 
             while (HotspotLabelList.Count > count)
@@ -139,15 +317,24 @@ namespace RedHollow.Game.UI
                 {
                     DestroyGameObject(last.gameObject);
                 }
+
+                changed = true;
+            }
+
+            if (changed)
+            {
+                ArrangeTopBar();
             }
         }
 
-        private static Text NewLabel(GameObject parent, string name)
+        private static Text NewLabel(GameObject parent, string name, int size = 16)
         {
-            var go = new GameObject(name);
+            var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent.transform, false);
+            UiStyle.Stretch((RectTransform)go.transform);
             var label = go.AddComponent<Text>();
             label.text = string.Empty;
+            UiStyle.StyleLabel(label, size);
             return label;
         }
 
