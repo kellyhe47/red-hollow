@@ -1,10 +1,10 @@
 ---
 id: 024
 title: Play-mode pointer adapter — mouse ray to the S3 placement seam
-status: pending
+status: green
 depends_on: [023]
 touches: [unity/RedHollow/Assets/Game/UI/, unity/RedHollow/Assets/Game/Input/]
-iterations: 0
+iterations: 1
 test_files: [unity/RedHollow/Assets/Tests/EditMode/T24_PointerTests.cs]
 branch: ""
 board_id: T-24
@@ -30,11 +30,11 @@ mouse. Adds:
 
 ## Acceptance criteria
 
-- [ ] during planning, the real mouse moves the ghost; left-click places at the cursor's
+- [x] during planning, the real mouse moves the ghost; left-click places at the cursor's
       ground point; clicking a standing placeable sells it
-- [ ] the zone oracle's answer agrees with the sim's accept/reject verdict across sampled
+- [x] the zone oracle's answer agrees with the sim's accept/reject verdict across sampled
       positions (property-tested against the live sim)
-- [ ] combat aim keeps working; no gameplay intent from mouse buttons (R-30)
+- [x] combat aim keeps working; no gameplay intent from mouse buttons (R-30)
 
 ## Test plan
 
@@ -77,6 +77,10 @@ public seam — the tests drive the EXISTING `IInputSource` (cursor ground point
 ## Attempt log
 
 _(created 2026-08-26 by the orchestrator at 023 close.)_
+
+- 2026-08-26 green in 1 pass. Red 18/22 verified; green verified by orchestrator: EditMode
+  218/218, dotnet 371/371. Final playability audit found T-25 (SPACE/Q/E intents consumed
+  by nobody) — boarded before the owner ping.
 
 ## Handoff notes
 

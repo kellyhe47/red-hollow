@@ -513,6 +513,21 @@
         "the zone oracle's answer agrees with the sim's accept/reject verdict across sampled positions (property-tested)",
         "combat aim keeps working; no gameplay intent from mouse buttons (R-30)"
       ]
+    },
+    {
+      "id": "T-25",
+      "title": "Combat action routing \u2014 SPACE/Q/E intents reach the sim",
+      "owns_requirements": [],
+      "grades_fixtures": [],
+      "depends_on": [
+        "T-24"
+      ],
+      "scope": "Final playability audit find: DefaultHeroInputMap produces BasicAttack/Ability intents but NOTHING consumes them \u2014 HostLoop and LocalHeroIntentSource route movement only. In Play, SPACE/Q/E do nothing and monsters cannot be killed by the player. Adds shell-side combat action routing: consume the intents in the pump/host path, build HeroAttackRequest.EntitiesOnLine from sim state along the cursor aim line (the sim doc says physics decides who is on the line, the sim decides who is hit; DEC-RUN-8 makes pellet connection the shell's answer), damage from the kit catalog, a config attack cadence (unspecced by the PRD \u2014 flag value to owner), and HeroAbilityRequest for Q/E (cooldowns/ranks stay sim-side).",
+      "acceptance": [
+        "holding SPACE in combat attacks along the cursor aim line at the configured cadence and monsters take catalog damage",
+        "Q/E issue HeroAbilityRequest for the mapped slot; sim-side cooldown/lock rejections surface, nothing double-fires",
+        "aim-line entity ordering is nearest-first and derived from sim state only; no MonoBehaviour writes sim state"
+      ]
     }
   ]
 }
