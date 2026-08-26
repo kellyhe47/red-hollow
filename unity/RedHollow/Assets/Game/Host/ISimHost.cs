@@ -16,8 +16,8 @@ namespace RedHollow.Game.Host
     /// The surface is deliberately narrow: the five ticks the sim cannot schedule for itself
     /// (R-03, R-23, R-31, R-33, R-35), the R-18 attack gate, and the three damage commands that
     /// gate guards. Per-entity commands the host also drives (SelectTarget, TurretTick, hero
-    /// attacks, abilities, economy) are not here yet — widening this interface is expected, and
-    /// costs the test fake one more member.
+    /// attacks, abilities, economy) widen <see cref="IMatchSimHost"/> instead of this interface —
+    /// adding a member here would break ticket 010's locked recording fake.
     /// </summary>
     public interface ISimHost
     {

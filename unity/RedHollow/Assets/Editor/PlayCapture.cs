@@ -31,6 +31,7 @@ namespace RedHollow.EditorTools
         private const string WaveClearPath = "/workspace/unity/shots/wave1-clear.png";
         private const string Wave2Path = "/workspace/unity/shots/wave2.png";
         private const string ShopPath = "/workspace/unity/shots/shop.png";
+        private const string TurretShotPath = "/workspace/unity/shots/turret-shot.png";
 
         private static double _enteredAt;
         private static bool _driving;
@@ -40,6 +41,14 @@ namespace RedHollow.EditorTools
         private static bool _shopAttempted;
         private static bool _shopShot;
         private static double _planningSince;
+        private static bool _holdFire;
+        private static bool _turretProofCaptured;
+        private static bool _proofPhaseDone;
+        private static bool _wave3Captured;
+        private static int _readiedWave;
+        private static double _wave2CombatSince;
+        private static readonly Dictionary<string, double> Wave2HpAtHold = new Dictionary<string, double>();
+        private static string _turretProofLine = "";
         private static readonly List<string> PurchaseLog = new List<string>();
         private static readonly StringBuilder Logs = new StringBuilder();
 
@@ -90,6 +99,14 @@ namespace RedHollow.EditorTools
                 _shopAttempted = false;
                 _shopShot = false;
                 _planningSince = 0;
+                _holdFire = false;
+                _turretProofCaptured = false;
+                _proofPhaseDone = false;
+                _wave3Captured = false;
+                _readiedWave = 0;
+                _wave2CombatSince = 0;
+                Wave2HpAtHold.Clear();
+                _turretProofLine = "";
                 PurchaseLog.Clear();
                 EditorApplication.isPlaying = true;
                 return;
@@ -110,10 +127,15 @@ namespace RedHollow.EditorTools
             DriveCombatInput();
             DriveWaveProgression();
 
-            var timedOut = elapsed >= 32.0;
-            // Wave-loop proof: stay in Play until wave 1 is cleared AND wave 2 combat
-            // has spawned (or we time out). Combat-first opening is unchanged.
-            if (!_wave2Captured && !timedOut)
+            var timedOut = elapsed >= 75.0;
+            // Stay in Play until a turret shot is proven (HP drop with SPACE released)
+            // or we time out. Linger after that so autoplay Ready-Up can open wave 3.
+            if (!timedOut && !_proofPhaseDone)
+            {
+                return;
+            }
+
+            if (!timedOut && elapsed < 55.0)
             {
                 return;
             }
@@ -147,6 +169,14 @@ namespace RedHollow.EditorTools
 
             _driving = true;
             OverlayInputSource.ExtraHeld.Clear();
+            if (_holdFire)
+            {
+                // Turret-proof window: SPACE/Q/E off so an HP drop cannot be the gunslinger.
+                OverlayInputSource.CursorOverride = new Vector2(10f, 8f);
+                ParkHeroEast(match);
+                return;
+            }
+
             OverlayInputSource.ExtraHeld.Add(PlayerKey.Space);
             OverlayInputSource.ExtraHeld.Add(PlayerKey.Q);
             OverlayInputSource.ExtraHeld.Add(PlayerKey.E);
@@ -247,6 +277,8 @@ namespace RedHollow.EditorTools
                 {
                     shell.Planning.ReadyUp();
                     _readySent = true;
+                    _readiedWave = match.State.Wave.Number;
+                    _holdFire = true;
                 }
             }
 
@@ -254,6 +286,118 @@ namespace RedHollow.EditorTools
             {
                 DumpCamera(Camera.main, Wave2Path);
                 _wave2Captured = true;
+                _holdFire = true;
+                _wave2CombatSince = EditorApplication.timeSinceStartup;
+                SnapshotLivingHp(match.State);
+            }
+
+            if (_holdFire && !_turretProofCaptured && match.State.Phase == MatchPhase.Combat)
+            {
+                TryCaptureTurretProof(match);
+                var waited = _wave2CombatSince > 0
+                    && (EditorApplication.timeSinceStartup - _wave2CombatSince) >= 14.0;
+                if (waited && !_turretProofCaptured)
+                {
+                    _turretProofLine = "turretProof=False timeout after 14s of wave-2 hold-fire";
+                    _holdFire = false;
+                    _proofPhaseDone = true;
+                }
+            }
+
+            if (_wave2Captured
+                && match.State.Phase == MatchPhase.Planning
+                && match.State.Wave.Number >= 3
+                && shell != null
+                && shell.Planning != null
+                && _readiedWave != match.State.Wave.Number)
+            {
+                shell.Planning.ReadyUp();
+                _readiedWave = match.State.Wave.Number;
+                PurchaseLog.Add("ready-up wave=" + match.State.Wave.Number);
+            }
+
+            if (!_wave3Captured
+                && match.State.Phase == MatchPhase.Combat
+                && match.State.Wave.Number >= 3
+                && match.State.Wave.LivingMonsterIds.Count > 0)
+            {
+                _wave3Captured = true;
+                PurchaseLog.Add("wave3 live monsters=" + match.State.Wave.LivingMonsterIds.Count);
+            }
+        }
+
+        private static void ParkHeroEast(HostedMatch match)
+        {
+            Hero hero = null;
+            foreach (var h in match.State.Heroes.Values)
+            {
+                if (h != null && h.Alive)
+                {
+                    hero = h;
+                    break;
+                }
+            }
+
+            if (hero == null)
+            {
+                return;
+            }
+
+            // Walk toward +x so the gunslinger is not standing on the west lane the turret covers.
+            if (hero.Pos.X < 8.0)
+            {
+                OverlayInputSource.ExtraHeld.Add(PlayerKey.D);
+            }
+        }
+
+        private static void SnapshotLivingHp(MatchState state)
+        {
+            Wave2HpAtHold.Clear();
+            foreach (var monster in state.Monsters.Values)
+            {
+                if (monster != null && monster.Alive)
+                {
+                    Wave2HpAtHold[monster.Id] = monster.Hp;
+                }
+            }
+        }
+
+        /// <summary>
+        /// A turret shot is 20 dmg (R-23). Gunslinger SPACE is 25. With SPACE released, an HP
+        /// drop of ~20 on a living wave-2 monster is the turret (we bought no trap).
+        /// </summary>
+        private static void TryCaptureTurretProof(HostedMatch match)
+        {
+            foreach (var monster in match.State.Monsters.Values)
+            {
+                if (monster == null)
+                {
+                    continue;
+                }
+
+                double before;
+                if (!Wave2HpAtHold.TryGetValue(monster.Id, out before))
+                {
+                    continue;
+                }
+
+                var dropped = before - monster.Hp;
+                if (dropped < 19.0)
+                {
+                    continue;
+                }
+
+                _turretProofCaptured = true;
+                _proofPhaseDone = true;
+                _holdFire = false;
+                _turretProofLine = "turretProof=True monster=" + monster.Id
+                    + " type=" + monster.Type
+                    + " hp=" + before.ToString("0.0") + "->" + monster.Hp.ToString("0.0")
+                    + " drop=" + dropped.ToString("0.0")
+                    + " spaceHeld=False";
+                DumpCamera(Camera.main, TurretShotPath);
+                PurchaseLog.Add(_turretProofLine);
+                return;
             }
         }
 
@@ -357,7 +501,7 @@ namespace RedHollow.EditorTools
             var preferred = new[]
             {
                 new Vec2(-20.0, 0.0),
-                new Vec2(-16.0, -4.0),
+                new Vec2(-16.0, 0.0),
                 new Vec2(-18.0, 4.0),
                 new Vec2(-14.0, 2.0),
                 new Vec2(5.0, 0.0),
@@ -529,6 +673,8 @@ namespace RedHollow.EditorTools
                     .Append(" exists=").Append(File.Exists(Wave2Path)).Append('\n');
                 sb.Append("shopShot=").Append(ShopPath)
                     .Append(" exists=").Append(File.Exists(ShopPath)).Append('\n');
+                sb.Append("turretShot=").Append(TurretShotPath)
+                    .Append(" exists=").Append(File.Exists(TurretShotPath)).Append('\n');
                 try
                 {
                     CropHeroProof(cam, ProofPath);
@@ -791,7 +937,13 @@ namespace RedHollow.EditorTools
             sb.Append("proofReady=").Append(CombatProofReady()).Append('\n');
             sb.Append("wave1Clear=").Append(_wave1Captured)
                 .Append(" wave2Live=").Append(_wave2Captured)
-                .Append(" shopPlaced=").Append(_shopAttempted).Append('\n');
+                .Append(" shopPlaced=").Append(_shopAttempted)
+                .Append(" turretProof=").Append(_turretProofCaptured)
+                .Append(" wave3Live=").Append(_wave3Captured).Append('\n');
+            if (!string.IsNullOrEmpty(_turretProofLine))
+            {
+                sb.Append(_turretProofLine).Append('\n');
+            }
         }
 
         private static void CropHeroProof(Camera camera, string path)

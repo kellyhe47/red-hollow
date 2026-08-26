@@ -44,6 +44,26 @@ namespace RedHollow.Game.Host
         private readonly IMonsterAttackSource _monsterAttacks;
         private readonly IHeroIntentSource _heroIntents;
 
+        /// <summary>
+        /// R-23 — 20 damage per TurretTick at 20 DPS means one call per second. Accumulated here
+        /// rather than inside the sim: TurretTick has no cadence of its own (G-028 is "on its
+        /// damage tick"), and inventing a TickTurrets() on MatchSim would be a new rule.
+        /// </summary>
+        private const double TurretTickIntervalSeconds = 1.0;
+
+        private double _turretAcc;
+
+        /// <summary>
+        /// Trap/monster pairs overlapping last step, keyed "placeableId\0monsterId". TriggerPlaceable
+        /// spends a spike trigger per CALL, so occupancy must not re-fire every frame — only the
+        /// enter (a crossing) issues the command.
+        /// </summary>
+        private readonly HashSet<string> _onTrap = new HashSet<string>();
+
+        private readonly HashSet<string> _onTrapNow = new HashSet<string>();
+
+        private readonly List<string> _scratchIds = new List<string>();
+
         /// <param name="heroIntents">
         /// Ticket 019 / R-30 — where this step's resolved hero intents come from. Optional for the
         /// same reason <paramref name="monsterAttacks"/> is: a host driving no player-controlled
@@ -104,7 +124,110 @@ namespace RedHollow.Game.Host
             }
 
             ResolveHeroMoves(deltaSeconds);
+
+            // After movement so a monster that walked into range / onto a trap this step is
+            // eligible the same tick. Gated on IMatchSimHost the same way TickMonsterMovement is:
+            // a bare ISimHost (T-10's recording fake) has no per-entity placeable commands.
+            TickTurrets(deltaSeconds);
+            TriggerTrapCrossings();
+
             ResolveMonsterAttacks(deltaSeconds);
+        }
+
+        /// <summary>
+        /// R-23 / G-028. One TurretTick per standing turret per second. The sim picks the nearest
+        /// living monster in range; an empty-sky tick is a defined no-op.
+        /// </summary>
+        private void TickTurrets(double deltaSeconds)
+        {
+            if (_matchSim == null || _matchSim.State == null)
+            {
+                return;
+            }
+
+            _turretAcc += deltaSeconds;
+            if (_turretAcc < TurretTickIntervalSeconds)
+            {
+                return;
+            }
+
+            _turretAcc -= TurretTickIntervalSeconds;
+
+            _scratchIds.Clear();
+            foreach (var placeable in _matchSim.State.Placeables.Values)
+            {
+                if (placeable != null
+                    && placeable.Exists
+                    && placeable.Type == PlaceableType.Turret)
+                {
+                    _scratchIds.Add(placeable.Id);
+                }
+            }
+
+            for (var i = 0; i < _scratchIds.Count; i++)
+            {
+                _matchSim.TurretTick(_scratchIds[i]);
+            }
+        }
+
+        /// <summary>
+        /// R-23 / G-027 / G-029. A monster whose centre has just entered a standing trap's
+        /// footprint (the existing R-24 occupancy radius) is a crossing. Inclusive, matching
+        /// G-019's boundary convention. Re-issue is suppressed while the pair stays overlapping
+        /// so a 10-trigger spike is not spent in ten frames.
+        /// </summary>
+        private void TriggerTrapCrossings()
+        {
+            if (_matchSim == null || _matchSim.State == null)
+            {
+                return;
+            }
+
+            var state = _matchSim.State;
+            var radius = _matchSim.PlaceableFootprintRadius;
+            _onTrapNow.Clear();
+
+            foreach (var placeable in state.Placeables.Values)
+            {
+                if (placeable == null || !placeable.Exists)
+                {
+                    continue;
+                }
+
+                if (placeable.Type != PlaceableType.SpikeTrap
+                    && placeable.Type != PlaceableType.DynamiteTrap)
+                {
+                    continue;
+                }
+
+                foreach (var monster in state.Monsters.Values)
+                {
+                    if (monster == null || !monster.Alive)
+                    {
+                        continue;
+                    }
+
+                    if (placeable.Pos.DistanceTo(monster.Pos) > radius)
+                    {
+                        continue;
+                    }
+
+                    var key = placeable.Id + "\0" + monster.Id;
+                    _onTrapNow.Add(key);
+                    if (_onTrap.Contains(key))
+                    {
+                        continue;
+                    }
+
+                    _matchSim.TriggerPlaceable(placeable.Id, monster.Id);
+                }
+            }
+
+            _onTrap.Clear();
+            foreach (var key in _onTrapNow)
+            {
+                _onTrap.Add(key);
+            }
         }
 
         /// <summary>

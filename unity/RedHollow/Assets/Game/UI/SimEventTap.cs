@@ -192,5 +192,21 @@ namespace RedHollow.Game.UI
             Drain();
             return result;
         }
+
+        public TurretTickResult TurretTick(string turretId)
+        {
+            var result = _inner.TurretTick(turretId);
+            Drain();
+            return result;
+        }
+
+        public ISimResult TriggerPlaceable(string placeableId, string monsterId)
+        {
+            var result = _inner.TriggerPlaceable(placeableId, monsterId);
+            Drain();
+            return result;
+        }
+
+        public double PlaceableFootprintRadius => _inner.PlaceableFootprintRadius;
     }
 }

@@ -48,5 +48,26 @@ namespace RedHollow.Game.Host
         /// nowhere else, which is what makes this the hinge of wave progression.
         /// </summary>
         PlanningPhaseResult BeginPlanningPhase();
+
+        /// <summary>
+        /// R-23 / G-028 — one turret's damage tick. Per-entity (takes the turret id), so it is not
+        /// one of T-10's parameterless Tick* net; the host loop walks standing turrets and issues
+        /// this command for each. The sim owns nearest-in-range targeting; the host owns the 1 Hz
+        /// schedule that makes catalog Damage 20 equal R-23's 20 DPS.
+        /// </summary>
+        TurretTickResult TurretTick(string turretId);
+
+        /// <summary>
+        /// R-23 / G-027 / G-029 — a monster crossed a trap. Contact is geometry the sim does not
+        /// own, so the host detects the enter and issues this; the sim owns the spike countdown
+        /// and the dynamite blast.
+        /// </summary>
+        ISimResult TriggerPlaceable(string placeableId, string monsterId);
+
+        /// <summary>
+        /// R-24 — the existing placeable occupancy radius on MatchSim. Trap crossings use this
+        /// rather than a second number invented in the shell.
+        /// </summary>
+        double PlaceableFootprintRadius { get; }
     }
 }
