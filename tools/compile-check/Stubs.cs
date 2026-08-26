@@ -41,17 +41,6 @@ namespace UnityEngine
     }
 }
 
-namespace RedHollow.Game.Input
-{
-    public sealed class HeroIntent
-    {
-        public UnityEngine.Vector2 MoveDirection;
-        public UnityEngine.Vector2 AimPoint;
-        public bool BasicAttack;
-        public string AbilitySlot;
-    }
-}
-
 namespace RedHollow.Game.View
 {
     public sealed class MatchViewBinder
