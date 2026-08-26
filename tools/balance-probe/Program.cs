@@ -367,8 +367,11 @@ namespace RedHollow.Tools.BalanceProbe
                     continue;
                 }
 
-                // The shell's derived reach: arrived, or arrived this tick.
-                if (monster.Pos.DistanceTo(targetPos) > monster.CurrentSpeed * StepSeconds)
+                // The shell's derived reach — arrived or arrived this tick — plus the archetype's
+                // own attack range (the Spitter's acid holds and fires from 10 out, R-17).
+                var reach = (monster.AttackRange > 0.0 ? monster.AttackRange : 0.0)
+                            + (monster.CurrentSpeed * StepSeconds);
+                if (monster.Pos.DistanceTo(targetPos) > reach)
                 {
                     continue;
                 }

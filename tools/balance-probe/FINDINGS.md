@@ -1,58 +1,48 @@
-# Balance probe findings — shipped numbers, 2026-08-26
+# Balance probe findings — shipped numbers, 2026-08-26 (updated after ticket 029)
 
 `dotnet run --project tools/balance-probe/BalanceProbe.csproj` (.NET 10). Every run drives the
 REAL `MatchSim` (shipped `SimConfig`, `WaveTable.V1`, `ColonyMap.V1`, the production
-`BarricadePathOracle`) through a faithful mirror of the Unity shell's host schedule. The scripted
-players have perfect aim and perfect uptime but no human movement finesse; treat them as a
-competent player, not the human ceiling in either direction.
+`BarricadePathOracle`, and — since ticket 029 — the Spitter's PRD-stated "ranged acid, range 10")
+through a faithful mirror of the Unity shell's host schedule. The scripted players have perfect
+aim and uptime but no human movement finesse; treat them as a competent player, not the human
+ceiling in either direction.
 
-## Outcomes at SHIPPED numbers
+## Outcomes at SHIPPED numbers (Spitter range live)
 
 | policy | outcome | died on | civilians |
 |---|---|---|---|
-| solo, basics only, no purchases | defeat | wave 8 | 0/20 |
-| solo + turrets | defeat | wave 9 | 0/20 |
-| solo + turrets + spikes | defeat | wave 10 | 0/20 |
-| solo + walls + turrets + spikes | defeat | wave 10 | 0/20 |
-| solo, full kit + abilities + threat-priority aim | defeat | wave 9 | 0/20 |
-| solo, full kit + spendthrift economy | defeat | wave 9 | 0/20 |
-| **two players, full kit** | **victory** | — | **20/20, zero downs** |
+| solo, basics only, no purchases | defeat | wave 6 | 0/20 |
+| solo + turrets (+ spikes, + walls) | defeat | wave 6 | 0/20 |
+| solo, full kit, nearest-monster aim | defeat | wave 6 | 0/20 |
+| **solo, full kit + THREAT-priority aim** | **victory** | — | **4/20** |
+| **two players, full kit** | **victory** | — | **6/20** |
 
-## Outcomes with waves 6–9 trimmed (probe-only config; defaults untouched)
-
-R-19's fixed points survive every candidate: wave 1 stays ~6 shamblers from one breach, the
-first Behemoth still lands at wave 5, and wave 10 ships exactly as authored (~30 mixed, all four
-breaches).
-
-| policy | outcome | civilians |
-|---|---|---|
-| solo skilled, 25% trim, lean economy | defeat on wave 10 | 20 → 0 in the finale alone |
-| solo skilled, 40% trim, lean economy | defeat on wave 10 | 20 → 0 in the finale alone |
-| **solo skilled, 25% trim + spendthrift economy** | **victory** | **6/20** |
-| duo, 25% trim (regression check) | victory | 20/20 |
+Earlier snapshots (before the Spitter's range existed) had every solo policy losing in waves
+8–10 and the duo winning 20/20. The ranged acid moved both ends: it punishes naive play four
+waves earlier, and it is the pressure that finally makes shelter-defence a real job for the duo.
 
 ## Reading
 
-1. **Waves 1–6 are safe solo under every policy** — zero losses even buying nothing.
-2. **At shipped numbers the solo campaign dies in waves 7–10, always by civilian bleed** —
-   3–4 simultaneous breaches outrun one hero's ~125 DPS plus an economy-capped turret grid.
-   20 civilians is the whole match's budget; waves 8–9 alone eat 10–16 of them.
-3. **The finale is the real wall.** Given a clean 20-civilian runway (any midgame trim), lean
-   solo play still loses wave 10 outright. What closes it is the ECONOMY: re-laying dynamite
-   every planning and buying turrets until the pool runs dry turns the trimmed finale into a
-   6/20 win. Solo winnability = midgame trim + spending discipline, together.
-4. **Two players win everything comfortably** (20/20 at shipped numbers, 2× time margin). The
-   shipped table reads as co-op-tuned.
-5. Barricades (now that the production path oracle exists) and spike lines are each worth about
-   one extra wave; abilities and repositioning moved little — the binding constraint is total
-   DPS across simultaneous lanes.
+1. **Spitters are the difficulty curve now.** From wave 4 they stand at their 10-unit line and
+   drain shelters (12 dmg/s each) while walkers soak attention. A player who keeps shooting the
+   nearest monster loses ten civilians in wave 4 alone and the colony by wave 6 — with any
+   amount of hardware on the ground, because turret nests parked by the shelters cannot reach a
+   spitter's line reliably (range 8 vs a line 10 from the shelter's centre).
+2. **Threat-priority targeting flips solo from unwinnable to a 4/20 win at shipped numbers.**
+   Kill what is about to land damage — spitters on their line, walkers at the door — and the
+   campaign closes. This is skill expression, not stat inflation: the difference between the
+   losing and winning solo runs is only which monster the reticle prefers.
+3. **The duo remains the comfortable way to play** (6/20, two-minute campaign), and spitters are
+   what keeps a duo honest — pre-029 they cleared 20/20 without noticing the roster.
+4. **No tuning recommendation stands.** The pre-029 candidates (waves 6–9 trims) are stale and
+   re-measured as unnecessary: solo is winnable at shipped numbers by exactly the player the
+   game is trying to teach. If the owner wants naive solo runs to survive past wave 6, the
+   measured lever is spitter count in waves 4–6 — but the current cliff reads as the game
+   working as designed.
 
-## Recommendation (owner decision — R-19 makes these numbers playtest-tunable)
+## Provenance
 
-If solo should be winnable at expert level: **trim waves 6–9 headcounts ~25%** (one config edit,
-fixed points untouched, duo stays a win). If solo should stay a co-op recruiting pitch, ship as
-is — the probe shows a skilled solo player reaching wave 8–10 before the colony falls, which is
-a real (if losing) run. Party-size wave scaling would close the gap cleanly but is a NEW sim
-rule needing a PRD decision first.
-
-No tuning was applied on this branch; the probe exists so any retune is measured, not guessed.
+Placeable combat (turrets 1 Hz, trap edge-triggering, kill reaping), the barricade path oracle,
+and the Spitter's attack range were all implemented on this branch; each probe update re-measured
+the same policies over the same shipped numbers. History of snapshots lives in this file's git
+log — the current table is the branch's live behaviour.
