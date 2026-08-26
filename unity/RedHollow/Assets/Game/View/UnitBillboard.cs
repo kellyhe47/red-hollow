@@ -82,10 +82,13 @@ namespace RedHollow.Game.View
 
             var root = new GameObject(name);
 
-            var bodyMat = ViewLook.Lit(bodyColor, smoothness: 0.10f);
+            // Lit, metallic 0, NOT emissive: the gunslinger receives the pool
+            // and casts a shadow. Cream/Unlit/emissive cards were the glowing
+            // cube around the hat.
+            var bodyMat = ViewLook.Lit(bodyColor, albedo, smoothness: 0.10f, emit: false);
             var cardMat = albedo != null
-                ? ViewLook.LitCutout(new Color(1.05f, 0.90f, 0.72f), albedo)
-                : ViewLook.Lit(bodyColor * 1.15f, smoothness: 0.10f);
+                ? ViewLook.LitCutout(Color.white, albedo, emit: false)
+                : bodyMat;
 
             var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             body.name = "body";
@@ -113,7 +116,7 @@ namespace RedHollow.Game.View
                 coat.transform.localScale = new Vector3(width * 0.92f, height * 0.52f, depth * 1.12f);
                 coat.transform.localPosition = new Vector3(0f, height * 0.36f, depth * 0.04f);
                 ViewLook.StripCollider(coat);
-                ViewLook.Paint(coat, ViewLook.Lit(new Color(0.22f, 0.13f, 0.07f), smoothness: 0.08f), castShadows: true);
+                ViewLook.Paint(coat, ViewLook.Lit(new Color(0.22f, 0.13f, 0.07f), smoothness: 0.08f, emit: false), castShadows: true);
 
                 var brim = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                 brim.name = "hat_brim";
@@ -121,7 +124,7 @@ namespace RedHollow.Game.View
                 brim.transform.localScale = new Vector3(headD * 1.85f, 0.035f, headD * 1.85f);
                 brim.transform.localPosition = new Vector3(0f, height - 0.04f, depth * 0.04f);
                 ViewLook.StripCollider(brim);
-                ViewLook.Paint(brim, ViewLook.Lit(new Color(0.12f, 0.07f, 0.04f), smoothness: 0.08f), castShadows: true);
+                ViewLook.Paint(brim, ViewLook.Lit(new Color(0.12f, 0.07f, 0.04f), smoothness: 0.08f, emit: false), castShadows: true);
 
                 var crown = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 crown.name = "hat_crown";
@@ -129,11 +132,11 @@ namespace RedHollow.Game.View
                 crown.transform.localScale = new Vector3(headD * 0.85f, 0.22f, headD * 0.95f);
                 crown.transform.localPosition = new Vector3(0f, height + 0.08f, depth * 0.04f);
                 ViewLook.StripCollider(crown);
-                ViewLook.Paint(crown, ViewLook.Lit(new Color(0.14f, 0.08f, 0.05f), smoothness: 0.08f), castShadows: true);
+                ViewLook.Paint(crown, ViewLook.Lit(new Color(0.14f, 0.08f, 0.05f), smoothness: 0.08f, emit: false), castShadows: true);
             }
 
-            // Front card faces local +Z (the unit's facing). Camera is south looking
-            // +Z, so a unit aiming into the cavern shows its back/side — a real figure.
+            // Front + back canon cards only. Left/right quads closed a glowing
+            // box around the hat. Cutout albedo + no emission = a person.
             PlaceCard(root.transform, "billboard", cardMat,
                 new Vector3(0f, height * 0.5f, depth * 0.52f),
                 Quaternion.identity,
@@ -142,14 +145,6 @@ namespace RedHollow.Game.View
                 new Vector3(0f, height * 0.5f, -depth * 0.52f),
                 Quaternion.Euler(0f, 180f, 0f),
                 new Vector3(width, height, 1f));
-            PlaceCard(root.transform, "card_right", cardMat,
-                new Vector3(width * 0.42f, height * 0.5f, 0f),
-                Quaternion.Euler(0f, 90f, 0f),
-                new Vector3(depth, height * 0.96f, 1f));
-            PlaceCard(root.transform, "card_left", cardMat,
-                new Vector3(-width * 0.42f, height * 0.5f, 0f),
-                Quaternion.Euler(0f, -90f, 0f),
-                new Vector3(depth, height * 0.96f, 1f));
 
             AttachBlobShadow(root.transform, Mathf.Max(0.7f, width * 0.85f));
             return root;

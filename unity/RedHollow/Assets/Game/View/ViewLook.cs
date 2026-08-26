@@ -55,7 +55,8 @@ namespace RedHollow.Game.View
         /// Falls back to Unlit only if neither Lit shader exists, never as the happy path.
         /// </summary>
         public static Material Lit(
-            Color color, Texture albedo = null, Texture normal = null, float smoothness = 0.18f)
+            Color color, Texture albedo = null, Texture normal = null, float smoothness = 0.18f,
+            bool emit = true)
         {
             var shader = FindLitShader();
             if (shader == null)
@@ -105,16 +106,28 @@ namespace RedHollow.Game.View
                 material.SetFloat("_Cull", 2f);
             }
 
-            // URP Lit with no probes/sky reads unlit as 0,0,0 (black IBL). A dim
-            // umber emissive keeps the near-cam deck readable without a sun or a
-            // fill-grid flood; lanterns still pool on top.
+            // Environment Lit: a *dim* umber emissive so cavern corners stay
+            // readable with no sky/probes. Units pass emit=false — they receive
+            // lanterns and cast, they do not glow like a lamp.
             if (material.HasProperty("_EmissionColor"))
             {
-                material.EnableKeyword("_EMISSION");
-                material.SetColor("_EmissionColor", new Color(0.16f, 0.100f, 0.045f));
-                if (material.HasProperty("_EmissionMap"))
+                if (emit)
                 {
-                    material.SetTexture("_EmissionMap", Texture2D.whiteTexture);
+                    material.EnableKeyword("_EMISSION");
+                    material.SetColor("_EmissionColor", new Color(0.08f, 0.048f, 0.020f));
+                    if (material.HasProperty("_EmissionMap"))
+                    {
+                        material.SetTexture("_EmissionMap", Texture2D.whiteTexture);
+                    }
+                }
+                else
+                {
+                    material.DisableKeyword("_EMISSION");
+                    material.SetColor("_EmissionColor", Color.black);
+                    if (material.HasProperty("_EmissionMap"))
+                    {
+                        material.SetTexture("_EmissionMap", Texture2D.blackTexture);
+                    }
                 }
             }
 
@@ -190,9 +203,9 @@ namespace RedHollow.Game.View
         /// of sitting as an Unlit postcard. Two-sided so a world-facing card is not
         /// invisible from behind.
         /// </summary>
-        public static Material LitCutout(Color color, Texture texture)
+        public static Material LitCutout(Color color, Texture texture, bool emit = true)
         {
-            var material = Lit(color, texture, smoothness: 0.12f);
+            var material = Lit(color, texture, smoothness: 0.12f, emit: emit);
             if (material == null)
             {
                 return UnlitCutout(color, texture);

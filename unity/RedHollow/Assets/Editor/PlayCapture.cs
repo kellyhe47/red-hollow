@@ -97,6 +97,14 @@ namespace RedHollow.EditorTools
 
             if (File.Exists(RequestPath) && !EditorApplication.isPlaying)
             {
+                // External script edits (this box) can miss the Linux watcher.
+                // Refresh so CavernBlockout / MatchSceneBuilder are live before Play.
+                AssetDatabase.Refresh();
+                if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+                {
+                    return;
+                }
+
                 try
                 {
                     var body = File.ReadAllText(RequestPath).Trim();
@@ -1451,6 +1459,38 @@ namespace RedHollow.EditorTools
                     .Append(" pos=").Append(light.transform.position)
                     .Append('\n');
             }
+
+            var stringTex = ViewLook.LoadTexture("RedHollowArt/string-lights");
+            sb.Append("stringLightsTex=").Append(stringTex != null ? stringTex.name : "null").Append('\n');
+            DumpFixture(sb, "StringLights_0");
+            DumpFixture(sb, "StringLights_1");
+            DumpFixture(sb, "StringGlobe_0_2");
+            DumpFixture(sb, "Window_SL_0");
+            DumpFixture(sb, "EaveGlass");
+            DumpFixture(sb, "Mast_0_glass");
+            DumpFixture(sb, "Mast_6_glass");
+        }
+
+        private static void DumpFixture(StringBuilder sb, string name)
+        {
+            var go = GameObject.Find(name);
+            sb.Append("fixture ").Append(name).Append(" present=").Append(go != null);
+            if (go != null)
+            {
+                sb.Append(" pos=").Append(go.transform.position)
+                    .Append(" scale=").Append(go.transform.lossyScale);
+                var renderer = go.GetComponentInChildren<Renderer>();
+                var mat = renderer != null ? renderer.sharedMaterial : null;
+                Texture tex = null;
+                if (mat != null)
+                {
+                    tex = mat.mainTexture;
+                }
+
+                sb.Append(" tex=").Append(tex != null ? tex.name : "null");
+            }
+
+            sb.Append('\n');
         }
 
         /// <summary>

@@ -49,11 +49,10 @@ namespace RedHollow.Game.View
     public static class MatchSceneBuilder
     {
         /// <summary>
-        /// How far above the colony floor the camera sits. Dropped from 16 so the
-        /// gunslinger reads ~1/8 frame like the trailer survivor vs houses. Keep the
-        /// south follow corridor empty so 1-storey flanks show SIDE+ROOF, not cliffs.
+        /// How far above the colony floor the camera sits. Street-scale follow:
+        /// hab SIDES, string lights and lamp heads fill the spawn shot.
         /// </summary>
-        public const float CameraHeight = 13.5f;
+        public const float CameraHeight = 16f;
 
         /// <summary>
         /// Pitch down from the horizon, degrees. ~55-58 so roof edges AND wall sides
@@ -62,7 +61,7 @@ namespace RedHollow.Game.View
         public const float CameraPitchDown = 55f;
 
         /// <summary>Vertical FOV for the street-scale follow cam. Ortho is retired.</summary>
-        public const float StreetFov = 44f;
+        public const float StreetFov = 38f;
 
         /// <summary>Legacy name kept so older callers compile; no longer drives the view.</summary>
         public const float StreetOrthoSize = 10f;
@@ -109,7 +108,7 @@ namespace RedHollow.Game.View
         /// brown, not 0,0,0. 0.07 crushed the near-cam deck into a black letterbox.
         /// Ceiling 0.25 is T-13 near-black; stay under it.
         /// </summary>
-        private static readonly Color AmbientUmber = new Color(0.24f, 0.155f, 0.075f);
+        private static readonly Color AmbientUmber = new Color(0.13f, 0.082f, 0.040f);
 
         /// <summary>
         /// Compose the scene the session is played in: a tilted top-down camera, the colony floor,
@@ -261,6 +260,12 @@ namespace RedHollow.Game.View
                     light.enabled = false;
                 }
             }
+
+            var urp = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
+            if (urp != null)
+            {
+                urp.maxAdditionalLightsCount = 16;
+            }
         }
 
         /// <summary>
@@ -335,7 +340,7 @@ namespace RedHollow.Game.View
             // Offset off the hero's head so the body is side-lit and the deck
             // pools instead of flooding. Matches the spawn-pad lamp mesh.
             var spawn = new Vec2(map.TeamSpawn.X + 2.8, map.TeamSpawn.Y + 2.8);
-            AddLantern(root, "Lantern_Spawn", spawn, 5.2f, amber, 10f, 40f, soft);
+            AddLantern(root, "Lantern_Spawn", spawn, 5.2f, amber, 9f, 32f, soft);
 
             foreach (var spec in map.Hotspots)
             {
@@ -347,8 +352,8 @@ namespace RedHollow.Game.View
                 AddLantern(root, "Lantern_" + spec.Id, spec.Pos, 6.2f, amber, 11f, 28f, LightShadows.None);
             }
 
-            // Street masts at hab rims. Two courtyard-facing masts keep Soft
-            // shadows so habs and the gunslinger blob the deck.
+            // Courtyard masts (match CavernBlockout posts). Two south posts keep
+            // Soft shadows so habs and the gunslinger blob the deck.
             var masts = new[]
             {
                 new Vec2(10.4, -1.1),
@@ -357,14 +362,14 @@ namespace RedHollow.Game.View
                 new Vec2(-11.0, 7.0),
             };
             var mastShadows = new[] { soft, soft, LightShadows.None, LightShadows.None };
-            var mastCd = new[] { 36f, 36f, 24f, 24f };
+            var mastCd = new[] { 26f, 26f, 14f, 14f };
             for (var i = 0; i < masts.Length; i++)
             {
-                AddLantern(root, "Lantern_Mast_" + i, masts[i], 5.6f, amber, 10f, mastCd[i], mastShadows[i]);
+                AddLantern(root, "Lantern_Mast_" + i, masts[i], 5.6f, amber, 9f, mastCd[i], mastShadows[i]);
             }
 
-            // Dim fills on the SOUTH near deck — the 55° follow-cam's foreground.
-            // Intensity well below the keys so pools still read; no shadows.
+            // Fills on the SOUTH near deck AND the NORTH far deck so the 55°
+            // follow-cam's top of frame is umber, not a black letterbox.
             var fills = new[]
             {
                 new Vec2(0.0, -5.4),
@@ -372,10 +377,10 @@ namespace RedHollow.Game.View
                 new Vec2(-6.2, -4.6),
                 new Vec2(0.0, -1.6),
             };
-            var fillCd = new[] { 14f, 12f, 12f, 10f };
+            var fillCd = new[] { 5f, 4f, 4f, 3.5f };
             for (var i = 0; i < fills.Length; i++)
             {
-                AddLantern(root, "Lantern_Fill_" + i, fills[i], 3.2f, fill, 9f, fillCd[i], LightShadows.None);
+                AddLantern(root, "Lantern_Fill_" + i, fills[i], 3.2f, fill, 6f, fillCd[i], LightShadows.None);
             }
         }
 
