@@ -1,10 +1,10 @@
 ---
 id: 021
 title: Runtime binding — UI screens, feel router and art resolver into the playable shell
-status: pending
+status: green
 depends_on: [012, 013, 019]
 touches: [unity/RedHollow/Assets/Game/UI/, unity/RedHollow/Assets/Game/View/]
-iterations: 0
+iterations: 1
 test_files:
   - unity/RedHollow/Assets/Tests/EditMode/T21_ShellUiBindingTests.cs
   - unity/RedHollow/Assets/Tests/EditMode/T21_FeelArtBindingTests.cs
@@ -27,12 +27,12 @@ effects, and resolves real art.
 
 ## Acceptance criteria
 
-- [ ] a launched scene renders the UI screens through the 012 models — visible UI elements
+- [x] a launched scene renders the UI screens through the 012 models — visible UI elements
       bound to model state, screen switching driven by `UiRouter`
-- [ ] the host's sim event stream reaches `FeelRouter`; feel state applied to views each frame
-- [ ] `MatchViewBinder` receives an `ArtVisualResolver` whose catalog registers the imported
+- [x] the host's sim event stream reaches `FeelRouter`; feel state applied to views each frame
+- [x] `MatchViewBinder` receives an `ArtVisualResolver` whose catalog registers the imported
       representative assets, chained over the placeholder
-- [ ] the Cecil invariant still holds — UI/feel MonoBehaviours never write sim state
+- [x] the Cecil invariant still holds — UI/feel MonoBehaviours never write sim state
 
 ## Test plan
 
@@ -119,3 +119,5 @@ new green is the plain-C#-shape guard, green-on-stubs by design (T-19 AC6 preced
 ## Attempt log
 
 _(created 2026-08-25 by the handoff-2 orchestrator after the §5 recheck.)_
+
+- 2026-08-25 green in 1 pass. Red verified 11/12 NotImplementedException (1 shape guard green by design). Green verified by orchestrator: EditMode 154/154, dotnet 371/371; locked areas and adjacent shell dirs untouched.
