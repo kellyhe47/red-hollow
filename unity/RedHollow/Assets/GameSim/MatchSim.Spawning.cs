@@ -153,6 +153,10 @@ namespace RedHollow.Sim
                         // BaseSpeed, so one that spawned pre-slowed would speed up the first time
                         // it was lassoed and released.
                         CurrentSpeed = entry.Stats.MoveSpeed,
+
+                        // R-17 — the archetype's reach rides onto the entity like every other
+                        // column (the Spitter's "ranged acid, range 10"; zero for melee).
+                        AttackRange = entry.Stats.AttackRange,
                         Alive = true,
                     };
 

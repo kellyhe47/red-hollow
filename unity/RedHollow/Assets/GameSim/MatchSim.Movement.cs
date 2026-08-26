@@ -130,15 +130,15 @@ namespace RedHollow.Sim
 
                 // Arrival (R-18). The step is clamped to the ground there actually is to cover, so
                 // a monster lands on its target rather than sailing past it and then oscillating
-                // across it for the rest of the match once the direction is recomputed. A clamp
-                // rather than a stopping radius because the PRD names no melee reach — inventing
-                // one here would ship a guess as spec, and the clamp needs no number at all. At a
-                // real 60Hz tick it never binds; it exists for the coarse steps a stalled host
-                // catches up with.
+                // across it for the rest of the match once the direction is recomputed. The stop
+                // line is the archetype's own reach (R-17): zero for melee — the arrival clamp,
+                // bit-identical to what always shipped — and the Spitter's PRD-stated 10, which is
+                // the one row that names a reach. No other number is invented here.
                 var gap = from.DistanceTo(targetPos);
-                if (step > gap)
+                var ground = gap - (monster.AttackRange > 0.0 ? monster.AttackRange : 0.0);
+                if (step > ground)
                 {
-                    step = gap;
+                    step = ground;
                 }
 
                 if (!(step > 0.0))
