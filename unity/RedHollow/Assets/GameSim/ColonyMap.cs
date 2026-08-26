@@ -43,22 +43,22 @@ namespace RedHollow.Sim
         ///
         /// The civilian counts are the contract (R-10 / R-02: 8 + 6 + 6 = 20 is a match's whole loss
         /// budget). The coordinates are layout taste — no fixture pins them — and describe a cavern
-        /// roughly 60 units across: the three shelters ring the centre, the four tunnels breach the
+        /// roughly 100 units across so a tight follow-cam reveals streets: the three shelters ring the centre, the four tunnels breach the
         /// edges, and the team spawn sits at the middle so every shelter is a comparable run away.
         /// </summary>
         public static ColonyMap V1()
         {
             var map = new ColonyMap();
 
-            map.Hotspots.Add(new HotspotSpec { Id = "hs_saloon", Pos = new Vec2(-12.0, 6.0), Civilians = 8 });
-            map.Hotspots.Add(new HotspotSpec { Id = "hs_chapel", Pos = new Vec2(11.0, 9.0), Civilians = 6 });
-            map.Hotspots.Add(new HotspotSpec { Id = "hs_homestead", Pos = new Vec2(2.0, -13.0), Civilians = 6 });
+            map.Hotspots.Add(new HotspotSpec { Id = "hs_saloon", Pos = new Vec2(-24.0, 16.0), Civilians = 8 });
+            map.Hotspots.Add(new HotspotSpec { Id = "hs_chapel", Pos = new Vec2(22.0, 18.0), Civilians = 6 });
+            map.Hotspots.Add(new HotspotSpec { Id = "hs_homestead", Pos = new Vec2(4.0, -28.0), Civilians = 6 });
 
             // R-14 — four breaches, one per cavern edge, so no shelter is safe by geometry alone.
-            map.EntryTunnels.Add(new Vec2(-30.0, 0.0));
-            map.EntryTunnels.Add(new Vec2(30.0, 0.0));
-            map.EntryTunnels.Add(new Vec2(0.0, 30.0));
-            map.EntryTunnels.Add(new Vec2(0.0, -30.0));
+            map.EntryTunnels.Add(new Vec2(-48.0, 0.0));
+            map.EntryTunnels.Add(new Vec2(48.0, 0.0));
+            map.EntryTunnels.Add(new Vec2(0.0, 48.0));
+            map.EntryTunnels.Add(new Vec2(0.0, -48.0));
 
             // R-33 — heroes enter at wave 1 and respawn here; mirrors SimConfig.RespawnPoint.
             map.TeamSpawn = new Vec2(0.0, 0.0);

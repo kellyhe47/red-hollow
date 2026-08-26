@@ -163,6 +163,101 @@ namespace RedHollow.Sim.Tests
             Assert.That(result.Distance, Is.EqualTo(expectedDistance).Within(Tolerance));
         }
 
+        // ---- BarricadePathOracle: live geometry, not a declared pair --------------------------------
+
+        /// <summary>
+        /// G-004's arrangement, answered from positions rather than from a declared pair: a wall
+        /// sitting on the walk from the shambler to the saloon becomes the target. This is the
+        /// production oracle the Unity factory injects; goldens still use DeclaredPathOracle so
+        /// a fixture that names `blocks_path_between` is not rewritten as geometry.
+        /// </summary>
+        [Test]
+        public void A_standing_barricade_across_the_walk_becomes_the_target()
+        {
+            var state = new MatchState();
+            AddMonster(state, "m1", MonsterType.Shambler, 0, 0);
+            AddHotspot(state, "hs_saloon", 10, 0, civilians: 8);
+            AddBarricade(state, "bar_1", 5, 0, hp: 300);
+
+            var result = new MatchSim(state, pathOracle: new BarricadePathOracle(state)).SelectTarget("m1");
+
+            Assert.That(result.TargetId, Is.EqualTo("bar_1"));
+            Assert.That(result.Distance, Is.EqualTo(5.0).Within(Tolerance));
+        }
+
+        /// <summary>
+        /// Off the walk is not "in the way". A wall five units beside the lane must not steal the
+        /// hotspot — otherwise every barricade on the map is every monster's target.
+        /// </summary>
+        [Test]
+        public void A_barricade_off_the_walk_does_not_redirect()
+        {
+            var state = new MatchState();
+            AddMonster(state, "m1", MonsterType.Shambler, 0, 0);
+            AddHotspot(state, "hs_saloon", 10, 0, civilians: 8);
+            AddBarricade(state, "bar_1", 5, 5, hp: 300);
+
+            var result = new MatchSim(state, pathOracle: new BarricadePathOracle(state)).SelectTarget("m1");
+
+            Assert.That(result.TargetId, Is.EqualTo("hs_saloon"));
+        }
+
+        /// <summary>
+        /// "First" is nearest along the walk, not cheapest id: the wall the monster hits first is
+        /// the one it chews, even if a later wall sorts earlier.
+        /// </summary>
+        [Test]
+        public void The_first_standing_barricade_along_the_walk_wins()
+        {
+            var state = new MatchState();
+            AddMonster(state, "m1", MonsterType.Shambler, 0, 0);
+            AddHotspot(state, "hs_saloon", 10, 0, civilians: 8);
+            AddBarricade(state, "bar_z", 3, 0, hp: 300);
+            AddBarricade(state, "bar_a", 7, 0, hp: 300);
+
+            var result = new MatchSim(state, pathOracle: new BarricadePathOracle(state)).SelectTarget("m1");
+
+            Assert.That(result.TargetId, Is.EqualTo("bar_z"),
+                "the nearer wall is first on the walk even though bar_a sorts earlier");
+        }
+
+        /// <summary>
+        /// B-003 in the oracle itself: a Burrower walking the same line as the shambler above
+        /// ignores the wall (and the hero) and commits to the hotspot at its true distance.
+        /// </summary>
+        [Test]
+        public void A_burrower_tunnels_past_a_wall_the_oracle_can_see()
+        {
+            var state = new MatchState();
+            AddMonster(state, "m9", MonsterType.Burrower, 0, 0);
+            AddHero(state, "hero_a", 1, 0, alive: true);
+            AddHotspot(state, "hs_saloon", 10, 0, civilians: 8);
+            AddBarricade(state, "bar_1", 5, 0, hp: 300);
+
+            var result = new MatchSim(state, pathOracle: new BarricadePathOracle(state)).SelectTarget("m9");
+
+            Assert.That(result.TargetId, Is.EqualTo("hs_saloon"));
+            Assert.That(result.Distance, Is.EqualTo(10.0).Within(Tolerance));
+        }
+
+        /// <summary>
+        /// Exists is the standing predicate. A sold or destroyed wall is ground again and must
+        /// not redirect, matching G-004's "until destroyed" and T06's retarget after the break.
+        /// </summary>
+        [Test]
+        public void A_destroyed_barricade_is_not_across_the_walk()
+        {
+            var state = new MatchState();
+            AddMonster(state, "m1", MonsterType.Shambler, 0, 0);
+            AddHotspot(state, "hs_saloon", 10, 0, civilians: 8);
+            AddBarricade(state, "bar_1", 5, 0, hp: 0);
+            state.Placeables["bar_1"].Exists = false;
+
+            var result = new MatchSim(state, pathOracle: new BarricadePathOracle(state)).SelectTarget("m1");
+
+            Assert.That(result.TargetId, Is.EqualTo("hs_saloon"));
+        }
+
         // ---- sad paths -----------------------------------------------------------------------------
 
         /// <summary>

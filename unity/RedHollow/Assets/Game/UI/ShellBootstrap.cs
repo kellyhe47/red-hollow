@@ -249,6 +249,9 @@ namespace RedHollow.Game.UI
         /// <summary>T-26 — the attached colony scene (null until the entry hands one over).</summary>
         private MatchScene _scene;
 
+        /// <summary>Street-cam follow has snapped once this match (smooth thereafter).</summary>
+        private bool _cameraFollowSeeded;
+
         /// <summary>
         /// T-24 — was MouseLeft held on the PREVIOUS pump? <see cref="InputSnapshot.Pressed"/> is
         /// held-this-frame, so a press EDGE (one click per press, never one per pump) needs the
@@ -663,6 +666,12 @@ namespace RedHollow.Game.UI
 
             // 6 — presentation feel on top of the authoritative sync (transform only, T-10).
             ApplyFeel();
+
+            // R-30 — face the cursor, not the feet. Views just synced from replicated state;
+            // this is the one presentation pose that does not come from the sim.
+            ApplyLocalHeroFacing();
+
+            FollowLocalHeroCamera(deltaSeconds);
         }
 
         /// <summary>
@@ -708,11 +717,10 @@ namespace RedHollow.Game.UI
 
             RegisterResourceArt(catalog, ShellArtKeys.GroundTile, "RedHollowArt/cavern-ground");
             RegisterResourceArt(catalog, ShellArtKeys.GunslingerCharacter, "RedHollowArt/gunslinger");
-            RegisterResourceArt(catalog, ShellArtKeys.RevolverShotIcon, "RedHollowArt/gs-revolver-shot");
-            RegisterResourceArt(catalog, ShellArtKeys.ButtonFrame, "RedHollowArt/button-normal");
-
             RegisterResourceArt(catalog, HeroClass.Rancher, "RedHollowArt/rancher");
             RegisterResourceArt(catalog, HeroClass.Sawbones, "RedHollowArt/sawbones");
+            RegisterResourceArt(catalog, ShellArtKeys.RevolverShotIcon, "RedHollowArt/gs-revolver-shot");
+            RegisterResourceArt(catalog, ShellArtKeys.ButtonFrame, "RedHollowArt/button-normal");
 
             RegisterResourceArt(catalog, MonsterType.Shambler, "RedHollowArt/shambler");
             RegisterResourceArt(catalog, MonsterType.Ravager, "RedHollowArt/ravager");
@@ -745,6 +753,7 @@ namespace RedHollow.Game.UI
             }
 
             _boundMatch = match;
+            _cameraFollowSeeded = false;
 
             // T-25 — combat routing state is per match: a fresh match starts with no ability
             // outcome, no cadence in flight, and no key remembered as held from the old one.
@@ -1139,7 +1148,7 @@ namespace RedHollow.Game.UI
             {
                 var monsterId = _reapScratch[i];
                 if (!state.Monsters.TryGetValue(monsterId, out var monster)
-                    || monster == null || !monster.Alive || monster.Hp > 0.0)
+                    || monster == null || monster.Hp > 0.0)
                 {
                     continue;
                 }
@@ -1359,6 +1368,7 @@ namespace RedHollow.Game.UI
             _ui.WaveLabel.text = "Wave "
                 + _hud.WaveNumber.ToString(CultureInfo.InvariantCulture)
                 + "/" + _hud.TotalWaves.ToString(CultureInfo.InvariantCulture);
+
             _ui.ScripLabel.text = _hud.Scrip.ToString(CultureInfo.InvariantCulture) + " scrip";
             _ui.HpLabel.text = ((int)_hud.Hp).ToString(CultureInfo.InvariantCulture) + " HP";
             _ui.MonstersRemainingLabel.text =
@@ -1402,6 +1412,75 @@ namespace RedHollow.Game.UI
         }
 
         /// <summary>
+        /// R-30 — turn the local hero's view toward this frame's aim point. Presentation only:
+        /// <see cref="HeroView.Apply"/> writes the view's facing/rotation, never sim state.
+        /// </summary>
+        private void ApplyLocalHeroFacing()
+        {
+            var intent = _heroIntents != null ? _heroIntents.LastIntent : null;
+            if (intent == null || _views == null)
+            {
+                return;
+            }
+
+            var hero = LocalHeroOf(_boundMatch == null ? null : _boundMatch.State);
+            if (hero == null)
+            {
+                return;
+            }
+
+            var view = _views.HeroViewFor(hero.Id);
+            if (view != null)
+            {
+                view.Apply(intent);
+            }
+        }
+
+        /// <summary>
+        /// Street-scale follow cam: keep the local living hero in frame. Presentation only —
+        /// reads replicated hero position, writes the camera transform, never sim state.
+        /// </summary>
+        private void FollowLocalHeroCamera(double deltaSeconds)
+        {
+            if (_scene == null || _scene.Camera == null)
+            {
+                return;
+            }
+
+            Vector3 lookAt;
+            var hero = LocalHeroOf(_boundMatch == null ? null : _boundMatch.State);
+            if (hero != null && hero.Alive)
+            {
+                lookAt = SimSpace.ToWorld(hero.Pos);
+            }
+            else if (_scene.TeamSpawn != null)
+            {
+                lookAt = _scene.TeamSpawn.transform.position;
+            }
+            else
+            {
+                lookAt = Vector3.zero;
+            }
+
+            var desired = lookAt + MatchSceneBuilder.FollowOffset;
+            var cam = _scene.Camera.transform;
+            if (!_cameraFollowSeeded || deltaSeconds <= 0.0)
+            {
+                cam.position = desired;
+                _cameraFollowSeeded = true;
+            }
+            else
+            {
+                var t = 1f - Mathf.Exp(-7.5f * (float)deltaSeconds);
+                cam.position = Vector3.Lerp(cam.position, desired, t);
+            }
+
+            cam.rotation = Quaternion.Euler(MatchSceneBuilder.CameraPitchDown, 0f, 0f);
+            _scene.Camera.orthographic = true;
+            _scene.Camera.orthographicSize = MatchSceneBuilder.StreetOrthoSize;
+        }
+
+        /// <summary>
         /// R-64 — <see cref="FeelRig.Apply"/> per bound monster view, on top of the position the
         /// binder's sync wrote. The nudge lands on the TRANSFORM only; sim state is never written.
         /// </summary>
@@ -1429,6 +1508,7 @@ namespace RedHollow.Game.UI
 
             catalog.Register(artKey, () =>
             {
+
                 if (!textureAttempted)
                 {
                     textureAttempted = true;
@@ -1445,8 +1525,43 @@ namespace RedHollow.Game.UI
                 {
                     var plane = GameObject.CreatePrimitive(PrimitiveType.Plane);
                     plane.name = name;
-                    TopDownArt.Paint(plane, TopDownArt.Rust, texture, 1f);
+                    ViewLook.StripCollider(plane);
+                    var groundMat = ViewLook.Lit(new Color(0.82f, 0.58f, 0.38f), texture,
+                        ViewLook.LoadTexture(resourcePath + "_normal"),
+                        smoothness: 0.12f);
+                    if (groundMat != null)
+                    {
+                        ViewLook.SetTiling(groundMat, new Vector2(8f, 8f));
+                        ViewLook.Paint(plane, groundMat);
+                    }
+
                     return plane;
+                }
+
+                if (IsCharacterKey(artKey))
+                {
+                    var standing = ViewLook.CreateStandingSprite(texture);
+                    if (standing == null)
+                    {
+                        return null;
+                    }
+
+                    var go = new GameObject(name);
+                    var renderer = go.AddComponent<SpriteRenderer>();
+                    renderer.sprite = standing;
+                    renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    renderer.receiveShadows = false;
+
+                    var targetHeight = CharacterHeight(artKey);
+                    var natural = standing.bounds.size.y;
+                    if (natural > 0.0001f)
+                    {
+                        var s = targetHeight / natural;
+                        go.transform.localScale = new Vector3(s, s, 1f);
+                    }
+
+                    var height = standing.bounds.size.y * go.transform.localScale.y;
+                    return UnitBillboard.WrapStandingSprite(go, height);
                 }
 
                 if (IsStandingSprite(artKey))
@@ -1456,6 +1571,35 @@ namespace RedHollow.Game.UI
 
                 return TopDownArt.QuadOnXz(name, FootprintForArtKey(artKey), texture, Color.white);
             });
+        }
+
+        private static bool IsCharacterKey(string artKey)
+        {
+            return artKey == HeroClass.Gunslinger
+                || artKey == HeroClass.Rancher
+                || artKey == HeroClass.Sawbones
+                || artKey == MonsterType.Shambler
+                || artKey == MonsterType.Ravager
+                || artKey == MonsterType.Spitter
+                || artKey == MonsterType.Burrower
+                || artKey == MonsterType.BullBehemoth;
+        }
+
+        private static float CharacterHeight(string artKey)
+        {
+            if (artKey == MonsterType.BullBehemoth)
+            {
+                return 8.4f;
+            }
+
+            if (artKey == HeroClass.Gunslinger
+                || artKey == HeroClass.Rancher
+                || artKey == HeroClass.Sawbones)
+            {
+                return 6.6f;
+            }
+
+            return 5.5f;
         }
 
         private static bool IsStandingSprite(string artKey)
@@ -1584,6 +1728,12 @@ namespace RedHollow.Game.UI
 
             private readonly List<HeroIntentCommand> _commands = new List<HeroIntentCommand>(1);
 
+            /// <summary>
+            /// The intent resolved on the most recent host step, or null when none was. The pump
+            /// reads this to face the local hero at the cursor (R-30) after views sync.
+            /// </summary>
+            public HeroIntent LastIntent { get; private set; }
+
             public LocalHeroIntentSource(ShellBootstrap shell)
             {
                 _shell = shell;
@@ -1594,17 +1744,20 @@ namespace RedHollow.Game.UI
                 var source = _shell._input;
                 if (source == null || sim == null)
                 {
+                    LastIntent = null;
                     return null;
                 }
 
                 var hero = LocalHero(sim.State);
                 if (hero == null)
                 {
+                    LastIntent = null;
                     return null;
                 }
 
                 _command.HeroId = hero.Id;
                 _command.Intent = _map.Resolve(source.Sample());
+                LastIntent = _command.Intent;
 
                 _commands.Clear();
                 _commands.Add(_command);

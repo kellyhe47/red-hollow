@@ -501,9 +501,67 @@ namespace RedHollow.Tests.EditMode
             AssertVisiblyClickable(shell.Controls.JoinButton, shell.Ui.Root.transform);
         }
 
+        /// <summary>
+        /// Overlay dumps park the canvas on a camera and still batch inactive Screen_* children,
+        /// which stacked S1 HOST GAME / callsign onto S2. Pins both directions: Lobby hides
+        /// title chrome, Title hides lobby chrome (including a return to S1).
+        /// </summary>
+        [Test]
+        public void Lobby_hides_title_chrome_and_title_hides_lobby_chrome()
+        {
+            var shell = NewShell();
+            shell.Pump(0.0);
+            AssertScreenPainted(shell, UiScreen.Title, true, "boot lands on S1");
+            AssertScreenPainted(shell, UiScreen.Lobby, false, "S2 is not stacked on S1");
+
+            shell.Title.SetCallsign(HostAccount);
+            shell.RequestHost();
+            shell.Pump(0.0);
+            Assert.That(shell.Router.Screen, Is.EqualTo(UiScreen.Lobby),
+                "sanity (R-50): HOST GAME opened S2");
+            AssertScreenPainted(shell, UiScreen.Lobby, true, "S2 is the painted screen");
+            AssertScreenPainted(shell, UiScreen.Title, false,
+                "S1 HOST GAME / callsign chrome must not stack on the lobby");
+
+            shell.LeaveToTitle();
+            shell.Pump(0.0);
+            Assert.That(shell.Router.Screen, Is.EqualTo(UiScreen.Title),
+                "sanity: leave returns to S1");
+            AssertScreenPainted(shell, UiScreen.Title, true, "returning to S1 shows title chrome");
+            AssertScreenPainted(shell, UiScreen.Lobby, false, "returning to S1 hides S2 chrome");
+        }
+
         // ==========================================================================================
         //  shared assertions
         // ==========================================================================================
+
+        /// <summary>
+        /// A screen root is either fully paintable or fully culled: activeInHierarchy, CanvasGroup
+        /// alpha, and every CanvasRenderer.cull agree. The cull is what an overlay-to-camera dump
+        /// honors when SetActive alone does not.
+        /// </summary>
+        private static void AssertScreenPainted(
+            ShellBootstrap shell, UiScreen screen, bool painted, string because)
+        {
+            var root = shell.Ui.ScreenRoot(screen);
+            Assert.That(root, Is.Not.Null, because + " — " + screen + " has a root");
+            Assert.That(root.activeInHierarchy, Is.EqualTo(painted),
+                because + " — " + screen + " activeInHierarchy");
+
+            var group = root.GetComponent<CanvasGroup>();
+            Assert.That(group, Is.Not.Null, because + " — " + screen + " has a CanvasGroup");
+            Assert.That(group.alpha, painted ? Is.EqualTo(1f) : Is.EqualTo(0f),
+                because + " — " + screen + " CanvasGroup.alpha");
+
+            var renderers = root.GetComponentsInChildren<CanvasRenderer>(true);
+            Assert.That(renderers, Is.Not.Empty, because + " — " + screen + " has graphics");
+            foreach (var renderer in renderers)
+            {
+                Assert.That(renderer.cull, Is.EqualTo(!painted),
+                    because + " — " + screen + "/" + renderer.gameObject.name
+                    + " CanvasRenderer.cull must be " + (!painted));
+            }
+        }
 
         /// <summary>A Button the player can actually see and hit.</summary>
         private static void AssertVisiblyClickable(Button button, Transform shellRoot)

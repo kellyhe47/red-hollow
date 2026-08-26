@@ -1,5 +1,4 @@
 using System;
-using RedHollow.Game.Art;
 using RedHollow.Game.Input;
 using RedHollow.Game.View;
 using RedHollow.Sim;
@@ -44,6 +43,13 @@ namespace RedHollow.Game.UI
         /// <summary>T-26 — the colony scene this entry composed and owns (the shell only reads it).</summary>
         private MatchScene _matchScene;
 
+        /// <summary>
+        /// LAN bring-up sets this before Play so Awake (which still runs on a disabled
+        /// behaviour) does not compose a second S1 shell under the lobby. Static, not an
+        /// instance field — T-22's thin-pump count stays on the instance members.
+        /// </summary>
+        public static bool BootSuppressed;
+
         /// <summary>The shell this entry constructed on Awake. Readable, never assignable.</summary>
         public ShellBootstrap Shell => _shell;
 
@@ -61,19 +67,21 @@ namespace RedHollow.Game.UI
 
         private void Awake()
         {
-            // Loopback by default — every option null except identity, the device seam (which
-            // only a scene entry can own; ShellBootstrap deliberately has no device default) and
-            // the profile store: R-43/R-44 make lifetime XP survive the process, and the shell's
-            // in-memory default is a store whose XP dies on quit. The JSON document lives in
-            // Unity's per-app data directory — the same "server-local" file a dedicated host
-            // would own.
+            // Awake runs even when this behaviour is disabled. LAN host-listen disables the
+            // entry so LanPartyBehaviour is the only shell — skip composition or S1 chrome
+            // (HOST GAME / callsign) stacks on S2.
+            if (!enabled || BootSuppressed)
+            {
+                return;
+            }
+
+            // Loopback by default — every option null except identity and the device seam, which
+            // only a scene entry can own (ShellBootstrap deliberately has no device default).
             _shell = new ShellBootstrap(new ShellBootstrapOptions
             {
                 LocalPeerId = LocalPeerId,
                 LocalAccountId = LocalAccountId,
-                InputSource = new LegacyDeviceInputSource(null),
-                Profiles = new JsonProfileStore(
-                    System.IO.Path.Combine(Application.persistentDataPath, "redhollow-profiles.json")),
+                InputSource = new OverlayInputSource(new LegacyDeviceInputSource(null)),
             });
 
             EnsureEventSystem();
@@ -86,28 +94,37 @@ namespace RedHollow.Game.UI
             var baked = GameObject.Find("RedHollow_Match");
             if (baked != null)
             {
-                // Destroy is deferred in play mode: an enabled baked camera (Skybox + Unity
-                // default slate) keeps rendering beside the runtime one for a frame and
-                // letterboxes the Game view. Disable every camera first.
+                // Destroy() is deferred until end of frame: leave the baked TopDownCamera
+                // enabled and URP has two Base cameras for a frame, which is the
+                // letterboxed-slate Game view. Disable every camera on the baked colony
+                // NOW so the replacement is the only one the Game view draws.
                 foreach (var cam in baked.GetComponentsInChildren<Camera>(true))
                 {
                     cam.enabled = false;
-                    cam.gameObject.SetActive(false);
                 }
 
                 DestroyGameObjectCompat(baked);
             }
 
             _matchScene = MatchSceneBuilder.Build(ColonyMap.V1(), _shell.Visuals);
-            if (Application.isPlaying)
+            _shell.AttachScene(_matchScene);
+        }
+
+        /// <summary>
+        /// Play-only: skip S1/S2 so pressing Play lands in a live wave-1 match. EditMode tests
+        /// drive Awake/Update reflectively and never call Start, so they still see a title shell.
+        /// </summary>
+        private void Start()
+        {
+            if (!Application.isPlaying || _shell == null)
             {
-                // Fog, warm ambient, no sun, cavern dome. Skipped in EditMode so T16/T22
-                // do not leak RenderSettings; the dome is taller than the camera so this
-                // no longer paints a shell over the colony.
-                LanternDeepLighting.Apply(_matchScene);
+                return;
             }
 
-            _shell.AttachScene(_matchScene);
+            _shell.Title.SetCallsign("Kelly");
+            _shell.RequestHost();
+            _shell.Lobby.PickClass(HeroClass.Gunslinger);
+            _shell.Lobby.SetReady(true);
         }
 
         private void Update()

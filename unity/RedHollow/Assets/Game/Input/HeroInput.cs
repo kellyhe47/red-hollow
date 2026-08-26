@@ -197,6 +197,55 @@ namespace RedHollow.Game.Input
         }
     }
 
+    /// <summary>
+    /// Wraps any <see cref="IInputSource"/> and merges editor/playtest-held keys and an optional
+    /// cursor override. Production play still reads the inner device; PlayCapture drives the
+    /// extras so a headless Game view can prove WASD/SPACE without a focused keyboard.
+    /// Empty extras are a no-op, so EditMode tests that never touch them keep their own snapshots.
+    /// </summary>
+    public sealed class OverlayInputSource : IInputSource
+    {
+        private readonly IInputSource _inner;
+
+        /// <summary>Extra keys treated as held this frame, on top of the inner device.</summary>
+        public static readonly HashSet<PlayerKey> ExtraHeld = new HashSet<PlayerKey>();
+
+        /// <summary>When set, replaces the inner cursor's ground point (sim space).</summary>
+        public static Vector2? CursorOverride;
+
+        public OverlayInputSource(IInputSource inner)
+        {
+            _inner = inner;
+        }
+
+        public static void Clear()
+        {
+            ExtraHeld.Clear();
+            CursorOverride = null;
+        }
+
+        public InputSnapshot Sample()
+        {
+            var snapshot = _inner != null ? _inner.Sample() : new InputSnapshot();
+            if (snapshot == null)
+            {
+                snapshot = new InputSnapshot();
+            }
+
+            foreach (var key in ExtraHeld)
+            {
+                snapshot.Pressed.Add(key);
+            }
+
+            if (CursorOverride.HasValue)
+            {
+                snapshot.CursorGroundPoint = CursorOverride.Value;
+            }
+
+            return snapshot;
+        }
+    }
+
 #if ENABLE_LEGACY_INPUT_MANAGER
     /// <summary>
     /// The device end of the seam: real keys and a real cursor, and nothing else. It reads devices

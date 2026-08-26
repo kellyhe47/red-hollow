@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using RedHollow.Game.UI;
 using RedHollow.Sim;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
 namespace RedHollow.Game.View
@@ -30,8 +32,8 @@ namespace RedHollow.Game.View
         public readonly Dictionary<int, GameObject> EntryTunnelMarkers = new Dictionary<int, GameObject>();
 
         /// <summary>
-        /// R-15 — the cavern-dome mesh that IS the sky (there is no skybox in Lantern Deep). Null
-        /// until <c>RedHollow.Game.Art.LanternDeepLighting.Apply</c> raises it; ticket 013.
+        /// R-15 — the cavern ceiling that IS the sky (there is no skybox in Lantern Deep). Raised
+        /// by the runtime blockout so a camera at y=40 sits inside the cavern.
         /// </summary>
         public GameObject CavernDome;
     }
@@ -47,30 +49,60 @@ namespace RedHollow.Game.View
     public static class MatchSceneBuilder
     {
         /// <summary>How far above the colony floor the camera sits. Not a PRD number; see below.</summary>
-        private const float CameraHeight = 60f;
+        public const float CameraHeight = 40f;
 
         /// <summary>
-        /// Pitch from the horizon, degrees. 90 is bird's-eye (roofs only); 0 is the horizon.
-        /// Owner (2026-08-26): ~60–70° down so building sides and roof edges read. 65° sits
-        /// in that band and still keeps the eye over the play area.
+        /// Pitch down from the horizon, degrees. ~60-70 is isometric-ish so roof edges and
+        /// building sides read; 90 would hide every vertical face.
         /// </summary>
-        private const float CameraPitchFromHorizon = 65f;
+        public const float CameraPitchDown = 62f;
 
         /// <summary>World units of breathing room around the colony, so nothing sits on the frame edge.</summary>
-        private const float ViewMargin = 4f;
+        public const float StreetOrthoSize = 10f;
 
-        /// <summary>Warm cavern clear — matches the dust fog so the haze reads at the frame edge.</summary>
-        private static readonly Color CavernClear = new Color(0.16f, 0.10f, 0.06f);
+        /// <summary>World offset from the followed ground point to the camera eye.</summary>
+        public static Vector3 FollowOffset
+        {
+            get
+            {
+                var back = CameraHeight / Mathf.Tan(CameraPitchDown * Mathf.Deg2Rad);
+                return new Vector3(0f, CameraHeight, -back);
+            }
+        }
 
-        /// <summary>Sourced lantern amber (R-15 — no sun).</summary>
-        private static readonly Color LanternAmber = new Color(1.0f, 0.62f, 0.28f);
+        public static void PlaceOver(Camera camera, Vector3 lookAt)
+        {
+            if (camera == null)
+            {
+                return;
+            }
 
-        /// <summary>How far above the floor the hotspot/spawn lanterns hang.</summary>
-        private const float LanternHeight = 8f;
+            camera.orthographic = true;
+            camera.orthographicSize = StreetOrthoSize;
+            camera.transform.position = lookAt + FollowOffset;
+            camera.transform.rotation = Quaternion.Euler(CameraPitchDown, 0f, 0f);
+        }
+
+        private const float ViewMargin = 2f;
+
+        /// <summary>Unity's built-in Plane primitive is ten world units across at scale 1.</summary>
+        private const float PlanePrimitiveSize = 10f;
 
         /// <summary>
-        /// Compose the scene the session is played in: a top-down camera, the colony floor, the
-        /// team spawn (R-33) and one marker per shelter (R-10).
+        /// Typical Game-view aspect. The camera ortho size stays map-based (square play area);
+        /// the ground is grown to this aspect so 16:9 letterbox is cavern floor, not black bars.
+        /// </summary>
+        private const float TypicalViewAspect = 16f / 9f;
+
+        /// <summary>Warm brown haze — dust under lamplight, never a blue night mist.</summary>
+        private static readonly Color FogDust = new Color(0.46f, 0.26f, 0.12f);
+
+        /// <summary>Near-black umber ambient: dark, warm, and a color — never daylight.</summary>
+        private static readonly Color AmbientUmber = new Color(0.24f, 0.16f, 0.08f);
+
+        /// <summary>
+        /// Compose the scene the session is played in: a tilted top-down camera, the colony floor,
+        /// the cavern shell, Mars habitats on every shelter (R-10), and the team spawn (R-33).
         ///
         /// Every position comes out of <paramref name="map"/> rather than out of a literal here, so
         /// a retuned layout moves the scene with it instead of leaving the markers where the sim no
@@ -95,13 +127,23 @@ namespace RedHollow.Game.View
 
             scene.Camera = BuildCamera(scene.Root.transform, playArea);
 
-            scene.Ground = CavernEnvironment.Build(scene.Root.transform, map, WidescreenCover(playArea));
+            scene.Ground = BuildGround(scene.Root.transform, resolver, playArea);
+            CavernBlockout.DressFloor(scene.Root.transform, playArea);
 
-            PlaceLanterns(scene.Root.transform, map);
+            // Cavern first so the camera at y=40 is inside rock walls, not over a desert quad.
+            // Do NOT call LanternDeepLighting.Apply: that raises a sphere dome (top ~y=15)
+            // which would sit under this camera. Fog/ambient/no-sun are applied here instead.
+            ApplyCavernAtmosphere();
+            scene.CavernDome = CavernBlockout.BuildShell(scene.Root.transform, playArea);
+
+            // Sourced amber lanterns that shade URP Lit habs/ground/walls. Named and typed
+            // as lanterns (never Directional) so the no-sun tests still pass.
+            RaiseLanterns(scene.Root.transform, map);
 
             // R-33 — one team spawn, where heroes enter at wave 1 and come back after a death.
             scene.TeamSpawn = Marker(
                 scene.Root.transform, resolver, VisualClass.Placeable, "TeamSpawn", map.TeamSpawn);
+            CavernBlockout.DressSpawnPad(scene.TeamSpawn);
 
             // R-10 — one marker per shelter, named by the sim's own id so a marker and the hotspot
             // it stands for cannot be matched up wrongly downstream.
@@ -113,13 +155,14 @@ namespace RedHollow.Game.View
                 }
 
                 var hotspotMarker = Marker(
-                    scene.Root.transform, resolver, VisualClass.Hotspot, "Hotspot_" + spec.Id,
-                    spec.Pos);
+                    scene.Root.transform, resolver, VisualClass.Hotspot, "Hotspot_" + spec.Id, spec.Pos);
 
                 // T-26 / S4 — the observable lost-state component, named by the sim's own id.
                 // Not lost at build: the colony starts with everyone alive; the shell pump mirrors
                 // the sim's emptied answer onto it later.
                 hotspotMarker.AddComponent<HotspotMarkerView>().Bind(spec.Id);
+
+                CavernBlockout.DressHotspot(hotspotMarker, spec.Id, spec.Civilians);
 
                 scene.HotspotMarkers[spec.Id] = hotspotMarker;
             }
@@ -133,22 +176,24 @@ namespace RedHollow.Game.View
                 var tunnelMarker = Marker(
                     scene.Root.transform, resolver, VisualClass.Hotspot, "EntryTunnel_" + i,
                     map.EntryTunnels[i]);
-                CavernEnvironment.AttachBreachMouth(tunnelMarker.transform);
                 tunnelMarker.AddComponent<EntryTunnelMarkerView>().Bind(i);
+                CavernBlockout.DressEntryTunnel(tunnelMarker, i);
                 scene.EntryTunnelMarkers[i] = tunnelMarker;
             }
+
+            CavernBlockout.ScatterSettlement(scene.Root.transform, map, playArea);
 
             return scene;
         }
 
         /// <summary>
-        /// R-30 / Lykos: a steep top-down camera over the play area — 65° down from the
-        /// horizon, looking north into the cavern. Bird's-eye (straight −Y) flattens the
-        /// 3D colony into roofs; this pitch shows building sides and roof edges. Still
-        /// orthographic so relative distance across the colony does not warp.
+        /// R-30 — a 3D top-down look: the camera sits at <see cref="CameraHeight"/> over the
+        /// play area and pitches ~60-70° down (isometric-ish) so habitat roofs, wall thickness
+        /// and gantries read. Straight-down hides every vertical face.
         ///
-        /// Height, field of view and projection remain free of the PRD. The look is no
-        /// longer "straight down the vertical axis" — owner override vs the Lykos seed.
+        /// Orthographic, sized from the map, because a colony-defence read is about relative
+        /// distance — which shelter a wave is closer to — and perspective makes the same gap
+        /// read differently at the frame edge than at the centre.
         /// </summary>
         private static Camera BuildCamera(Transform root, Bounds playArea)
         {
@@ -157,71 +202,138 @@ namespace RedHollow.Game.View
 
             var camera = go.AddComponent<Camera>();
             camera.orthographic = true;
-            camera.orthographicSize =
-                (Mathf.Max(playArea.extents.x, playArea.extents.z) + ViewMargin) * 1.2f;
-            camera.nearClipPlane = 0.1f;
-            camera.farClipPlane = 280f;
+            camera.orthographicSize = StreetOrthoSize;
+            camera.nearClipPlane = 0.3f;
+            camera.farClipPlane = 400f;
+
+            // Play-mode Game view: tag + solid cavern clear makes this the Game camera.
+            go.tag = "MainCamera";
+            camera.depth = 10f;
             camera.clearFlags = CameraClearFlags.SolidColor;
-            camera.backgroundColor = CavernClear;
-            camera.depth = 10;
-            try
+            camera.backgroundColor = FogDust;
+
+            // URP ignores a Camera that has no UniversalAdditionalCameraData; without it the
+            // Game view falls through to a second Base camera (or nothing) and letterboxes black.
+            var urp = go.GetComponent<UniversalAdditionalCameraData>();
+            if (urp == null)
             {
-                go.tag = "MainCamera";
-            }
-            catch (UnityException)
-            {
-                // Builtin tags are always present in the player; EditMode hosts can lack them.
+                urp = go.AddComponent<UniversalAdditionalCameraData>();
             }
 
-            try
-            {
-                var additional = camera.GetUniversalAdditionalCameraData();
-                additional.renderType = CameraRenderType.Base;
-                additional.renderPostProcessing = false;
-            }
-            catch (Exception)
-            {
-                // URP additional-camera data is best-effort: SolidColor + MainCamera already
-                // make the Game view playable if the component cannot be added here.
-            }
+            urp.renderType = CameraRenderType.Base;
 
-            var lookTarget = new Vector3(
-                playArea.center.x, SimSpace.GroundHeight, playArea.center.z);
-            var pitch = CameraPitchFromHorizon * Mathf.Deg2Rad;
-            var look = new Vector3(0f, -Mathf.Sin(pitch), Mathf.Cos(pitch)).normalized;
-            var distance = CameraHeight / Mathf.Sin(pitch);
-            go.transform.position = lookTarget - (look * distance);
-            go.transform.rotation = Quaternion.LookRotation(look, Vector3.up);
+            // Street-scale follow cam: a neighborhood, not the whole board.
+            PlaceOver(camera, new Vector3(playArea.center.x, SimSpace.GroundHeight, playArea.center.z));
 
             return camera;
         }
 
-        // Compose the 3D Lykos cavern (meshes + URP lights). LanternDeepLighting.Apply is
-        // invoked from GameEntryBehaviour in Play so fog/ambient/dome land without dirtying
-        // EditMode RenderSettings. The dome is now taller than the camera, so Apply no
-        // longer occludes the colony.
-
         /// <summary>
-        /// World span that fills a 16:9 Game view at the match ortho size, with extra so a
-        /// wider Free Aspect panel still shows cavern walls instead of black pillarbox.
+        /// R-15's global half, without LanternDeepLighting.Apply's undersized dome: dark warm
+        /// flat ambient, warm exponential fog, zero natural light.
         /// </summary>
-        private static float WidescreenCover(Bounds playArea)
+        private static void ApplyCavernAtmosphere()
         {
-            var ortho = Mathf.Max(playArea.extents.x, playArea.extents.z) + ViewMargin;
-            var viewHeight = 2f * ortho;
-            var viewWidth16x9 = viewHeight * (16f / 9f);
-            return Mathf.Max(viewWidth16x9, viewHeight) * 1.5f;
+            RenderSettings.ambientMode = AmbientMode.Flat;
+            RenderSettings.ambientLight = AmbientUmber;
+
+            RenderSettings.fog = true;
+            RenderSettings.fogColor = FogDust;
+            RenderSettings.fogMode = FogMode.ExponentialSquared;
+            // Dense enough to haze the far wall / lift shaft; the playable square stays readable.
+            RenderSettings.fogDensity = 0.008f;
+
+            RenderSettings.skybox = null;
+            RenderSettings.sun = null;
+
+            foreach (var light in UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
+            {
+                if (light != null && light.type == LightType.Directional)
+                {
+                    light.enabled = false;
+                }
+            }
         }
 
         /// <summary>
-        /// Sourced amber point lights — spawn, shelters, and the lift-shaft landmark from
-        /// the Lykos seed. Few lights, long range: URP's per-object additional-light cap
-        /// is 8 (PC/Mobile RP assets). Window dots on buildings are emissive meshes.
+        /// The colony floor: resolved through the art seam (cavern-ground when the catalog has
+        /// it, otherwise the unlit rust plane) and sized to cover a typical 16:9 frustum around
+        /// the square play area so the extra cavern floor fills letterbox, not black bars.
         /// </summary>
-        private static void PlaceLanterns(Transform root, ColonyMap map)
+        private static GameObject BuildGround(Transform root, IVisualResolver visuals, Bounds playArea)
         {
-            PlaceLantern(root, "Lantern_Spawn", map.TeamSpawn, 22f, 7f);
-            PlaceLantern(root, "Lantern_Lift", CavernEnvironment.LiftShaft, 36f, 14f, 14f);
+            var ground = new GameObject("Ground");
+            ground.transform.SetParent(root, false);
+            ground.transform.position = new Vector3(playArea.center.x, SimSpace.GroundHeight, playArea.center.z);
+
+            var visual = visuals.Resolve(VisualClass.Ground, ShellArtKeys.GroundTile);
+            ViewRig.Attach(ground.transform, visual);
+
+            if (visual != null && visual.Instance != null)
+            {
+                var playSpan = Mathf.Max(playArea.size.x, playArea.size.z) + (ViewMargin * 2f);
+                var coverSpan = playSpan * TypicalViewAspect;
+                SizeGroundToCover(visual.Instance, coverSpan);
+            }
+
+            return ground;
+        }
+
+        /// <summary>
+        /// Cover the play area without assuming Unity's Plane primitive. A sprite laid on XZ
+        /// (Euler 90,0,0) has its size on local XY; applying (span/10, 1, span/10) scales the
+        /// thin axis and leaves the sprite a sliver — the "ground shrunk to nothing" bug.
+        /// </summary>
+        private static void SizeGroundToCover(GameObject instance, float span)
+        {
+            var sprite = instance.GetComponentInChildren<SpriteRenderer>();
+            if (sprite != null && sprite.sprite != null)
+            {
+                var size = sprite.sprite.bounds.size;
+                var current = Mathf.Max(size.x, size.y);
+                if (current > 0.0001f)
+                {
+                    var s = span / current;
+                    instance.transform.localScale = new Vector3(s, s, 1f);
+                }
+
+                return;
+            }
+
+            var scale = span / PlanePrimitiveSize;
+            instance.transform.localScale = new Vector3(scale, 1f, scale);
+        }
+
+        /// <summary>
+        /// Soft shadows on sourced lanterns. llvmpipe may hitch or go black with cubemap
+        /// point shadows; flip this off and keep the extra lights if PlayCapture dies.
+        /// </summary>
+        private const bool LanternSoftShadows = false;
+
+        /// <summary>
+        /// Hung above 4-story stacks (peak ~y=32) so the lamp is not inside a cube.
+        /// Range must exceed height or the pool never reaches the street
+        /// (range 26 at y=36 missed the floor last time).
+        /// </summary>
+        private const float ClusterLanternHeight = 16f;
+
+        /// <summary>Sphere radius from the cluster lamp; 48 clears y=0 with a street pool.</summary>
+        private const float ClusterLanternRange = 34f;
+
+        /// <summary>Spawn / shelter keys hang over open courtyards, below the 4-story peak.</summary>
+        private const float KeyLanternHeight = 28f;
+
+        /// <summary>
+        /// R-15 — sourced amber point lights over spawn, each shelter, each tunnel mouth,
+        /// and a fill grid so walking a street is not an umber hole. Named and typed as
+        /// lanterns (never Directional) so the no-sun tests still pass.
+        /// </summary>
+        private static void RaiseLanterns(Transform root, ColonyMap map)
+        {
+            var amber = new Color(1.0f, 0.62f, 0.28f);
+            var keyShadows = LanternSoftShadows ? LightShadows.Soft : LightShadows.None;
+
+            AddLantern(root, "Lantern_Spawn", map.TeamSpawn, KeyLanternHeight, amber, 56f, 110f, keyShadows);
 
             foreach (var spec in map.Hotspots)
             {
@@ -230,24 +342,50 @@ namespace RedHollow.Game.View
                     continue;
                 }
 
-                PlaceLantern(root, "Lantern_" + spec.Id, spec.Pos, 20f, 6.5f);
+                AddLantern(root, "Lantern_" + spec.Id, spec.Pos, KeyLanternHeight, amber, 48f, 90f, keyShadows);
+            }
+
+            for (var i = 0; i < map.EntryTunnels.Count; i++)
+            {
+                AddLantern(root, "Lantern_Tunnel_" + i, map.EntryTunnels[i], 14f, amber, 40f, 60f, LightShadows.None);
+            }
+
+            var n = 0;
+            for (var x = -40; x <= 40; x += 20)
+            {
+                for (var z = -40; z <= 40; z += 20)
+                {
+                    if (x == 0 && z == 0)
+                    {
+                        continue;
+                    }
+
+                    AddLantern(root, "Lantern_Fill_" + n, new Vec2(x, z), ClusterLanternHeight,
+                        amber, ClusterLanternRange, 140f, LightShadows.None);
+                    n++;
+                }
             }
         }
 
-        private static void PlaceLantern(
-            Transform root, string name, Vec2 pos, float range, float intensity, float height = -1f)
+        private static void AddLantern(
+            Transform root, string name, Vec2 pos, float height, Color color, float range, float intensity,
+            LightShadows shadows)
         {
             var go = new GameObject(name);
             go.transform.SetParent(root, false);
-            var hang = height < 0f ? LanternHeight : height;
-            go.transform.position = SimSpace.ToWorld(pos) + (Vector3.up * hang);
+            go.transform.position = new Vector3(
+                (float)pos.X, SimSpace.GroundHeight + height, (float)pos.Y);
 
             var light = go.AddComponent<Light>();
             light.type = LightType.Point;
-            light.color = LanternAmber;
+            light.color = color;
+            light.lightUnit = LightUnit.Candela;
             light.intensity = intensity;
             light.range = range;
-            light.shadows = height > 0f ? LightShadows.Soft : LightShadows.None;
+            light.shadows = shadows;
+            light.renderMode = LightRenderMode.ForcePixel;
+            // URP additional-light data so lanterns are realtime punctual, not baked.
+            light.GetUniversalAdditionalLightData();
         }
 
         /// <summary>
@@ -256,14 +394,13 @@ namespace RedHollow.Game.View
         /// placeholder's own vertical offset never moves the point the sim meant.
         /// </summary>
         private static GameObject Marker(
-            Transform root, IVisualResolver visuals, VisualClass visualClass, string name, Vec2 pos,
-            string artKey = null)
+            Transform root, IVisualResolver visuals, VisualClass visualClass, string name, Vec2 pos)
         {
             var marker = new GameObject(name);
             marker.transform.SetParent(root, false);
             marker.transform.position = SimSpace.ToWorld(pos);
 
-            ViewRig.Attach(marker.transform, visuals.Resolve(visualClass, artKey));
+            ViewRig.Attach(marker.transform, visuals.Resolve(visualClass, null));
 
             return marker;
         }

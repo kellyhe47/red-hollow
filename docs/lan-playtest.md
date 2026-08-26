@@ -1,49 +1,22 @@
-# Playtest procedure — solo 10-wave and 2-player LAN (branch `cursor/fix-playable-lykos-view-cd88`)
+# Playtest procedure — solo 10-wave and 2-player LAN (branch `fix/playable-lykos-view`)
 
-Written for the local coordinator: this branch's agent has no Unity editor, so everything below
-is the hand-verify half. Everything decision-shaped already runs headless and green
-(`dotnet test sim/GameSim.Tests/GameSim.Tests.csproj` → 391, incl. all 30 goldens;
-`dotnet test tools/compile-check/ShellCheck.csproj` → 75 executed EditMode tests, incl. the
-turret-stall, barricade-redirect and replication pins).
+The 2-player stack is ported ADDITIVELY onto this branch from PR 1
+(`origin/cursor/fix-playable-lykos-view-cd88`). `GameEntryBehaviour` stays the scene default
+(solo 10-wave + Lykos hotspot facades). Do not wholesale-merge PR 1.
 
-## A. Solo 10-wave (the R-01 bar)
+## A. Solo 10-wave (the R-01 bar) — unchanged
 
-Scene: the existing `RedHollow.unity` with `GameEntryBehaviour` (unchanged). Play →
-callsign → HOST GAME → pick (or skip; defaults gunslinger) → READY.
+Scene: `RedHollow.unity` with `GameEntryBehaviour`. Play auto-hosts a loopback match (no UGS).
+WASD / SPACE / shop / turret last-hit / hab facades on hotspot fronts — the already-proven bar.
 
-Per-wave loop to verify:
-
-1. **Wave 1 opens in combat** (factory lock). WASD moves, hero faces cursor, SPACE fires at the
-   cursor, Q/E once unlocked (level up → `L` opens the picker).
-2. **Wave clear → S5 banner → planning**: top bar now shows the countdown (`0:47`) and the
-   ready fraction (`1/1 ready`). Shop bar: click item → ghost follows cursor, red tint in
-   invalid zones → click to place. Click a standing placeable → sell. READY UP ends planning.
-3. **Placeables fight** (all previously dead in the shipped composition, all fixed on this
-   branch, all executed-pinned):
-   - a **barricade** across a lane redirects the wave onto itself, gets chewed down, and its
-     collapse releases the lane (production `BarricadePathOracle` — was `OpenPathOracle`,
-     "nothing ever blocks");
-   - a **turret** fires ~1/s; a turret LAST-HIT removes the monster from the wave and pays
-     bounty + placer XP (this was the local-playtest wave-stall: `TurretTick` flips `Alive`,
-     and only `MatchSession`'s reap turns that into `RecordMonsterKill`);
-   - **spike/dynamite** trigger on walk-over (footprint entry, not per-frame).
-4. **Spitters (wave 4+) stop ~10 out and drain shelters from range** — R-17's row, newly
-   implemented. Shooting the nearest walker while spitters work is a losing habit *by design*:
-   see `tools/balance-probe/FINDINGS.md` — threat-priority solo WINS at shipped numbers (4/20
-   civilians), naive solo dies around wave 6. Do not read the wave-6 collapse as a bug.
-5. Lifetime XP survives quitting and relaunching (JSON store under `persistentDataPath`).
-
-Presentation must stay DEC-026: ~65° tilt, hab meshes with rust/window glow, lanterns, no sun,
-camera-facing 2.5D cards with blob shadows. If monsters are invisible, check the standing-card
-material path (URP Unlit + `_BaseMap` — already the branch default) before suspecting the sim.
-
-## B. Two-process LAN / loopback (the R-50 "up to 2 players" stretch)
+## B. Two-player LAN / loopback (R-50 stretch)
 
 Both sides use `LanPartyBehaviour` (drop it into a scene INSTEAD of `GameEntryBehaviour`; it
-creates its own `NetworkManager` + `UnityTransport`).
+creates its own `NetworkManager` + `UnityTransport`). Solo Play must keep `GameEntryBehaviour`.
 
 1. **Host process**: `LanPartyBehaviour`, defaults (`joinAsClient` off, port 7777). Play → S1 →
-   callsign → HOST GAME. S2 shows join code `LAN`.
+   callsign → HOST GAME. S2 shows join code `LAN`. Stay in the lobby until the client knocks —
+   R-53 refuses mid-match joins.
 2. **Client process** (second editor instance or a build, same machine): `LanPartyBehaviour`
    with `joinAsClient` ON and `joinCode` = `LAN` (same machine) or `LAN:<host-ip>:7777`.
    The client connects at Awake; its hello (peer/account/class) is seated through
@@ -58,6 +31,16 @@ creates its own `NetworkManager` + `UnityTransport`).
 4. Disconnect the client mid-match: host gets the R-53 toast, the client's hero despawns, its
    held input stops (no ghost-walking hero).
 
+Single-editor host listen (no second process): drop `/workspace/unity/lan.request`. The open
+editor disables `GameEntryBehaviour`, enters Play with `LanPartyBehaviour`, HOST GAMEs into
+the lobby, dumps `/workspace/unity/shots/lan-lobby.png` of S2 with the join code, and writes
+`/workspace/unity/lan.status` (`joinCode=LAN`, UDP 7777). Exit Play re-enables GameEntry.
+NGO StartHost itself needs Play mode (NetworkManager singleton); batchmode `-executeMethod`
+without Play fails with "There is no NetworkManager assigned to this instance!".
+
+Headless 2P decisions: EditMode fixture `T30_ReplicationTests` (in-memory channel pair +
+`LanServices` bring-up). NGO StartHost itself needs Play mode (NetworkManager singleton); use LanPartyBehaviour in Play. Two-process Unity on this box is too heavy (llvmpipe / ~15GB).
+
 Known v1 cuts (deliberate, documented in code): no client-side shop/HUD chrome (mirror + world
 view only), no event/feel replication (state renders; stingers are host-side), no client-side
 interpolation (R-52's smoothing curve is unstated in the PRD — snapshots at pump rate are
@@ -65,11 +48,9 @@ smooth enough on loopback).
 
 ## C. If something fails
 
-The decision layers are all headless — reproduce there first:
-
 ```bash
-dotnet test tools/compile-check/ShellCheck.csproj --nologo   # T11/T12/T14/T20/T30, executed
-dotnet run --project tools/balance-probe/BalanceProbe.csproj # plays full campaigns at shipped numbers
+dotnet test sim/GameSim.Tests/GameSim.Tests.csproj --nologo   # goldens
+# EditMode: /workspace/unity/editmode.request  → T10_HostLoopTests / T30_ReplicationTests
 ```
 
 A failure that reproduces in neither is Unity-side plumbing (`NgoWire`, `NgoMatchChannel`,

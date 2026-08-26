@@ -44,6 +44,32 @@ namespace RedHollow.Game.Host
         private readonly IMonsterAttackSource _monsterAttacks;
         private readonly IHeroIntentSource _heroIntents;
 
+        /// <summary>
+        /// R-23 — 20 damage per TurretTick at 20 DPS means one call per second. Accumulated here
+        /// rather than inside the sim: TurretTick has no cadence of its own (G-028 is "on its
+        /// damage tick"), and inventing a TickTurrets() on MatchSim would be a new rule.
+        /// </summary>
+        private const double TurretTickIntervalSeconds = 1.0;
+
+        private double _turretAcc;
+
+        /// <summary>
+        /// Trap/monster pairs overlapping last step, keyed "placeableId\0monsterId". TriggerPlaceable
+        /// spends a spike trigger per CALL, so occupancy must not re-fire every frame — only the
+        /// enter (a crossing) issues the command.
+        /// </summary>
+        private readonly HashSet<string> _onTrap = new HashSet<string>();
+
+        private readonly HashSet<string> _onTrapNow = new HashSet<string>();
+
+        private readonly List<string> _scratchIds = new List<string>();
+
+        /// <summary>
+        /// Snapshot of <see cref="WaveState.LivingMonsterIds"/> for the reap pass. RecordMonsterKill
+        /// removes from that list, so the walk cannot enumerate it.
+        /// </summary>
+        private readonly List<string> _reapScratch = new List<string>();
+
         /// <param name="heroIntents">
         /// Ticket 019 / R-30 — where this step's resolved hero intents come from. Optional for the
         /// same reason <paramref name="monsterAttacks"/> is: a host driving no player-controlled
@@ -104,7 +130,132 @@ namespace RedHollow.Game.Host
             }
 
             ResolveHeroMoves(deltaSeconds);
+
+            // After movement so a monster that walked into range / onto a trap this step is
+            // eligible the same tick. Gated on IMatchSimHost the same way TickMonsterMovement is:
+            // a bare ISimHost (T-10's recording fake) has no per-entity placeable commands.
+            TickTurrets(deltaSeconds);
+            TriggerTrapCrossings();
+
             ResolveMonsterAttacks(deltaSeconds);
+        }
+
+        /// <summary>
+        /// R-23 / G-028. One TurretTick per standing turret per second. The sim picks the nearest
+        /// living monster in range; an empty-sky tick is a defined no-op.
+        /// </summary>
+        private void TickTurrets(double deltaSeconds)
+        {
+            if (_matchSim == null || _matchSim.State == null)
+            {
+                return;
+            }
+
+            _turretAcc += deltaSeconds;
+            if (_turretAcc < TurretTickIntervalSeconds)
+            {
+                return;
+            }
+
+            _turretAcc -= TurretTickIntervalSeconds;
+
+            _scratchIds.Clear();
+            foreach (var placeable in _matchSim.State.Placeables.Values)
+            {
+                if (placeable != null
+                    && placeable.Exists
+                    && placeable.Type == PlaceableType.Turret)
+                {
+                    _scratchIds.Add(placeable.Id);
+                }
+            }
+
+            for (var i = 0; i < _scratchIds.Count; i++)
+            {
+                var turretId = _scratchIds[i];
+                var result = _matchSim.TurretTick(turretId);
+                if (result == null
+                    || string.IsNullOrEmpty(result.TargetId)
+                    || result.TargetHpAfter > 0.0)
+                {
+                    continue;
+                }
+
+                // G-028's tick dropped the target to 0 HP (and DamageMonster flipped alive) but
+                // did not RecordMonsterKill. Same kill path as a hero last-hit, same step.
+                string killerHeroId;
+                string accountId;
+                CreditForPlaceable(LookupPlaceable(turretId), out killerHeroId, out accountId);
+                ReapMonster(result.TargetId, killerHeroId, accountId);
+            }
+        }
+
+        /// <summary>
+        /// R-23 / G-027 / G-029. A monster whose centre has just entered a standing trap's
+        /// footprint (the existing R-24 occupancy radius) is a crossing. Inclusive, matching
+        /// G-019's boundary convention. Re-issue is suppressed while the pair stays overlapping
+        /// so a 10-trigger spike is not spent in ten frames.
+        /// </summary>
+        private void TriggerTrapCrossings()
+        {
+            if (_matchSim == null || _matchSim.State == null)
+            {
+                return;
+            }
+
+            var state = _matchSim.State;
+            var radius = _matchSim.PlaceableFootprintRadius;
+            _onTrapNow.Clear();
+
+            foreach (var placeable in state.Placeables.Values)
+            {
+                if (placeable == null || !placeable.Exists)
+                {
+                    continue;
+                }
+
+                if (placeable.Type != PlaceableType.SpikeTrap
+                    && placeable.Type != PlaceableType.DynamiteTrap)
+                {
+                    continue;
+                }
+
+                foreach (var monster in state.Monsters.Values)
+                {
+                    if (monster == null || !monster.Alive)
+                    {
+                        continue;
+                    }
+
+                    if (placeable.Pos.DistanceTo(monster.Pos) > radius)
+                    {
+                        continue;
+                    }
+
+                    var key = placeable.Id + "\0" + monster.Id;
+                    _onTrapNow.Add(key);
+                    if (_onTrap.Contains(key))
+                    {
+                        continue;
+                    }
+
+                    _matchSim.TriggerPlaceable(placeable.Id, monster.Id);
+
+                    // A spike last-hit or a dynamite blast can empty several bodies. Reap them
+                    // through RecordMonsterKill so the wave roster and bounty move (G-029 only
+                    // flips alive so the corpse is not hit twice).
+                    string killerHeroId;
+                    string accountId;
+                    CreditForPlaceable(placeable, out killerHeroId, out accountId);
+                    ReapZeroHpMonsters(killerHeroId, accountId);
+                }
+            }
+
+            _onTrap.Clear();
+            foreach (var key in _onTrapNow)
+            {
+                _onTrap.Add(key);
+            }
         }
 
         /// <summary>
@@ -240,6 +391,138 @@ namespace RedHollow.Game.Host
                         intent.TargetKind,
                         "no damage command is defined for this target kind");
             }
+        }
+
+        /// <summary>
+        /// R-02 / R-20 / R-40. Every 0-HP monster still on this wave's living roster is a last-hit
+        /// the placeable commands left unreaped: issue <see cref="IMatchSimHost.RecordMonsterKill"/>
+        /// (bounty, roster, wave complete) and credit XP to the placer. Does not require
+        /// <c>Alive</c> — TurretTick/TriggerPlaceable already flip that so a corpse is not shot
+        /// twice (G-029), which is exactly why the hero-attack reap (which waits for Alive) misses
+        /// these. RecordMonsterKill no-ops a duplicate, so a second pass is safe.
+        /// </summary>
+        private void ReapZeroHpMonsters(string killerHeroId, string accountId)
+        {
+            if (_matchSim == null || _matchSim.State == null || _matchSim.State.Wave == null)
+            {
+                return;
+            }
+
+            _reapScratch.Clear();
+            _reapScratch.AddRange(_matchSim.State.Wave.LivingMonsterIds);
+
+            for (var i = 0; i < _reapScratch.Count; i++)
+            {
+                ReapMonster(_reapScratch[i], killerHeroId, accountId);
+            }
+        }
+
+        private void ReapMonster(string monsterId, string killerHeroId, string accountId)
+        {
+            if (_matchSim == null || _matchSim.State == null || monsterId == null)
+            {
+                return;
+            }
+
+            var state = _matchSim.State;
+            if (!state.Monsters.TryGetValue(monsterId, out var monster) || monster == null)
+            {
+                return;
+            }
+
+            // Still on the roster with emptied HP: the kill command has not run. Alive is not
+            // consulted — a placeable last-hit has already flipped it.
+            if (monster.Hp > 0.0 || !state.Wave.LivingMonsterIds.Contains(monsterId))
+            {
+                return;
+            }
+
+            var stats = _matchSim.Config.Monsters.TryGet(monster.Type);
+            var kill = new MonsterKillRequest
+            {
+                MonsterId = monsterId,
+                MonsterType = monster.Type,
+                Bounty = stats == null ? 0 : stats.Bounty,
+                KillerHeroId = killerHeroId,
+            };
+
+            _matchSim.RecordMonsterKill(kill);
+
+            // R-40: turret/trap last-hits credit the placer. No account means bounty still pays
+            // (shared pool) but XP has nowhere to land.
+            if (!string.IsNullOrEmpty(accountId))
+            {
+                _matchSim.AwardKillXp(kill, accountId);
+            }
+        }
+
+        /// <summary>
+        /// R-40 — "turret kills credit the placer, not the turret". OwnerPlayerId is the player
+        /// slot PurchasePlacement recorded; the credited hero is the one seated on that account.
+        /// </summary>
+        private void CreditForPlaceable(Placeable placeable, out string killerHeroId, out string accountId)
+        {
+            killerHeroId = null;
+            accountId = null;
+            if (placeable == null || _matchSim == null || _matchSim.State == null)
+            {
+                return;
+            }
+
+            var ownerId = placeable.OwnerPlayerId;
+            if (string.IsNullOrEmpty(ownerId))
+            {
+                return;
+            }
+
+            var state = _matchSim.State;
+            var players = state.Players;
+            for (var i = 0; i < players.Count; i++)
+            {
+                var player = players[i];
+                if (player != null && string.Equals(player.Id, ownerId, StringComparison.Ordinal))
+                {
+                    accountId = player.AccountId;
+                    break;
+                }
+            }
+
+            foreach (var hero in state.Heroes.Values)
+            {
+                if (hero == null)
+                {
+                    continue;
+                }
+
+                if (!string.IsNullOrEmpty(accountId)
+                    && string.Equals(hero.AccountId, accountId, StringComparison.Ordinal))
+                {
+                    killerHeroId = hero.Id;
+                    return;
+                }
+
+                if (string.Equals(hero.Id, ownerId, StringComparison.Ordinal))
+                {
+                    killerHeroId = hero.Id;
+                    if (string.IsNullOrEmpty(accountId))
+                    {
+                        accountId = hero.AccountId;
+                    }
+
+                    return;
+                }
+            }
+        }
+
+        private Placeable LookupPlaceable(string id)
+        {
+            if (_matchSim == null || _matchSim.State == null || id == null)
+            {
+                return null;
+            }
+
+            Placeable placeable;
+            return _matchSim.State.Placeables.TryGetValue(id, out placeable) ? placeable : null;
         }
     }
 }

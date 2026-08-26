@@ -59,13 +59,34 @@ namespace RedHollow.Game.UI
         private bool _clientReadiedThisPlanning;
         private string _clientPhaseSeen;
 
+        /// <summary>Host-side shell (null on the client). For the LAN bring-up and EditMode probes.</summary>
+        public ShellBootstrap Shell => _shell;
+
+        /// <summary>The NGO transport this party composed. Null until Awake.</summary>
+        public NgoNetTransport Transport => _transport;
+
+        /// <summary>R-07 — the join code the host advertises once the wire is up (LAN / LAN:ip:port).</summary>
+        public string JoinCode => _transport == null ? null : _transport.JoinCode;
+
         private void Awake()
         {
             _ngoRoot = new GameObject("RedHollow_NGO");
-            _ngoRoot.transform.SetParent(null, false);
-            var networkManager = _ngoRoot.AddComponent<NetworkManager>();
+            DontDestroyOnLoad(_ngoRoot);
+            // Transport first, then assign onto the NetworkConfig Awake already created.
+            // Replacing NetworkConfig wholesale is what left ConnectionManager.NetworkManager
+            // unset and threw "There is no NetworkManager assigned to this instance!".
             var transport = _ngoRoot.AddComponent<UnityTransport>();
-            networkManager.NetworkConfig = new NetworkConfig { NetworkTransport = transport };
+            var networkManager = _ngoRoot.AddComponent<NetworkManager>();
+            if (networkManager.NetworkConfig == null)
+            {
+                networkManager.NetworkConfig = new NetworkConfig();
+            }
+
+            networkManager.NetworkConfig.NetworkTransport = transport;
+            if (NetworkManager.Singleton != networkManager)
+            {
+                networkManager.SetSingleton();
+            }
 
             _wire = new NgoWire(networkManager);
             _transport = new NgoNetTransport(new LanServices(port: hostPort), _wire);
@@ -91,7 +112,7 @@ namespace RedHollow.Game.UI
                 Transport = _transport,
                 LocalPeerId = HostPeerId,
                 LocalAccountId = callsign,
-                InputSource = new LegacyDeviceInputSource(null),
+                InputSource = new OverlayInputSource(new LegacyDeviceInputSource(null)),
                 Profiles = new JsonProfileStore(
                     System.IO.Path.Combine(Application.persistentDataPath, "redhollow-profiles.json")),
             });
@@ -136,7 +157,7 @@ namespace RedHollow.Game.UI
 
             _presenter = new ClientMatchPresenter(
                 _wire.CreateClientMatchChannel(),
-                new LegacyDeviceInputSource(null));
+                new OverlayInputSource(new LegacyDeviceInputSource(null)));
 
             var catalog = ShellBootstrap.LoadRepresentativeArt();
             var visuals = new ArtVisualResolver(catalog, new PlaceholderVisualResolver());

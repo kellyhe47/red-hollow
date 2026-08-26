@@ -47,9 +47,8 @@ namespace RedHollow.Tests.EditMode
     /// somewhere to stand. Both are stated rather than assumed:
     ///  * <see cref="HeroIntent.MoveDirection"/> and <see cref="InputSnapshot.CursorGroundPoint"/>
     ///    are ground-space, x = right and y = forward, so "W is forward" has a meaning.
-    ///  * <see cref="SimSpace"/> lays the colony on one horizontal plane with Unity's Y as up.
-    ///    The match camera looks down at that plane from a steep tilt (owner: ~60–70° from the
-    ///    horizon), not straight down the vertical axis — bird's-eye flattens the 3D cavern.
+    ///  * <see cref="SimSpace"/> lays the colony on one horizontal plane with Unity's Y as up, which
+    ///    is what "the camera looks down the world's vertical axis" refers to.
     ///
     /// <b>What is deliberately NOT asserted</b>, because the PRD states none of it and a guessed
     /// number would ship as spec: move speed, turn rate, camera height and field of view, camera
@@ -412,14 +411,12 @@ namespace RedHollow.Tests.EditMode
         }
 
         /// <summary>
-        /// The camera sits above the colony and looks down at it from a steep tilt (~60–70°
-        /// from the horizon, looking north). Owner override 2026-08-26: bird's-eye (straight
-        /// −Y) flattens the Lykos cavern into roofs; the tilt is what shows building sides
-        /// and roof edges. Still over the play area, still looking down — not a horizon shot.
-        /// Height, field of view and projection stay free.
+        /// R-30. The camera is a 3D top-down look: pitched ~60-70° down (isometric-ish) from
+        /// above the colony so habitat roofs and wall sides read. Straight-down hides every
+        /// vertical face, which is the failure this pins.
         /// </summary>
         [Test]
-        public void The_built_scene_looks_down_at_the_play_area_from_a_steep_tilt()
+        public void The_built_scene_looks_straight_down_at_the_play_area()
         {
             var map = ColonyMap.V1();
             var scene = Track(MatchSceneBuilder.Build(map, new PlaceholderVisualResolver()));
@@ -429,14 +426,12 @@ namespace RedHollow.Tests.EditMode
 
             var forward = scene.Camera.transform.forward.normalized;
             var downDot = Vector3.Dot(forward, Vector3.down);
-            // sin(60°)≈0.866, sin(70°)≈0.940 — the Lykos pitch band.
-            Assert.That(downDot, Is.GreaterThan(0.84f).And.LessThan(0.95f),
-                "the camera must look down at 60–70° from the horizon (building sides visible); "
-                + "bird's-eye (dot≈1) flattens the cavern, a horizon shot (dot≈0) is not top-down; "
-                + "got " + downDot);
-
+            // sin(60°)≈0.866, sin(70°)≈0.940 — isometric pitch, not 1.0 (straight down).
+            Assert.That(downDot, Is.InRange(0.85f, 0.95f),
+                "R-30: the camera pitches ~60-70 degrees down so building sides and roof edges "
+                + "read; got down-dot " + downDot);
             Assert.That(forward.z, Is.GreaterThan(0.2f),
-                "the look is into the cavern (+Z / north), so the south ridge sits in the foreground");
+                "the camera looks into the cavern (+Z), not back at the near wall");
 
             var eye = scene.Camera.transform.position;
             var ground = SimSpace.ToWorld(map.TeamSpawn);

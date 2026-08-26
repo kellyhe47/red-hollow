@@ -35,25 +35,7 @@ namespace RedHollow.Game.View
         {
             Pulsing = pulsing;
             Flaring = flaring;
-        }
-
-        private void LateUpdate()
-        {
-            if (Flaring)
-            {
-                MarkerTint.Apply(transform, new Color(1.15f, 0.32f, 0.10f));
-                return;
-            }
-
-            if (Pulsing)
-            {
-                var wave = 0.40f + 0.60f * (0.5f + 0.5f * Mathf.Sin(Time.time * 5.2f));
-                MarkerTint.Apply(
-                    transform, new Color(1.05f, 0.22f + 0.18f * wave, 0.08f) * wave);
-                return;
-            }
-
-            MarkerTint.Clear(transform);
+            CavernBlockout.ApplyTunnelLook(gameObject, pulsing, flaring);
         }
     }
 
@@ -80,64 +62,7 @@ namespace RedHollow.Game.View
         public void SetLost(bool lost)
         {
             Lost = lost;
-            if (lost)
-            {
-                MarkerTint.Apply(transform, new Color(0.16f, 0.10f, 0.06f));
-            }
-            else
-            {
-                MarkerTint.Clear(transform);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Per-renderer color via property blocks so shared hull/glow materials are not mutated.
-    /// Presentation only.
-    /// </summary>
-    internal static class MarkerTint
-    {
-        private static readonly MaterialPropertyBlock Block = new MaterialPropertyBlock();
-
-        internal static void Apply(Transform root, Color color)
-        {
-            if (root == null)
-            {
-                return;
-            }
-
-            var renderers = root.GetComponentsInChildren<Renderer>(true);
-            for (var i = 0; i < renderers.Length; i++)
-            {
-                var renderer = renderers[i];
-                if (renderer == null)
-                {
-                    continue;
-                }
-
-                renderer.GetPropertyBlock(Block);
-                Block.SetColor("_BaseColor", color);
-                Block.SetColor("_Color", color);
-                Block.SetColor("_EmissionColor", color);
-                renderer.SetPropertyBlock(Block);
-            }
-        }
-
-        internal static void Clear(Transform root)
-        {
-            if (root == null)
-            {
-                return;
-            }
-
-            var renderers = root.GetComponentsInChildren<Renderer>(true);
-            for (var i = 0; i < renderers.Length; i++)
-            {
-                if (renderers[i] != null)
-                {
-                    renderers[i].SetPropertyBlock(null);
-                }
-            }
+            CavernBlockout.ApplyLostLook(gameObject, lost);
         }
     }
 }

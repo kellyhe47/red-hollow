@@ -1,4 +1,5 @@
 using System;
+using RedHollow.Sim;
 using UnityEngine;
 
 namespace RedHollow.Game.View
@@ -110,7 +111,7 @@ namespace RedHollow.Game.View
         /// </summary>
         public VisualHandle Resolve(VisualClass visualClass, string artKey)
         {
-            var instance = CreatePlaceholder(visualClass);
+            var instance = CreatePlaceholder(visualClass, artKey);
 
             return new VisualHandle
             {
@@ -122,47 +123,197 @@ namespace RedHollow.Game.View
         }
 
         /// <summary>
-        /// A visible primitive for the class. Heroes and monsters are the same 2.5D
-        /// camera-facing cards the catalog uses (no texture → tinted placeholder).
-        /// Hotspots are an industrial lantern pylon (not a western sign). Ground is unused
-        /// in the match (the cavern is <see cref="CavernEnvironment"/>). Shape is presentation
-        /// — T16 pins a Renderer, not a mesh.
+        /// A visible primitive for the class. <see cref="GameObject.CreatePrimitive"/> is the happy
+        /// path; the catch is not defensive habit but the seam's contract — this method has no
+        /// permission to fail, so an engine that refuses a primitive still has to yield something
+        /// with a <see cref="Renderer"/> on it.
         /// </summary>
-        private static GameObject CreatePlaceholder(VisualClass visualClass)
+        private static GameObject CreatePlaceholder(VisualClass visualClass, string artKey)
         {
             var name = "placeholder_" + visualClass.ToString().ToLowerInvariant();
 
             try
             {
-                if (visualClass == VisualClass.Ground)
+                if (visualClass == VisualClass.Hero || visualClass == VisualClass.Monster)
                 {
-                    return TopDownArt.BlockToken(name, 4f, 0.6f, TopDownArt.Rust);
+                    return UnitBillboard.CreatePlaceholder(visualClass);
                 }
 
-                if (visualClass == VisualClass.Hotspot)
-                {
-                    return TopDownArt.LanternPylon(name);
-                }
-
-                if (visualClass == VisualClass.Hero)
-                {
-                    return TopDownArt.StandingCard(
-                        name, TopDownArt.HeroFootprint, null, TopDownArt.Amber);
-                }
-
-                if (visualClass == VisualClass.Monster)
-                {
-                    return TopDownArt.StandingCard(
-                        name, TopDownArt.MonsterFootprint, null, TopDownArt.HostileGreen);
-                }
-
-                return TopDownArt.BlockToken(name, 2.6f, 0.32f, TopDownArt.Brass);
+                var primitive = GameObject.CreatePrimitive(PrimitiveFor(visualClass));
+                primitive.name = name;
+                ScalePlaceholder(primitive, visualClass, artKey);
+                primitive.transform.localPosition = StandingOffsetFor(visualClass, artKey);
+                TintPlaceholder(primitive, visualClass, artKey);
+                return primitive;
             }
             catch (Exception)
             {
-                var bare = BareRenderable(name);
-                TopDownArt.Paint(bare, TopDownArt.ColorFor(visualClass));
-                return bare;
+                return BareRenderable(name);
+            }
+        }
+
+        private static PrimitiveType PrimitiveFor(VisualClass visualClass)
+        {
+            switch (visualClass)
+            {
+                case VisualClass.Ground:
+                    return PrimitiveType.Plane;
+
+                case VisualClass.Hotspot:
+                    return PrimitiveType.Cube;
+
+                default:
+                    return PrimitiveType.Cube;
+            }
+        }
+
+        /// <summary>
+        /// Footprint from the isometric match camera at height 60 over a ~60-unit colony.
+        /// Heroes/monsters are upright billboards (see <see cref="UnitBillboard"/>). Hotspot
+        /// cubes are a fallback volume — MatchSceneBuilder dresses them as Mars habs.
+        /// </summary>
+        private static void ScalePlaceholder(GameObject go, VisualClass visualClass, string artKey)
+        {
+            switch (visualClass)
+            {
+                case VisualClass.Hotspot:
+                    go.transform.localScale = new Vector3(7.5f, 8.5f, 7.5f);
+                    break;
+
+                case VisualClass.Placeable:
+                    if (artKey == PlaceableType.Barricade)
+                    {
+                        go.transform.localScale = new Vector3(4.6f, 2.4f, 1.4f);
+                    }
+                    else if (artKey == PlaceableType.Turret)
+                    {
+                        go.transform.localScale = new Vector3(1.8f, 3.4f, 1.8f);
+                    }
+                    else
+                    {
+                        go.transform.localScale = new Vector3(3.2f, 1.6f, 3.2f);
+                    }
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// How far up the primitive sits so it stands on the floor instead of sinking half into it.
+        /// Presentation only — every position assertion in this ticket is horizontal, and the
+        /// vertical axis is the one <see cref="SimSpace"/> leaves free for exactly this.
+        /// </summary>
+        private static Vector3 StandingOffsetFor(VisualClass visualClass, string artKey)
+        {
+            switch (visualClass)
+            {
+                case VisualClass.Ground:
+                    return Vector3.zero;
+
+                case VisualClass.Hotspot:
+                    return new Vector3(0f, 4.25f, 0f);
+
+                case VisualClass.Placeable:
+                    if (artKey == PlaceableType.Barricade)
+                    {
+                        return new Vector3(0f, 1.2f, 0f);
+                    }
+                    if (artKey == PlaceableType.Turret)
+                    {
+                        return new Vector3(0f, 1.7f, 0f);
+                    }
+                    return new Vector3(0f, 0.8f, 0f);
+
+                default:
+                    return new Vector3(0f, 0.5f, 0f);
+            }
+        }
+
+        /// <summary>
+        /// Ground / hotspot / placeable placeholders are URP Lit so sourced lanterns shade them.
+        /// Heroes and monsters never reach here (UnitBillboard is Unlit). T16 pins none of the
+        /// colours. Default-Material-with-zero-lights was the first-playtest black; we Lit only
+        /// now that sourced point lights actually exist.
+        /// </summary>
+        private static void TintPlaceholder(GameObject go, VisualClass visualClass, string artKey)
+        {
+            var renderer = go.GetComponent<Renderer>();
+            if (renderer == null)
+            {
+                return;
+            }
+
+            var color = ColorFor(visualClass, artKey);
+            var material = ViewLook.Lit(color);
+            if (material != null)
+            {
+                ViewLook.Paint(go, material);
+                return;
+            }
+
+            // Last resort: tint whatever CreatePrimitive assigned so the seam still renders.
+            ApplyColor(renderer.material, color);
+        }
+
+        private static void ApplyColor(Material material, Color color)
+        {
+            if (material == null)
+            {
+                return;
+            }
+
+            material.color = color;
+            if (material.HasProperty("_BaseColor"))
+            {
+                material.SetColor("_BaseColor", color);
+            }
+
+            if (material.HasProperty("_Color"))
+            {
+                material.SetColor("_Color", color);
+            }
+        }
+
+        private static Color ColorFor(VisualClass visualClass, string artKey)
+        {
+            switch (visualClass)
+            {
+                case VisualClass.Ground:
+                    return new Color(0.55f, 0.28f, 0.14f);
+
+                case VisualClass.Hero:
+                    return new Color(0.95f, 0.70f, 0.25f);
+
+                case VisualClass.Monster:
+                    return new Color(0.42f, 0.70f, 0.28f);
+
+                case VisualClass.Hotspot:
+                    return new Color(0.72f, 0.42f, 0.18f);
+
+                case VisualClass.Placeable:
+                    if (artKey == PlaceableType.Barricade)
+                    {
+                        return new Color(0.62f, 0.38f, 0.16f);
+                    }
+                    if (artKey == PlaceableType.Turret)
+                    {
+                        return new Color(0.55f, 0.64f, 0.72f);
+                    }
+                    if (artKey == PlaceableType.SpikeTrap)
+                    {
+                        return new Color(0.72f, 0.28f, 0.14f);
+                    }
+                    if (artKey == PlaceableType.DynamiteTrap)
+                    {
+                        return new Color(0.80f, 0.22f, 0.14f);
+                    }
+                    if (artKey == PlaceableType.MedStation)
+                    {
+                        return new Color(0.42f, 0.72f, 0.40f);
+                    }
+                    return new Color(0.70f, 0.58f, 0.32f);
+
+                default:
+                    return new Color(0.55f, 0.48f, 0.38f);
             }
         }
 
@@ -180,3 +331,4 @@ namespace RedHollow.Game.View
         }
     }
 }
+
