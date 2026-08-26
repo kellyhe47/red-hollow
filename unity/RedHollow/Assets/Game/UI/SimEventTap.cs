@@ -222,5 +222,19 @@ namespace RedHollow.Game.UI
             Drain();
             return result;
         }
+
+        public HeroAttackResult ResolveHeroAttack(HeroAttackRequest request)
+        {
+            var result = _inner.ResolveHeroAttack(request);
+            Drain();
+            return result;
+        }
+
+        public AbilityCastOutcome CastAbility(HeroAbilityRequest request)
+        {
+            var result = _inner.CastAbility(request);
+            Drain();
+            return result;
+        }
     }
 }

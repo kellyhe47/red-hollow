@@ -82,6 +82,12 @@ namespace RedHollow.Game.View
 
             var root = new GameObject(name);
 
+            var pick = root.AddComponent<CapsuleCollider>();
+            pick.isTrigger = true;
+            pick.radius = Mathf.Max(0.45f, width * 0.55f);
+            pick.height = height;
+            pick.center = new Vector3(0f, height * 0.5f, 0f);
+
             // Lit, metallic 0, NOT emissive: the gunslinger receives the pool
             // and casts a shadow. Cream/Unlit/emissive cards were the glowing
             // cube around the hat.

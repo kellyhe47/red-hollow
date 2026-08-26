@@ -50,5 +50,31 @@ namespace RedHollow.Game.Input
             groundPos = SimSpace.ToGround(ray.GetPoint(distance));
             return true;
         }
+
+        /// <summary>
+        /// Live Play aim: hit a unit/hab collider first (perspective camera, elevated
+        /// sprites) then fall back to the T-24 ground plane. EditMode T-24 still uses
+        /// <see cref="TryScreenToGround"/> exclusively.
+        /// </summary>
+        public static bool TryScreenToAim(Camera camera, Vector2 screenPoint, out Vec2 groundPos)
+        {
+            groundPos = default(Vec2);
+            if (camera == null)
+            {
+                return false;
+            }
+
+            var ray = camera.ScreenPointToRay(new Vector3(screenPoint.x, screenPoint.y, 0f));
+            RaycastHit hit;
+            if (Physics.Raycast(
+                    ray, out hit, 240f,
+                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Collide))
+            {
+                groundPos = SimSpace.ToGround(hit.point);
+                return true;
+            }
+
+            return TryScreenToGround(camera, screenPoint, out groundPos);
+        }
     }
 }

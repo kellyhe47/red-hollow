@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using RedHollow.Game.View;
 using RedHollow.Sim;
 
 namespace RedHollow.Game.Host
@@ -299,11 +300,27 @@ namespace RedHollow.Game.Host
                     continue;
                 }
 
+                var stepSeconds = deltaSeconds;
+                Hero hero;
+                if (_matchSim.State != null
+                    && _matchSim.State.Heroes.TryGetValue(command.HeroId, out hero)
+                    && hero != null)
+                {
+                    // Presentation CapsuleCast against hab walls/deck. Clipped delta
+                    // is still a sim command — the view never writes Hero.Pos (T-10).
+                    stepSeconds = PresentationCollision.ClipMoveSeconds(
+                        hero.Pos, new Vec2(direction.x, direction.y), deltaSeconds);
+                    if (!(stepSeconds > 0.0))
+                    {
+                        continue;
+                    }
+                }
+
                 _matchSim.MoveHero(new HeroMoveRequest
                 {
                     HeroId = command.HeroId,
                     Direction = new Vec2(direction.x, direction.y),
-                    DeltaSeconds = deltaSeconds,
+                    DeltaSeconds = stepSeconds,
                 });
             }
         }

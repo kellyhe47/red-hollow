@@ -1073,17 +1073,63 @@ namespace RedHollow.Game.UI
         private void FireBasicAttack(MatchSim sim, MatchState state, Hero hero, Vec2 cursor)
         {
             var kit = sim.Config.HeroKits.KitFor(hero.HeroClass);
-            var line = AimLine.EntitiesAlong(
-                state, hero.Id, hero.Pos, cursor,
-                _combatActions.AimLineLength, _combatActions.AimLineWidth);
+            var length = _combatActions.AimLineLength;
+            var width = _combatActions.AimLineWidth;
+            var aim = cursor;
+            var line = AimLine.EntitiesAlong(state, hero.Id, hero.Pos, aim, length, width);
+            if (!LineHasMonster(line))
+            {
+                // Perspective follow-cam + unit scatter put the visible body off the
+                // y=0 plane projection. Retry a wider corridor before treating it as a miss.
+                line = AimLine.EntitiesAlong(state, hero.Id, hero.Pos, aim, length, 8.0);
+            }
 
-            sim.ResolveHeroAttack(new HeroAttackRequest
+            if (!LineHasMonster(line))
+            {
+                // Last resort for live Play: SPACE still damages the nearest in-range
+                // body when the perspective plane projection aimed at empty ground.
+                Monster nearest = null;
+                var best = length;
+                foreach (var m in state.Monsters.Values)
+                {
+                    if (m == null || !m.Alive)
+                    {
+                        continue;
+                    }
+
+                    var d = hero.Pos.DistanceTo(m.Pos);
+                    if (d > 0.0 && d <= best)
+                    {
+                        best = d;
+                        nearest = m;
+                    }
+                }
+
+                if (nearest != null)
+                {
+                    aim = nearest.Pos;
+                    line = AimLine.EntitiesAlong(state, hero.Id, hero.Pos, aim, length, 8.0);
+                }
+            }
+
+            CombatVfx.PulseShot(hero.Pos, aim);
+
+            var request = new HeroAttackRequest
             {
                 AttackerId = hero.Id,
                 AttackerClass = hero.HeroClass,
                 Damage = kit.BasicAttackDamage,
                 EntitiesOnLine = line,
-            });
+            };
+            if (_boundMatch != null && _boundMatch.Host != null)
+            {
+                _boundMatch.Host.ResolveHeroAttack(request);
+            }
+            else
+            {
+                sim.ResolveHeroAttack(request);
+            }
+
             DrainTap();
 
             ReapDeadMonsters(sim, state, hero);
@@ -1109,13 +1155,16 @@ namespace RedHollow.Game.UI
                 ? new Vec2(dx / magnitude, dy / magnitude)
                 : new Vec2(0.0, 0.0);
 
-            var outcome = sim.CastAbility(new HeroAbilityRequest
+            var ability = new HeroAbilityRequest
             {
                 CasterId = hero.Id,
                 Slot = slot,
                 AimDirection = aimDirection,
                 EntitiesOnLine = line,
-            });
+            };
+            var outcome = (_boundMatch != null && _boundMatch.Host != null)
+                ? _boundMatch.Host.CastAbility(ability)
+                : sim.CastAbility(ability);
             DrainTap();
 
             if (outcome == null)
@@ -1128,6 +1177,26 @@ namespace RedHollow.Game.UI
             {
                 ReapDeadMonsters(sim, state, hero);
             }
+        }
+
+
+        private static bool LineHasMonster(System.Collections.Generic.IList<LineEntity> line)
+        {
+            if (line == null)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < line.Count; i++)
+            {
+                var e = line[i];
+                if (e != null && string.Equals(e.Kind, "monster", StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -1164,12 +1233,28 @@ namespace RedHollow.Game.UI
                     KillerHeroId = attacker.Id,
                 };
 
-                sim.RecordMonsterKill(kill);
+                if (_boundMatch != null && _boundMatch.Host != null)
+                {
+                    _boundMatch.Host.RecordMonsterKill(kill);
+                }
+                else
+                {
+                    sim.RecordMonsterKill(kill);
+                }
+
                 DrainTap();
 
                 if (!string.IsNullOrEmpty(attacker.AccountId))
                 {
-                    sim.AwardKillXp(kill, attacker.AccountId);
+                    if (_boundMatch != null && _boundMatch.Host != null)
+                    {
+                        _boundMatch.Host.AwardKillXp(kill, attacker.AccountId);
+                    }
+                    else
+                    {
+                        sim.AwardKillXp(kill, attacker.AccountId);
+                    }
+
                     DrainTap();
                 }
             }

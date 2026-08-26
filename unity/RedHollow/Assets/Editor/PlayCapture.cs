@@ -70,7 +70,18 @@ namespace RedHollow.EditorTools
         private static readonly StringBuilder Logs = new StringBuilder();
         private static bool _hotspotFrontsCaptured;
         private static bool _lookCaptured;
+        private static bool _combatProofCaptured;
+        private static bool _hitObserved;
+        private static bool _bodyStopped;
+        private static int _stallFrames;
+        private static double _heroXLast = double.NaN;
+        private static string _combatProofLine = "";
         private static string _playMode = "full";
+
+        private static bool IsCombatProofMode()
+        {
+            return _playMode == "units" || _playMode == "combat";
+        }
 
         static PlayCapture()
         {
@@ -147,6 +158,12 @@ namespace RedHollow.EditorTools
                 PurchaseLog.Clear();
                 _hotspotFrontsCaptured = false;
                 _lookCaptured = false;
+                _combatProofCaptured = false;
+                _hitObserved = false;
+                _bodyStopped = false;
+                _stallFrames = 0;
+                _heroXLast = double.NaN;
+                _combatProofLine = "";
                 const string MatchScene = "Assets/Scenes/RedHollow.unity";
                 if (SceneManager.GetActiveScene().path != MatchScene)
                 {
@@ -190,14 +207,16 @@ namespace RedHollow.EditorTools
             var matchOver = MatchIsOver();
             var frontsOnlyDone = _playMode == "fronts" && _hotspotFrontsCaptured;
             var lookOnlyDone = (_playMode == "look" || _playMode == "lit" || _playMode == "lit2"
-                    || _playMode == "lit3" || _playMode == "units")
+                    || _playMode == "lit3")
                 && _lookCaptured;
+            var unitsProofDone = IsCombatProofMode() && _combatProofCaptured;
             // Turret last-hit is already proven. Stay in Play until victory, defeat, or timeout
             // so autoplay can finish a 10-wave run (or dump the leak if it cannot).
             // "fronts" mode exits after the hotspot-front dump so art wiring can be checked
             // without another 10-wave campaign. "look" dumps wave-1 Game view (no victory
             // overlay) and exits so a cavern pass does not wait on a 10-wave run.
-            if (!timedOut && !matchOver && !frontsOnlyDone && !lookOnlyDone)
+            TryCaptureCombatProof(elapsed);
+            if (!timedOut && !matchOver && !frontsOnlyDone && !lookOnlyDone && !unitsProofDone)
             {
                 return;
             }
@@ -243,14 +262,6 @@ namespace RedHollow.EditorTools
             OverlayInputSource.ExtraHeld.Add(PlayerKey.Q);
             OverlayInputSource.ExtraHeld.Add(PlayerKey.E);
 
-            // Units recapture: keep the gunslinger in the spawn courtyard so the
-            // follow cam sits in open street, not inside a west-lane GridHab.
-            if (_playMode == "units")
-            {
-                OverlayInputSource.CursorOverride = new Vector2(6f, 10f);
-                return;
-            }
-
             Hero hero = null;
             foreach (var h in match.State.Heroes.Values)
             {
@@ -277,6 +288,12 @@ namespace RedHollow.EditorTools
             var dx = target.Pos.X - hero.Pos.X;
             var dy = target.Pos.Y - hero.Pos.Y;
             var dist = Math.Sqrt((dx * dx) + (dy * dy));
+            if (IsCombatProofMode())
+            {
+                DriveUnitsProofWalk(match, hero);
+                return;
+            }
+
             if (dist > 8.0)
             {
                 if (dx < -0.4)
@@ -296,6 +313,110 @@ namespace RedHollow.EditorTools
                 {
                     OverlayInputSource.ExtraHeld.Add(PlayerKey.S);
                 }
+            }
+
+            DriveUnitsProofWalk(match, hero);
+        }
+
+        /// <summary>
+        /// Units/combat proof: after a real hit, walk the gunslinger east into StreetHab_SE
+        /// so the same Play frame can show a connected shot AND a body stopped on a wall.
+        /// </summary>
+        private static void DriveUnitsProofWalk(HostedMatch match, Hero hero)
+        {
+            if (!IsCombatProofMode() || hero == null || match == null || match.State == null)
+            {
+                return;
+            }
+
+            NoteHit(match.State);
+
+            // StreetHab_SE sits at ~ (9.2, 0.8); west face ~x=5.2. Steer at the wall,
+            // not "always D" — a north chase would otherwise walk east at z=40, missing the hab.
+            OverlayInputSource.ExtraHeld.Remove(PlayerKey.A);
+            OverlayInputSource.ExtraHeld.Remove(PlayerKey.D);
+            OverlayInputSource.ExtraHeld.Remove(PlayerKey.W);
+            OverlayInputSource.ExtraHeld.Remove(PlayerKey.S);
+            const double wallX = 5.5;
+            const double wallZ = 0.8;
+            var toX = wallX - hero.Pos.X;
+            var toZ = wallZ - hero.Pos.Y;
+            if (toX > 0.25)
+            {
+                OverlayInputSource.ExtraHeld.Add(PlayerKey.D);
+            }
+            else if (toX < -0.25)
+            {
+                OverlayInputSource.ExtraHeld.Add(PlayerKey.A);
+            }
+
+            if (toZ > 0.25)
+            {
+                OverlayInputSource.ExtraHeld.Add(PlayerKey.W);
+            }
+            else if (toZ < -0.25)
+            {
+                OverlayInputSource.ExtraHeld.Add(PlayerKey.S);
+            }
+
+            if (double.IsNaN(_heroXLast))
+            {
+                _heroXLast = hero.Pos.X;
+                return;
+            }
+
+            var nearWall = hero.Pos.X >= 3.5 && hero.Pos.X < 8.2
+                && Math.Abs(hero.Pos.Y - 0.8) < 3.0;
+            if (nearWall && Math.Abs(hero.Pos.X - _heroXLast) < 0.02)
+            {
+                _stallFrames++;
+            }
+            else
+            {
+                _stallFrames = 0;
+            }
+
+            _heroXLast = hero.Pos.X;
+            if (_stallFrames >= 8 && nearWall)
+            {
+                _bodyStopped = true;
+            }
+
+            var blocked = PresentationCollision.ClipMoveSeconds(
+                hero.Pos, new Vec2(1.0, 0.0), 0.05) <= 0.0;
+            if (blocked && hero.Pos.X >= 3.2 && hero.Pos.X < 8.5
+                && Math.Abs(hero.Pos.Y - 0.8) < 4.0)
+            {
+                _bodyStopped = true;
+            }
+
+        }
+
+        private static void NoteHit(MatchState state)
+        {
+            if (_hitObserved || state == null)
+            {
+                return;
+            }
+
+            foreach (var monster in state.Monsters.Values)
+            {
+                if (monster == null)
+                {
+                    continue;
+                }
+
+                // Wave-1 shamblers spawn at 60 HP. Any drop, or a corpse, is a connected hit.
+                if (!monster.Alive || monster.Hp < 59.9)
+                {
+                    _hitObserved = true;
+                    return;
+                }
+            }
+
+            if (state.Wave != null && state.Wave.LivingMonsterIds.Count < 6)
+            {
+                _hitObserved = true;
             }
         }
 
@@ -1211,6 +1332,16 @@ namespace RedHollow.EditorTools
             {
                 sb.Append(_turretLastHitLine).Append('\n');
             }
+
+            if (!string.IsNullOrEmpty(_combatProofLine))
+            {
+                sb.Append(_combatProofLine).Append('\n');
+            }
+
+            sb.Append("hitObserved=").Append(_hitObserved)
+                .Append(" bodyStopped=").Append(_bodyStopped)
+                .Append(" stallFrames=").Append(_stallFrames)
+                .Append('\n');
         }
 
         private static void CropHeroProof(Camera camera, string path)
@@ -1313,7 +1444,7 @@ namespace RedHollow.EditorTools
                 return;
             }
 
-            if (_playMode == "units")
+            if (IsCombatProofMode())
             {
                 if (match.State.Phase != MatchPhase.Combat
                     || match.State.Wave.LivingMonsterIds.Count == 0)
@@ -1342,19 +1473,17 @@ namespace RedHollow.EditorTools
                 MatchSceneBuilder.PlaceOver(cam, SimSpace.ToWorld(hero.Pos));
             }
 
-            var lookPath = _playMode == "units" ? UnitsPath
+            var lookPath = IsCombatProofMode() ? UnitsPath
                 : _playMode == "lit3" ? Lit3Path
                 : _playMode == "lit2" ? Lit2Path
                 : _playMode == "lit" ? LitPath
                 : LookPath;
-            DumpCamera(Camera.main, lookPath);
-            if (_playMode == "units" && File.Exists(lookPath))
+            if (IsCombatProofMode())
             {
-                var clean = "/workspace/unity/shots/units-visible-clean.png";
-                File.Copy(lookPath, clean, true);
-                var stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
-                File.Copy(lookPath, "/workspace/unity/shots/progress-" + stamp + ".png", true);
+                return;
             }
+
+            DumpCamera(Camera.main, lookPath);
             _lookCaptured = true;
             PurchaseLog.Add("lykos-look shot path=" + lookPath
                 + " elapsed=" + elapsed.ToString("0.00")
@@ -1363,6 +1492,96 @@ namespace RedHollow.EditorTools
                 + " living=" + match.State.Wave.LivingMonsterIds.Count
                 + " camPos=" + (Camera.main != null ? Camera.main.transform.position.ToString() : "null")
                 + " litShader=" + ViewLook.LitShaderName);
+        }
+
+        private static void TryCaptureCombatProof(double elapsed)
+        {
+            if (!IsCombatProofMode() || _combatProofCaptured)
+            {
+                return;
+            }
+
+            var match = LiveMatch();
+            if (match == null || match.State == null || match.State.Phase != MatchPhase.Combat)
+            {
+                return;
+            }
+
+            NoteHit(match.State);
+
+            Hero hero = null;
+            foreach (var h in match.State.Heroes.Values)
+            {
+                if (h != null && h.Alive)
+                {
+                    hero = h;
+                    break;
+                }
+            }
+
+            var timed = elapsed >= 45.0;
+            if (hero != null && !timed && !(_hitObserved && _bodyStopped))
+            {
+                return;
+            }
+
+            var cam = Camera.main;
+            if (cam == null)
+            {
+                return;
+            }
+
+            DumpCamera(cam, ProofPath);
+            var clean = "/workspace/unity/shots/units-visible-clean.png";
+            DumpCamera(cam, clean);
+            DumpCamera(cam, UnitsPath);
+            var stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+            try
+            {
+                File.Copy(ProofPath, "/workspace/unity/shots/progress-" + stamp + ".png", true);
+            }
+            catch (Exception)
+            {
+            }
+
+            var habColliders = 0;
+            var walls = UnityEngine.Object.FindObjectsByType<BoxCollider>(FindObjectsSortMode.None);
+            for (var i = 0; i < walls.Length; i++)
+            {
+                var c = walls[i];
+                if (c == null)
+                {
+                    continue;
+                }
+
+                var n = c.gameObject.name;
+                if (n.StartsWith("Wall_", StringComparison.Ordinal) || n == "Deck" || n == "DoorSlab")
+                {
+                    habColliders++;
+                }
+            }
+
+            var living = match.State.Wave != null ? match.State.Wave.LivingMonsterIds.Count : -1;
+            var damaged = 0;
+            foreach (var monster in match.State.Monsters.Values)
+            {
+                if (monster != null && (!monster.Alive || monster.Hp < 59.9))
+                {
+                    damaged++;
+                }
+            }
+
+            _combatProofLine = "combatProof hit=" + _hitObserved
+                + " bodyStopped=" + _bodyStopped
+                + " stallFrames=" + _stallFrames
+                + " heroX=" + (hero != null ? hero.Pos.X.ToString("0.00") : "none")
+                + " living=" + living
+                + " damaged=" + damaged
+                + " habColliders=" + habColliders
+                + " elapsed=" + elapsed.ToString("0.00")
+                + " timed=" + timed;
+            PurchaseLog.Add(_combatProofLine);
+            _combatProofCaptured = true;
         }
 
         private static void DumpFacades(StringBuilder sb)

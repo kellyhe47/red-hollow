@@ -239,6 +239,49 @@ namespace RedHollow.Game.View
 
             var offset = feel != null ? feel.NudgeOffset : Vector3.zero;
             view.transform.position = view.WorldPosition + offset;
+            var flashing = feel != null && feel.IsFlashing;
+            ApplyFlashTint(view, flashing);
+            ApplyHitBurst(view, flashing);
+        }
+
+        private static void ApplyFlashTint(MonsterView view, bool flashing)
+        {
+            var tint = flashing ? new Color(1.6f, 0.42f, 0.16f) : Color.white;
+            var renderers = view.GetComponentsInChildren<Renderer>(true);
+            for (var i = 0; i < renderers.Length; i++)
+            {
+                if (renderers[i] != null && renderers[i].gameObject.name != "fx_hit_burst")
+                {
+                    ViewLook.TintBlock(renderers[i], tint);
+                }
+            }
+        }
+
+        private static void ApplyHitBurst(MonsterView view, bool flashing)
+        {
+            var t = view.transform.Find("fx_hit_burst");
+            if (t == null)
+            {
+                if (!flashing)
+                {
+                    return;
+                }
+
+                var burst = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                burst.name = "fx_hit_burst";
+                burst.transform.SetParent(view.transform, false);
+                burst.transform.localPosition = new Vector3(0f, 1.9f, 0f);
+                burst.transform.localScale = Vector3.one * 1.25f;
+                ViewLook.StripCollider(burst);
+                ViewLook.Paint(burst, ViewLook.Unlit(new Color(1f, 0.30f, 0.08f)));
+                return;
+            }
+
+            t.gameObject.SetActive(flashing);
+            if (flashing)
+            {
+                t.localScale = Vector3.one * 1.25f;
+            }
         }
     }
 }

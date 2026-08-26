@@ -320,7 +320,7 @@ namespace RedHollow.Game.Input
 
             // T-24 — one plane-projection for aim AND the planning pointer: both resolve a cursor
             // through PointerProjection, so they can never disagree about where the cursor is.
-            if (PointerProjection.TryScreenToGround(
+            if (PointerProjection.TryScreenToAim(
                     camera, new Vector2(mouse.x, mouse.y), out var ground))
             {
                 return new Vector2((float)ground.X, (float)ground.Y);

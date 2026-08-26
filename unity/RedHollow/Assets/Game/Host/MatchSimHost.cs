@@ -99,5 +99,11 @@ namespace RedHollow.Game.Host
 
         public XpAwardResult AwardKillXp(MonsterKillRequest kill, string accountId) =>
             _sim.AwardKillXp(kill, accountId);
+
+        public HeroAttackResult ResolveHeroAttack(HeroAttackRequest request) =>
+            _sim.ResolveHeroAttack(request);
+
+        public AbilityCastOutcome CastAbility(HeroAbilityRequest request) =>
+            _sim.CastAbility(request);
     }
 }

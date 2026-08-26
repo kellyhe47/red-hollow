@@ -82,5 +82,14 @@ namespace RedHollow.Game.Host
         /// kills credit the placer; the host resolves that account before calling.
         /// </summary>
         XpAwardResult AwardKillXp(MonsterKillRequest kill, string accountId);
+
+        /// <summary>
+        /// R-30 / R-26 — one basic-attack command. Shell builds the aim line; the sim
+        /// decides who is hit. Routed through this seam so MonoBehaviours never write sim.
+        /// </summary>
+        HeroAttackResult ResolveHeroAttack(HeroAttackRequest request);
+
+        /// <summary>R-31 / R-32 — one Q/E cast. Cooldowns and locks stay sim-side.</summary>
+        AbilityCastOutcome CastAbility(HeroAbilityRequest request);
     }
 }

@@ -44,6 +44,7 @@ namespace RedHollow.Game.View
             Facing = Vector2.up;
 
             ViewRig.Attach(transform, visual);
+            PresentationCollision.EnsureHeroMotor(gameObject);
         }
 
         /// <summary>
@@ -68,7 +69,8 @@ namespace RedHollow.Game.View
             DisplayedHp = hero.Hp;
             DisplayedAlive = hero.Alive;
             WorldPosition = SimSpace.ToWorld(hero.Pos);
-
+            // HostLoop already clipped this against hab colliders. Mirror it —
+            // CharacterController.Move from the view would desync the body.
             transform.position = WorldPosition;
             ViewRig.SetVisible(Visual, DisplayedAlive);
         }

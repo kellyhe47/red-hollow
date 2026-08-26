@@ -607,7 +607,7 @@ namespace RedHollow.Game.View
             Box(hab.transform, "Deck",
                 new Vector3(0f, DeckThickness * 0.5f, 0f),
                 new Vector3(g, DeckThickness, g),
-                deck, castShadows: true);
+                deck, castShadows: true, collide: false);
             SciFiKit.Place(hab.transform, "Floor", SciFiKit.FloorDark,
                 new Vector3(0f, DeckSurface, 0f), Quaternion.identity, deck, castShadows: true);
 
@@ -625,16 +625,16 @@ namespace RedHollow.Game.View
 
                 Box(hab.transform, "Wall_S_" + s,
                     new Vector3(0f, yMid, -half),
-                    new Vector3(g * 0.96f, storey, wallT), metal, castShadows: true);
+                    new Vector3(g * 0.96f, storey, wallT), metal, castShadows: true, collide: true);
                 Box(hab.transform, "Wall_N_" + s,
                     new Vector3(0f, yMid, half),
-                    new Vector3(g * 0.96f, storey, wallT), metal, castShadows: true);
+                    new Vector3(g * 0.96f, storey, wallT), metal, castShadows: true, collide: true);
                 Box(hab.transform, "Wall_E_" + s,
                     new Vector3(half, yMid, 0f),
-                    new Vector3(wallT, storey, g * 0.96f), metal, castShadows: true);
+                    new Vector3(wallT, storey, g * 0.96f), metal, castShadows: true, collide: true);
                 Box(hab.transform, "Wall_W_" + s,
                     new Vector3(-half, yMid, 0f),
-                    new Vector3(wallT, storey, g * 0.96f), metal, castShadows: true);
+                    new Vector3(wallT, storey, g * 0.96f), metal, castShadows: true, collide: true);
 
                 for (var f = 0; f < 4; f++)
                 {
@@ -670,7 +670,7 @@ namespace RedHollow.Game.View
                 new Vector3(0f, DeckSurface, 0f), SciFiKit.FaceSouth, dark, castShadows: true);
             Box(hab.transform, "DoorSlab",
                 new Vector3(0f, DeckSurface + 1.55f, -(half + 0.08f)),
-                new Vector3(1.7f, 3.1f, 0.18f), dark, castShadows: true);
+                new Vector3(1.7f, 3.1f, 0.18f), dark, castShadows: true, collide: true);
 
             var roofY = DeckSurface + (stories * storey);
             Box(hab.transform, "RoofSlab",
@@ -1036,14 +1036,20 @@ namespace RedHollow.Game.View
 
         private static GameObject Box(
             Transform parent, string name, Vector3 localPos, Vector3 scale, Material material,
-            bool castShadows = false)
+            bool castShadows = false, bool collide = false)
         {
             var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
             go.name = name;
             go.transform.SetParent(parent, false);
             go.transform.localPosition = localPos;
             go.transform.localScale = scale;
-            ViewLook.StripCollider(go);
+            // Street plates, lanterns and window panes stay collider-free. Hab walls/deck
+            // keep the primitive BoxCollider so bodies cannot walk through buildings.
+            if (!collide)
+            {
+                ViewLook.StripCollider(go);
+            }
+
             ViewLook.Paint(go, material, castShadows);
             return go;
         }

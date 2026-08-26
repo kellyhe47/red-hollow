@@ -16,9 +16,9 @@ namespace RedHollow.Game.UI
         public double AttackCadenceSeconds = 0.25;
 
         /// <summary>How far the basic-attack aim line reaches, in ground units.</summary>
-        public double AimLineLength = 30.0;
+        public double AimLineLength = 48.0;
 
         /// <summary>Full corridor width of the aim line, in ground units.</summary>
-        public double AimLineWidth = 1.5;
+        public double AimLineWidth = 6.0;
     }
 }
