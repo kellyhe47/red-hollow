@@ -67,6 +67,19 @@ namespace RedHollow.Game.UI
     /// is <see cref="MatchSim.SpendSkillPoint"/>, through the hosted match. Events arrive via
     /// <see cref="OnSimEvent"/>, session notices via <see cref="OnSessionNotice"/> — the adapters
     /// feed both; this class holds every rule about what they mean on screen.
+    ///
+    /// Delivery facts the VIEW that renders this model must respect (locked in
+    /// docs/comfy-prompts/04-ui-props-agent.md, "opaque-alpha escalation … resolved 2026-08-25";
+    /// none of them are this model's concern, but this is where the view implementer starts):
+    ///  - The full-bleed chrome in art/ui/ (hud-topbar, shop-bar, slot frames, toast, dialog-panel,
+    ///    defeat-banner, HP/XP frames and fills) is OPAQUE by design — all-255 alpha is correct
+    ///    there, not a defective import; don't "fix" importer alpha settings to compensate.
+    ///  - slot-frame's center is opaque: the ability icon (and the padlock state via
+    ///    slot-frame-locked) renders ON TOP of the frame, not through a transparent window.
+    ///  - hp-bar-fill is a white-gold glow strip; the view tints it red at runtime via UI
+    ///    Image.color (xp-bar-fill uses it untinted). Fills draw on top of their frames.
+    ///  - wave/victory/defeat banners ship with empty centers; all text is rendered by Unity.
+    ///  - dialog-panel is at _v2 (v1 had a baked background and was removed).
     /// </summary>
     public sealed class CombatHudModel
     {
