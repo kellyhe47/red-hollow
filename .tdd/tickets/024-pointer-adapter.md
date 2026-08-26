@@ -5,7 +5,7 @@ status: pending
 depends_on: [023]
 touches: [unity/RedHollow/Assets/Game/UI/, unity/RedHollow/Assets/Game/Input/]
 iterations: 0
-test_files: []
+test_files: [unity/RedHollow/Assets/Tests/EditMode/T24_PointerTests.cs]
 branch: ""
 board_id: T-24
 owns_requirements: []
@@ -38,7 +38,41 @@ mouse. Adds:
 
 ## Test plan
 
-_Filled in by the test-writer._
+`unity/RedHollow/Assets/Tests/EditMode/T24_PointerTests.cs` (Unity NUnit, EditMode). Stubs
+(throwing `NotImplementedException`): `Game/Input/PointerProjection.cs`,
+`Game/Input/PlaceablePicker.cs`, `Game/UI/PlacementZoneOracle.cs`. Pump wiring needs NO new
+public seam — the tests drive the EXISTING `IInputSource` (cursor ground point + a held
+`PlayerKey.MouseLeft`); implement the routing inside `ShellBootstrap.Pump`/planning refresh.
+
+1. **Ray math (pure)** — `PointerProjection.TryScreenToGround(Camera, Vector2, out Vec2)`:
+   round-trips sim points through the REAL `MatchSceneBuilder` top-down camera (given a
+   RenderTexture so EditMode screen space has pixel dimensions); false (never throw) for a
+   horizon-parallel ray, a ground point behind the camera, and a null camera.
+2. **Picking (pure)** — `PlaceablePicker.Pick(MatchState, Vec2, double pickRadius)`: nearest
+   standing wins; nothing beyond radius; `Exists=false` never picked (a farther standing one
+   wins instead); boundary INCLUSIVE at the radius (matches the sim's edge-inclusive auras).
+3. **Zone oracle (property-tested vs the real sim)** — `PlacementZoneOracle(ColonyMap)` with
+   settable `HotspotBuildingRadius`/`EntryTunnelMouthRadius`/`PlaceableFootprintRadius`
+   (defaults MUST mirror a fresh `MatchSim`'s — pinned by reading the sim's, not literals),
+   `WouldAccept(MatchState, Vec2)`: 17×17 grid over ColonyMap.V1 plus edge-straddling samples
+   at every hotspot/tunnel, fresh generously-funded planning-phase scratch sim per sample,
+   verdict == `MatchSim.PurchasePlacement(...).Accepted` (with `ZoneValid:true` sent as a lie
+   the sim must ignore); same around a deliberately placed standing obstacle + a sold one;
+   retuned-radius test proves the radii are read, not hardcoded. Anti-vacuity: both verdicts.
+4. **Pump integration (device faked)** — during planning the sampled cursor drives
+   `PointerAt` with the oracle's answer (hover hotspot → GhostInvalid, hover clear → valid,
+   hover inside a standing placeable's clearance → invalid = LIVE state); a fresh MouseLeft
+   press is ONE click (held across pumps neither re-buys nor sells the fresh placement):
+   ghost up → ClickGround at cursor (catalog-priced purchase / R-24 rejection keeps ghost);
+   no ghost + cursor on a standing placeable → ClickPlaceable sells for the modeled refund;
+   ghost up + cursor on a standing placeable → placement attempt (overlap-rejected), NEVER a
+   sale (T23's ClickPlaceable-ignored-while-ghost precedence); no ghost + clear ground →
+   nothing (LastSellRefused stays false — the click routed nowhere).
+5. **Combat** — a combat-phase click over a standing placeable buys/sells nothing (planning
+   pointer path is planning-only) and held W with MouseLeft held still walks the hero (T22's
+   path untouched). Mouse-button no-gameplay-INTENT is already locked in T16 — not re-pinned.
+6. **Thinness guard** — the three new types are plain C# in the scanned shell assembly
+   (born-green, T-10 convention).
 
 ## Attempt log
 
