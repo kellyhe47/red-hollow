@@ -498,6 +498,21 @@
         "a solo Play session can be driven title->host->lobby->ready->planning->combat entirely by mouse/keyboard",
         "controls stay thin: no logic beyond calling the model (Cecil invariant holds)"
       ]
+    },
+    {
+      "id": "T-24",
+      "title": "Play-mode pointer adapter \u2014 mouse ray to the S3 placement seam",
+      "owns_requirements": [],
+      "grades_fixtures": [],
+      "depends_on": [
+        "T-23"
+      ],
+      "scope": "023 pinned the placement wiring at a pointer seam (PointerAt/ClickGround/ClickPlaceable); nothing feeds it from a real mouse. Adds the play-mode adapter: cursor ray through the camera to the ground plane (SimSpace), placeable picking by proximity, and a client-side zone oracle answering zoneValid for the red-tint UX (advisory only \u2014 the sim stays authoritative per R-24). Pump-integrated during planning; mouse-left drives ground/placeable clicks (R-30 reserves it for UI, placement IS UI).",
+      "acceptance": [
+        "during planning, the real mouse moves the ghost, left-click places at the cursor's ground point, clicking a placeable sells",
+        "the zone oracle's answer agrees with the sim's accept/reject verdict across sampled positions (property-tested)",
+        "combat aim keeps working; no gameplay intent from mouse buttons (R-30)"
+      ]
     }
   ]
 }

@@ -1,10 +1,10 @@
 ---
 id: 023
 title: Interactive UI controls — clickable screens over the 012 models
-status: pending
+status: green
 depends_on: [022]
 touches: [unity/RedHollow/Assets/Game/UI/]
-iterations: 0
+iterations: 1
 test_files:
   - unity/RedHollow/Assets/Tests/EditMode/T23_InteractiveControlsTests.cs
 branch: ""
@@ -31,10 +31,10 @@ All actions already exist on the 012 models — this is wiring, not logic.
 
 ## Acceptance criteria
 
-- [ ] every wireframe control is clickable and routed to its model action
-- [ ] a solo Play session drives title → host → lobby → ready → planning → combat entirely
-      by mouse/keyboard
-- [ ] controls stay thin — no logic beyond calling the model (Cecil invariant holds)
+- [x] every wireframe control is clickable and routed to its model action
+- [x] a solo Play session drives title → host → lobby → ready → planning → combat entirely
+      by mouse/keyboard (mouse S3 placement needs T-24: the screen-ray pointer adapter)
+- [x] controls stay thin — no logic beyond calling the model (Cecil invariant holds)
 
 ## Test plan
 
@@ -80,6 +80,11 @@ New `PlayerKey.L` / `PlayerKey.Escape` (UI keys; must produce no gameplay intent
 ## Attempt log
 
 _(created 2026-08-26 by the orchestrator at 022 close.)_
+
+- 2026-08-26 green in 1 pass (one implementation iteration on client-side zone refusal).
+  Red 20/23 verified; green verified by orchestrator: EditMode 196/196, dotnet 371/371.
+  Remaining play-mode gap spun off as T-24: mouse ray → PointerAt/ClickGround/
+  ClickPlaceable adapter + zone-tint oracle.
 
 ## Handoff notes
 
