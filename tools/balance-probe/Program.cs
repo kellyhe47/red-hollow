@@ -51,14 +51,43 @@ namespace RedHollow.Tools.BalanceProbe
             RunPolicy("TWO players, skilled full kit (the R-50 duo)",
                 buyTurrets: true, buySpikes: true, buyWalls: true, useAbilities: true, reposition: false,
                 threatAim: true, heroCount: 2);
+
+            // ---- tuning candidates (probe-only; shipped defaults untouched) -------------------
+            // R-19's own fixed points survive every candidate: wave 1 stays ~6 shamblers from one
+            // breach, Behemoths still arrive at wave 5, wave 10 stays ~30 mixed from all four.
+            // Only the free middle (waves 6-9) is trimmed.
+            foreach (var trim in new[] { 0.25, 0.40 })
+            {
+                RunPolicy(
+                    "TUNING candidate: solo skilled, waves 6-9 trimmed "
+                    + (int)(trim * 100) + "%",
+                    buyTurrets: true, buySpikes: true, buyWalls: true, useAbilities: true,
+                    reposition: false, threatAim: true, heroCount: 1, midgameTrim: trim);
+            }
+
+            RunPolicy("TUNING check: duo on the 25% trim (must stay a win)",
+                buyTurrets: true, buySpikes: true, buyWalls: true, useAbilities: true,
+                reposition: false, threatAim: true, heroCount: 2, midgameTrim: 0.25);
+
+            RunPolicy("solo skilled + SPENDTHRIFT economy (dynamite rebuys, turret rings)",
+                buyTurrets: true, buySpikes: true, buyWalls: true, useAbilities: true,
+                reposition: false, threatAim: true, heroCount: 1, spendDown: true);
+
+            RunPolicy("solo skilled + spendthrift + 25% midgame trim",
+                buyTurrets: true, buySpikes: true, buyWalls: true, useAbilities: true,
+                reposition: false, threatAim: true, heroCount: 1, midgameTrim: 0.25,
+                spendDown: true);
         }
 
         private static void RunPolicy(
             string name, bool buyTurrets, bool buySpikes, bool buyWalls, bool useAbilities,
-            bool reposition, bool threatAim = false, int heroCount = 1)
+            bool reposition, bool threatAim = false, int heroCount = 1, double midgameTrim = 0.0,
+            bool spendDown = false)
         {
             Console.WriteLine("== policy: " + name + " ==");
-            var run = new SoloRun(buyTurrets, buySpikes, buyWalls, useAbilities, reposition, threatAim, heroCount);
+            var run = new SoloRun(
+                buyTurrets, buySpikes, buyWalls, useAbilities, reposition, threatAim, heroCount,
+                midgameTrim, spendDown);
             run.Play();
             Console.WriteLine();
         }
@@ -88,6 +117,7 @@ namespace RedHollow.Tools.BalanceProbe
         private readonly bool _reposition;
         private readonly bool _threatAim;
         private readonly int _heroCount;
+        private readonly bool _spendDown;
 
         private readonly ColonyMap _map = ColonyMap.V1();
         private readonly SimConfig _config = new SimConfig();
@@ -122,7 +152,8 @@ namespace RedHollow.Tools.BalanceProbe
 
         public SoloRun(
             bool buyTurrets, bool buySpikes, bool buyWalls, bool useAbilities, bool reposition,
-            bool threatAim = false, int heroCount = 1)
+            bool threatAim = false, int heroCount = 1, double midgameTrim = 0.0,
+            bool spendDown = false)
         {
             _buyTurrets = buyTurrets;
             _buySpikes = buySpikes;
@@ -131,6 +162,7 @@ namespace RedHollow.Tools.BalanceProbe
             _reposition = reposition;
             _threatAim = threatAim;
             _heroCount = heroCount;
+            _spendDown = spendDown;
 
             _state = _map.CreateMatchState(_config);
             _state.Wave.TotalWaves = _config.TotalWaves;
@@ -141,6 +173,11 @@ namespace RedHollow.Tools.BalanceProbe
             var pathOracle = new BarricadePathOracle(_state);
             _sim = new MatchSim(_state, _config, _profiles, _clock, pathOracle) { ColonyMap = _map };
             pathOracle.BlockingRadius = _sim.PlaceableFootprintRadius;
+
+            if (midgameTrim > 0.0)
+            {
+                _sim.WaveTable = TrimmedMidgame(midgameTrim);
+            }
 
             var kit = _config.HeroKits.KitFor(HeroClass.Gunslinger);
             for (var i = 1; i <= heroCount; i++)
@@ -662,6 +699,54 @@ namespace RedHollow.Tools.BalanceProbe
 
                 BuyAt(PlaceableType.Turret, new Vec2(0.0, 3.5));
             }
+
+            if (_spendDown)
+            {
+                SpendTheRestOfThePool(activeMouths);
+            }
+        }
+
+        /// <summary>
+        /// The spendthrift late-game shop: single-use dynamite is re-laid at every active breach
+        /// each planning, then the rest of the pool goes into second-ring turrets around the
+        /// shelters and mid-lane. A real player banking 400+ scrip into a finale defeat is the
+        /// bot's own report from the un-spent runs; this is what spending it looks like.
+        /// </summary>
+        private void SpendTheRestOfThePool(List<Vec2> activeMouths)
+        {
+            // Dynamite first: single-use, so every planning re-lays the blast line.
+            foreach (var mouth in activeMouths)
+            {
+                BuyAt(PlaceableType.DynamiteTrap, PulledToward(mouth, _map.TeamSpawn, 5.2));
+            }
+
+            // Then turrets until the pool runs dry: a second ring at the shelters, mid-lane
+            // nests toward each breach, and a spawn cluster.
+            var turretSpots = new List<Vec2>();
+            foreach (var hotspot in _map.Hotspots)
+            {
+                turretSpots.Add(PulledToward(hotspot.Pos, _map.TeamSpawn, 8.0));
+            }
+
+            foreach (var mouth in _map.EntryTunnels)
+            {
+                turretSpots.Add(PulledToward(mouth, _map.TeamSpawn, 12.0));
+                turretSpots.Add(PulledToward(mouth, _map.TeamSpawn, 18.0));
+            }
+
+            turretSpots.Add(new Vec2(-3.5, 0.0));
+            turretSpots.Add(new Vec2(3.5, 0.0));
+            turretSpots.Add(new Vec2(0.0, -3.5));
+
+            foreach (var spot in turretSpots)
+            {
+                if (_state.Team.Scrip < _config.Placeables.StatsFor(PlaceableType.Turret).Cost)
+                {
+                    return;
+                }
+
+                BuyAt(PlaceableType.Turret, spot);
+            }
         }
 
         /// <summary>
@@ -1013,6 +1098,32 @@ namespace RedHollow.Tools.BalanceProbe
                     return;
                 }
             }
+        }
+
+        /// <summary>
+        /// A tuning-candidate table: the shipped campaign with waves 6-9's headcounts scaled down
+        /// by <paramref name="trim"/> (floored, never below 1 of a group). R-19's fixed points are
+        /// untouched: wave 1's opener, the wave-5 Behemoth debut, and the ~30-strong four-breach
+        /// finale all ship exactly as authored.
+        /// </summary>
+        private static WaveTable TrimmedMidgame(double trim)
+        {
+            var table = WaveTable.V1();
+            foreach (var wave in table.Waves)
+            {
+                if (wave.Number < 6 || wave.Number > 9)
+                {
+                    continue;
+                }
+
+                foreach (var group in wave.Groups)
+                {
+                    var trimmed = (int)Math.Floor(group.Count * (1.0 - trim));
+                    group.Count = Math.Max(1, trimmed);
+                }
+            }
+
+            return table;
         }
 
         private static Vec2 PulledToward(Vec2 from, Vec2 toward, double distance)

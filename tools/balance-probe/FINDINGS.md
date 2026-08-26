@@ -3,10 +3,10 @@
 `dotnet run --project tools/balance-probe/BalanceProbe.csproj` (.NET 10). Every run drives the
 REAL `MatchSim` (shipped `SimConfig`, `WaveTable.V1`, `ColonyMap.V1`, the production
 `BarricadePathOracle`) through a faithful mirror of the Unity shell's host schedule. The scripted
-players have perfect aim and perfect uptime but no human finesse; treat them as a competent
-player, not an expert one.
+players have perfect aim and perfect uptime but no human movement finesse; treat them as a
+competent player, not the human ceiling in either direction.
 
-## Outcomes
+## Outcomes at SHIPPED numbers
 
 | policy | outcome | died on | civilians |
 |---|---|---|---|
@@ -14,34 +14,45 @@ player, not an expert one.
 | solo + turrets | defeat | wave 9 | 0/20 |
 | solo + turrets + spikes | defeat | wave 10 | 0/20 |
 | solo + walls + turrets + spikes | defeat | wave 10 | 0/20 |
-| solo, full kit + abilities + repositioning | defeat | wave 9 | 0/20 |
-| solo, full kit + threat-priority aim | defeat | wave 9 | 0/20 |
+| solo, full kit + abilities + threat-priority aim | defeat | wave 9 | 0/20 |
+| solo, full kit + spendthrift economy | defeat | wave 9 | 0/20 |
 | **two players, full kit** | **victory** | — | **20/20, zero downs** |
+
+## Outcomes with waves 6–9 trimmed (probe-only config; defaults untouched)
+
+R-19's fixed points survive every candidate: wave 1 stays ~6 shamblers from one breach, the
+first Behemoth still lands at wave 5, and wave 10 ships exactly as authored (~30 mixed, all four
+breaches).
+
+| policy | outcome | civilians |
+|---|---|---|
+| solo skilled, 25% trim, lean economy | defeat on wave 10 | 20 → 0 in the finale alone |
+| solo skilled, 40% trim, lean economy | defeat on wave 10 | 20 → 0 in the finale alone |
+| **solo skilled, 25% trim + spendthrift economy** | **victory** | **6/20** |
+| duo, 25% trim (regression check) | victory | 20/20 |
 
 ## Reading
 
-1. **Waves 1–6 are safe solo under every policy** — zero civilian losses even with no purchases.
-   The early game is comfortable at shipped numbers.
-2. **The solo campaign dies in waves 7–10**, always by civilian bleed, never by hero deaths. The
-   structural cause: those waves open 3–4 breaches at once, and one gunslinger (~125 DPS with the
-   crit rhythm) plus an economy-capped turret grid (~8 × 20 DPS but range-8-local) cannot clear
-   ~1600–2300 HP of wave before enough of it reaches shelters. 20 civilians is the budget for the
-   WHOLE match; waves 8–9 alone eat 10–16 of them.
-3. **Two players win with a perfect score and a 2× margin** (63 s of combined combat vs ~100 s of
-   solo attempts). The shipped table reads as tuned for co-op; the solo cliff between wave 6 and
-   wave 7 is the sharpest edge in the campaign.
-4. Barricades (now that the production path oracle exists) and spike lines are worth roughly one
-   extra wave of survival each; abilities and repositioning as scripted here moved little — the
-   binding constraint is total DPS across simultaneous lanes, not micro.
+1. **Waves 1–6 are safe solo under every policy** — zero losses even buying nothing.
+2. **At shipped numbers the solo campaign dies in waves 7–10, always by civilian bleed** —
+   3–4 simultaneous breaches outrun one hero's ~125 DPS plus an economy-capped turret grid.
+   20 civilians is the whole match's budget; waves 8–9 alone eat 10–16 of them.
+3. **The finale is the real wall.** Given a clean 20-civilian runway (any midgame trim), lean
+   solo play still loses wave 10 outright. What closes it is the ECONOMY: re-laying dynamite
+   every planning and buying turrets until the pool runs dry turns the trimmed finale into a
+   6/20 win. Solo winnability = midgame trim + spending discipline, together.
+4. **Two players win everything comfortably** (20/20 at shipped numbers, 2× time margin). The
+   shipped table reads as co-op-tuned.
+5. Barricades (now that the production path oracle exists) and spike lines are each worth about
+   one extra wave; abilities and repositioning moved little — the binding constraint is total
+   DPS across simultaneous lanes.
 
 ## Recommendation (owner decision — R-19 makes these numbers playtest-tunable)
 
-If solo is meant to be *winnable* rather than merely playable, the smallest levers are:
+If solo should be winnable at expert level: **trim waves 6–9 headcounts ~25%** (one config edit,
+fixed points untouched, duo stays a win). If solo should stay a co-op recruiting pitch, ship as
+is — the probe shows a skilled solo player reaching wave 8–10 before the colony falls, which is
+a real (if losing) run. Party-size wave scaling would close the gap cleanly but is a NEW sim
+rule needing a PRD decision first.
 
-- trim the late-table headcounts (waves 7–10) by ~25–30%, or
-- raise the civilian budget (R-10's 20) — it is the match's real HP bar, or
-- scale wave composition by party size (note: that is a NEW sim rule, not a config tweak, and
-  would need a PRD decision first).
-
-No tuning was applied on this branch: the shipped defaults are untouched, and the probe exists so
-the retune can be measured instead of guessed.
+No tuning was applied on this branch; the probe exists so any retune is measured, not guessed.
