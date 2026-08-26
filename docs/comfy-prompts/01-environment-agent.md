@@ -1,7 +1,7 @@
 # Agent 1 — Environment: tiles & textures pipeline (Comfy Cloud)
 
 ## Mission
-Build and commit a ComfyUI (cloud.comfy.org) pipeline that produces **seamlessly tileable albedo (and derived normal/AO) textures for 3D mesh UVs** in The Red Hollow. The game is a **tilted isometric 3D** Unity co-op wave-defense set in a terraformed underground Mars colony (**Lykos** — stacked blocky settlement in a cavern; DEC-026). There is **no country-western town inside the cavern**. Western look is characters only. Read `docs/comfy-prompts/00-shared-style.md` first and obey its style tail ("Lantern Deep", DEC-025), sampler locks, and process rules.
+Build and commit a ComfyUI (cloud.comfy.org) pipeline that produces **seamlessly tileable albedo (and derived normal/AO) textures for 3D mesh UVs** in The Red Hollow. The game is a **tilted isometric 3D** Unity co-op wave-defense set in a terraformed underground Mars colony (**Lykos**; DEC-026). Mix **~70% Martian / ~30% western**: tiles are **rusted metal, packed martian dust, carved sandstone** — not saloon porch or wagon-rut dirt. Wood/brass is a wear accent on metal plate, not the material of the town. Read `docs/comfy-prompts/00-shared-style.md` first.
 
 These tiles wrap **3D meshes** (cavern floor slabs, rock walls, colony block faces). They are **not** a 2D tilemap and they are **not** a single textured quad that *is* the world. Tiles carry only the palette (burnt-sienna monochrome, warm near-black shadows, dusty apricot highlights) and the matte-dusty material read — the scene language (haze, silhouettes, settlement vistas, camera tilt) belongs to Unity lighting and meshes, never to a tile.
 
@@ -29,7 +29,7 @@ Prompts = `{item}` + style tail. Needed set (all for **3D mesh UVs**):
 1. red-rock cavern ground, packed martian dust *(floor slabs)*
 4. rusted metal colony floor plate, hex-riveted *(colony decking / interior floors)*
 5. red sandstone cavern wall, rough-hewn *(perimeter cliffs, dome)*
-6. corrugated metal + timber wall (utilitarian **Lykos colony block**, not a western storefront)
+6. rusted metal colony habitat hull (utilitarian Lykos block, **wood/brass wear only as accent** — not a western storefront)
 7. cracked dry martian soil with frost veins
 8. gravel + scrap border ground (entry tunnel mouths)
 

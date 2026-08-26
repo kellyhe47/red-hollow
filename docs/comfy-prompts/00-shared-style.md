@@ -1,10 +1,14 @@
 # Shared style contract — all four Comfy Cloud pipelines
 
-**Art direction: "Lantern Deep"** (owner-approved 2026-08-24, DEC-025) **in a 3D Lykos underground colony** (owner override 2026-08-26, DEC-026; supersedes “interior western town” as the LOOK of the map). Palette, lighting, and matte-painterly rendering are DEC-025; setting, camera, and what is western vs not are DEC-026.
+**Art direction: "Lantern Deep"** (DEC-025) **in a 3D Lykos underground colony** (DEC-026). Camera language is tilted isometric with **real building height**; the **setting** is a terraformed Mars cavern city — not suburban apocalypse, not a western town in a cave.
 
 ## Design language (the words; use these when describing, prompting, or reviewing any asset)
 
-**One-line:** A vast enclosed Martian cavern city of stacked blocky colony architecture, rendered in a single warm monochrome, lit entirely from within — thousands of small artificial lights against immense dark rock, heavy atmospheric haze giving depth by silhouette. Western silhouettes belong on the **heroes and monsters**, not on the streets.
+**One-line:** A vast enclosed Martian cavern city of stacked colony **habitats** (~70% Mars industrial, ~30% western wood/brass/lantern wear), lit entirely from within — rusted metal and carved rock against immense dark stone, heavy atmospheric haze, western gunslingers as 2.5D figures in that space.
+
+**Mix (~70% Martian / ~30% western)**
+- **Map silhouette (70%):** stacked utilitarian habitat blocks, flat roofs, industrial gantries, rusted metal plate, carved-rock cavern walls, lantern masts, a glowing lift shaft. First-gen art leaned too western — **do not** use saloon porch, chapel steeple, ranch homestead, or hitching posts as the shape of the colony.
+- **Accents + characters (30%):** wood/brass/lantern wear **on** those Mars buildings (bands, lamp heads, dusty timber trim), plus western **2.5D heroes/monsters** and optional UI twang. Accents ride the habitat; they do not replace it.
 
 **Palette**
 - Near-monochromatic **burnt sienna / rust-amber**; shadows fall to warm near-black umber, highlights to pale dusty apricot — never white.
@@ -18,8 +22,8 @@
 - Light pools and falls off fast; darkness is the default state and feels heavy overhead.
 
 **Forms & materials**
-- Immense scale contrast: cathedral-height rock walls and dome dwarf dense low blocky architecture; human figures as tiny silhouettes for scale.
-- Architecture: **Lykos stacked cubes** — flat-roofed, cubic vernacular masses, utilitarian, accreted, no ornament; industrial gantries, cables, scaffold masts threading through. **Not** a western town (no saloon porch, wagon-rut dirt, hitching posts, tumbleweed, hay bales, chapel steeple, ranch porch as the map look).
+- Immense scale contrast: cathedral-height rock walls dwarf **tall** habitat stacks; 2.5D figures stay small against them.
+- Architecture: **Lykos habitat stacks** — tall flat-roofed cubic masses, rusted plate, industrial gantries and scaffold masts, carved into the rock. **Not** a western main street and **not** suburban houses. Wood/brass is trim and lantern hardware, not the building type.
 - Rock: rough-hewn, massive, softly modeled by bounce light, not textured detail.
 - Surfaces read matte and dusty; **no specular sparkle, no clean metal**.
 
@@ -31,10 +35,10 @@
 
 This is a **tilted 3D top-down / isometric** scene (~60–70° down), not straight bird's-eye and not a 2D tilemap.
 
-- **Environment:** simple 3D meshes (rock slabs, cavern walls, stacked colony blocks) with URP Lit materials, amber **point** lanterns, fog/haze, rock-dome as sky. Comfy environment tiles are **albedo / normal / AO for those mesh UVs** — they wrap 3D geometry; they are not laid as a flat tiled quad that *is* the world.
-- **Camera:** steep top-down so building **side walls and roof edges** read. Bird's-eye flattens the colony into roofs and is the wrong target.
-- **Characters (v1):** **camera-facing upright billboards** (world-up, yaw to the lens) with a **blob shadow** under the feet, in lantern tint and haze. One canon painted sheet per character. **Not** XZ-flat floor sprites (edge-on under the tilt). **Not** 8-direction walk cycles — do not over-invest; a later 3D hero **swaps the view mesh only**. Do **not** sculpt 3D character meshes for v1.
-- **Western split:** gunslinger/rancher/sawbones (and monster) art may stay western. The cavern and colony buildings may not.
+- **Environment:** simple 3D meshes with **real height** (habitat stacks, gantries, carved cliffs) + URP Lit, amber **point** lanterns, fog, rock-dome as sky. Comfy tiles are **albedo / normal / AO for those mesh UVs**.
+- **Camera:** ~60–70° down so **side walls and roof edges** read (DestroyMyGame-style tilt). Bird's-eye is the wrong target.
+- **Characters (v1):** **camera-facing upright billboards** + **blob shadow**, lantern tint/haze. One canon sheet. **Not** XZ-flat sprites, **not** 8-dir cycles, **not** sculpted 3D meshes. A later 3D hero swaps the view mesh only.
+- **Western 30%:** wood/brass/lantern wear on Mars hulls + western 2.5D characters. Not the map silhouette.
 
 ## Prompt contract
 

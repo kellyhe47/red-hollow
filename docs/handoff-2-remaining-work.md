@@ -207,15 +207,14 @@ probe** for an asset before falling back — a probe is a code path that can ans
 is where blocking-on-art creeps in. **Chain a real resolver in FRONT of it**; do not teach it to
 look.
 
-**R-15 / DEC-026 presentation:** art-to-scene means a **3D Lykos cavern** (stacked colony meshes,
-rock walls, lift shaft), a **tilted isometric camera (~60–70° down)**, and **camera-facing
-upright billboards** for heroes/monsters (blob shadow, lantern tint/haze) — not XZ-flat sprites,
-not 8-dir cycles, not a 2D tilemap, not a western main street, not sculpted character models.
-A later 3D hero swaps the view mesh only. Lantern Deep lighting still holds: dark warm ambient,
-amber **point** lights, volumetric fog, rock-dome mesh as sky; **no sun / directional golden-hour**.
-**URP 17.5.0 is the active pipeline** (adopted deliberately for exactly this; see the git log
-for 010). Read `docs/comfy-prompts/00-shared-style.md` before touching visuals. Environment Comfy
-tiles are albedo/normal/AO for those 3D meshes.
+**R-15 / DEC-026 presentation:** fully **3D Lykos cavern** with **real building height** (tilted
+isometric ~60–70° down — DestroyMyGame-style camera, Mars setting). Mix **~70% Martian
+habitat / ~30% western accents**: stacked rusted utilitarian blocks, gantries, carved-rock
+walls, lantern masts, lift shaft — **not** a western town in a cave, **not** suburban
+apocalypse. 2.5D heroes/monsters = camera-facing upright billboards + blob shadows (not
+XZ-flat, not 8-dir, not sculpted meshes). No sun; amber point lanterns + haze. Environment
+Comfy tiles are albedo/normal/AO for those meshes. **URP 17.5.0** is the active pipeline.
+Read `docs/comfy-prompts/00-shared-style.md` before touching visuals.
 
 R-64 feel targets hang off these sim events: `monster_damaged`, `hero_damaged`, `hero_died`,
 `hero_respawned`, `civilians_killed`, `hotspot_emptied`, `placeable_created`,
