@@ -11,11 +11,12 @@
   -->
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.1</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <LangVersion>9.0</LangVersion>
     <Nullable>disable</Nullable>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
@@ -40,6 +41,19 @@
     <Compile Include="../../unity/RedHollow/Assets/Game/Net/NetTransportFactory.cs" />
     <Compile Include="../../unity/RedHollow/Assets/Game/Net/NgoNetTransport.cs" />
     <Compile Include="../../unity/RedHollow/Assets/Game/Net/UgsServices.cs" />
+
+    <!-- The EditMode test files that are sim/net-pure (Unity touched only through Time.timeScale
+         and Debug.Log, stubbed above). These RUN here: `dotnet test tools/compile-check` executes
+         the real T11 session suite and the T14 timing/non-goal suites headlessly. -->
+    <Compile Include="../../unity/RedHollow/Assets/Tests/EditMode/T11_SessionTests.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Tests/EditMode/T14_TimingTests.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Tests/EditMode/T14_NonGoalTests.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.5.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
   </ItemGroup>
 
 </Project>

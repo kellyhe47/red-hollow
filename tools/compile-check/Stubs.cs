@@ -4,6 +4,19 @@
 
 namespace UnityEngine
 {
+    public static class Time
+    {
+        public static float timeScale = 1f;
+    }
+
+    public static class Debug
+    {
+        public static void Log(object message)
+        {
+            System.Console.WriteLine(message);
+        }
+    }
+
     public struct Vector2
     {
         public float x;
