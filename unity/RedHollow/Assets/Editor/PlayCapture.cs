@@ -40,6 +40,7 @@ namespace RedHollow.EditorTools
         private const string LitPath = "/workspace/unity/shots/lykos-lit.png";
         private const string Lit2Path = "/workspace/unity/shots/lykos-lit2.png";
         private const string Lit3Path = "/workspace/unity/shots/lykos-lit3.png";
+        private const string UnitsPath = "/workspace/unity/shots/units-visible.png";
         private const double MatchTimeoutSeconds = 240.0;
 
         private static double _enteredAt;
@@ -180,7 +181,8 @@ namespace RedHollow.EditorTools
             var timedOut = elapsed >= MatchTimeoutSeconds;
             var matchOver = MatchIsOver();
             var frontsOnlyDone = _playMode == "fronts" && _hotspotFrontsCaptured;
-            var lookOnlyDone = (_playMode == "look" || _playMode == "lit" || _playMode == "lit2" || _playMode == "lit3")
+            var lookOnlyDone = (_playMode == "look" || _playMode == "lit" || _playMode == "lit2"
+                    || _playMode == "lit3" || _playMode == "units")
                 && _lookCaptured;
             // Turret last-hit is already proven. Stay in Play until victory, defeat, or timeout
             // so autoplay can finish a 10-wave run (or dump the leak if it cannot).
@@ -1295,7 +1297,54 @@ namespace RedHollow.EditorTools
                 return;
             }
 
-            var lookPath = _playMode == "lit3" ? Lit3Path
+            if (_playMode == "units")
+            {
+                if (match.State.Phase != MatchPhase.Combat
+                    || match.State.Wave.LivingMonsterIds.Count == 0)
+                {
+                    return;
+                }
+
+                Hero hero = null;
+                foreach (var h in match.State.Heroes.Values)
+                {
+                    if (h != null && h.Alive)
+                    {
+                        hero = h;
+                        break;
+                    }
+                }
+
+                if (hero == null)
+                {
+                    return;
+                }
+
+                var nearest = 1e9;
+                foreach (var id in match.State.Wave.LivingMonsterIds)
+                {
+                    Monster monster;
+                    if (!match.State.Monsters.TryGetValue(id, out monster) || monster == null)
+                    {
+                        continue;
+                    }
+
+                    var d = hero.Pos.DistanceTo(monster.Pos);
+                    if (d < nearest)
+                    {
+                        nearest = d;
+                    }
+                }
+
+                // Tight street cam (~20u tall). Wait until a painted monster is in the neighborhood.
+                if (nearest > 12.0 && elapsed < 14.0)
+                {
+                    return;
+                }
+            }
+
+            var lookPath = _playMode == "units" ? UnitsPath
+                : _playMode == "lit3" ? Lit3Path
                 : _playMode == "lit2" ? Lit2Path
                 : _playMode == "lit" ? LitPath
                 : LookPath;

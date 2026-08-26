@@ -49,15 +49,40 @@ namespace RedHollow.Game.View
     public static class MatchSceneBuilder
     {
         /// <summary>How far above the colony floor the camera sits. Not a PRD number; see below.</summary>
-        private const float CameraHeight = 40f;
+        public const float CameraHeight = 40f;
 
         /// <summary>
         /// Pitch down from the horizon, degrees. ~60-70 is isometric-ish so roof edges and
         /// building sides read; 90 would hide every vertical face.
         /// </summary>
-        private const float CameraPitchDown = 62f;
+        public const float CameraPitchDown = 62f;
 
         /// <summary>World units of breathing room around the colony, so nothing sits on the frame edge.</summary>
+        public const float StreetOrthoSize = 10f;
+
+        /// <summary>World offset from the followed ground point to the camera eye.</summary>
+        public static Vector3 FollowOffset
+        {
+            get
+            {
+                var back = CameraHeight / Mathf.Tan(CameraPitchDown * Mathf.Deg2Rad);
+                return new Vector3(0f, CameraHeight, -back);
+            }
+        }
+
+        public static void PlaceOver(Camera camera, Vector3 lookAt)
+        {
+            if (camera == null)
+            {
+                return;
+            }
+
+            camera.orthographic = true;
+            camera.orthographicSize = StreetOrthoSize;
+            camera.transform.position = lookAt + FollowOffset;
+            camera.transform.rotation = Quaternion.Euler(CameraPitchDown, 0f, 0f);
+        }
+
         private const float ViewMargin = 2f;
 
         /// <summary>Unity's built-in Plane primitive is ten world units across at scale 1.</summary>
@@ -70,10 +95,10 @@ namespace RedHollow.Game.View
         private const float TypicalViewAspect = 16f / 9f;
 
         /// <summary>Warm brown haze — dust under lamplight, never a blue night mist.</summary>
-        private static readonly Color FogDust = new Color(0.40f, 0.22f, 0.10f);
+        private static readonly Color FogDust = new Color(0.46f, 0.26f, 0.12f);
 
         /// <summary>Near-black umber ambient: dark, warm, and a color — never daylight.</summary>
-        private static readonly Color AmbientUmber = new Color(0.18f, 0.115f, 0.055f);
+        private static readonly Color AmbientUmber = new Color(0.22f, 0.14f, 0.07f);
 
         /// <summary>
         /// Compose the scene the session is played in: a tilted top-down camera, the colony floor,
@@ -177,7 +202,7 @@ namespace RedHollow.Game.View
 
             var camera = go.AddComponent<Camera>();
             camera.orthographic = true;
-            camera.orthographicSize = Mathf.Max(playArea.extents.x, playArea.extents.z) + ViewMargin;
+            camera.orthographicSize = StreetOrthoSize;
             camera.nearClipPlane = 0.3f;
             camera.farClipPlane = 400f;
 
@@ -197,15 +222,8 @@ namespace RedHollow.Game.View
 
             urp.renderType = CameraRenderType.Base;
 
-            // Offset south of centre so Euler(pitch, 0, 0) still looks at the play-area middle.
-            // Pitch 62° keeps the camera over the ±30 play square (back ≈ 21 units).
-            var back = CameraHeight / Mathf.Tan(CameraPitchDown * Mathf.Deg2Rad);
-            go.transform.position = new Vector3(
-                playArea.center.x,
-                SimSpace.GroundHeight + CameraHeight,
-                playArea.center.z - back);
-
-            go.transform.rotation = Quaternion.Euler(CameraPitchDown, 0f, 0f);
+            // Street-scale follow cam: a neighborhood, not the whole board.
+            PlaceOver(camera, new Vector3(playArea.center.x, SimSpace.GroundHeight, playArea.center.z));
 
             return camera;
         }
@@ -306,43 +324,16 @@ namespace RedHollow.Game.View
         private const float KeyLanternHeight = 28f;
 
         /// <summary>
-        /// XZ of settlement masts (CavernBlockout.ScatterSettlement) plus fill over the
-        /// hab cluster gaps the 8 spawn/shelter/tunnel lanterns leave umber.
-        /// </summary>
-        private static readonly Vec2[] ClusterLanterns =
-        {
-            new Vec2(10.0, 10.0),
-            new Vec2(-11.0, 8.0),
-            new Vec2(8.0, -12.0),
-            new Vec2(-9.0, -9.0),
-            new Vec2(16.0, 2.0),
-            new Vec2(-15.0, -4.0),
-            new Vec2(18.0, 18.0),
-            new Vec2(-18.0, 18.0),
-            new Vec2(18.0, -18.0),
-            new Vec2(-18.0, -18.0),
-            new Vec2(0.0, 18.0),
-            new Vec2(0.0, -18.0),
-            new Vec2(22.0, 10.0),
-            new Vec2(-22.0, -6.0),
-            new Vec2(12.0, -4.0),
-            new Vec2(-6.0, 16.0),
-        };
-
-        /// <summary>
         /// R-15 — sourced amber point lights over spawn, each shelter, each tunnel mouth,
-        /// and a denser cluster through the packed habs. Named and typed as lanterns
-        /// (never Directional) so the no-sun tests still pass. Hung above roofs so the
-        /// 62° camera sees lit tops rather than a lamp inside a stack.
+        /// and a fill grid so walking a street is not an umber hole. Named and typed as
+        /// lanterns (never Directional) so the no-sun tests still pass.
         /// </summary>
         private static void RaiseLanterns(Transform root, ColonyMap map)
         {
             var amber = new Color(1.0f, 0.62f, 0.28f);
-            // Soft only on the four keys: 24 point lights * 6 cubemap faces overflow
-            // a 2048 atlas (URP dropped 112 maps on the first lit2 pass).
             var keyShadows = LanternSoftShadows ? LightShadows.Soft : LightShadows.None;
 
-            AddLantern(root, "Lantern_Spawn", map.TeamSpawn, KeyLanternHeight, amber, 52f, 100f, keyShadows);
+            AddLantern(root, "Lantern_Spawn", map.TeamSpawn, KeyLanternHeight, amber, 56f, 110f, keyShadows);
 
             foreach (var spec in map.Hotspots)
             {
@@ -351,18 +342,28 @@ namespace RedHollow.Game.View
                     continue;
                 }
 
-                AddLantern(root, "Lantern_" + spec.Id, spec.Pos, KeyLanternHeight, amber, 44f, 82f, keyShadows);
+                AddLantern(root, "Lantern_" + spec.Id, spec.Pos, KeyLanternHeight, amber, 48f, 90f, keyShadows);
             }
 
             for (var i = 0; i < map.EntryTunnels.Count; i++)
             {
-                AddLantern(root, "Lantern_Tunnel_" + i, map.EntryTunnels[i], 14f, amber, 36f, 50f, LightShadows.None);
+                AddLantern(root, "Lantern_Tunnel_" + i, map.EntryTunnels[i], 14f, amber, 40f, 60f, LightShadows.None);
             }
 
-            for (var i = 0; i < ClusterLanterns.Length; i++)
+            var n = 0;
+            for (var x = -40; x <= 40; x += 20)
             {
-                AddLantern(root, "Lantern_Cluster_" + i, ClusterLanterns[i], ClusterLanternHeight,
-                    amber, ClusterLanternRange, 72f, LightShadows.None);
+                for (var z = -40; z <= 40; z += 20)
+                {
+                    if (x == 0 && z == 0)
+                    {
+                        continue;
+                    }
+
+                    AddLantern(root, "Lantern_Fill_" + n, new Vec2(x, z), ClusterLanternHeight,
+                        amber, ClusterLanternRange, 80f, LightShadows.None);
+                    n++;
+                }
             }
         }
 

@@ -378,9 +378,11 @@ namespace RedHollow.Game.View
             // and the hotspot footprints so heroes and shelters stay readable.
             var spawn = SimSpace.ToWorld(map.TeamSpawn);
             var extra = 0;
-            for (var gx = -22; gx <= 22; gx += 7)
+            var gridMin = -44;
+            var gridMax = 44;
+            for (var gx = gridMin; gx <= gridMax; gx += 8)
             {
-                for (var gz = -22; gz <= 22; gz += 7)
+                for (var gz = gridMin; gz <= gridMax; gz += 8)
                 {
                     var pos = new Vector3(gx + (gz % 2) * 1.4f, 0f, gz + (gx % 3) * 0.6f);
                     if ((pos - spawn).sqrMagnitude < 8.5f * 8.5f)

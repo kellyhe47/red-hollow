@@ -31,8 +31,8 @@ namespace RedHollow.Tests.EditMode
     ///     (<c>IsPlaceholder == false</c>) through the chained resolver, with the character key
     ///     spelled as the hero-class literal the binder actually resolves with.
     ///  4. <b>The bootstrap's binder resolves through that chain</b> — a hero (registered key)
-    ///     stands in real art, a shambler (no representative delivered) stands in the placeholder,
-    ///     both through the one resolver the bootstrap built.
+    ///     and a shambler (registered monster keeper) both stand in real canon art, while unknown
+    ///     keys still fall through to the placeholder.
     ///
     /// <b>Not asserted</b>: nudge direction/magnitude and flash duration (playtest's numbers —
     /// only "present, then gone" is contract, with a generous 1s bound), audio actually playing,
@@ -243,12 +243,19 @@ namespace RedHollow.Tests.EditMode
             {
                 (key: ShellArtKeys.GroundTile, visualClass: VisualClass.Ground),
                 (key: ShellArtKeys.GunslingerCharacter, visualClass: VisualClass.Hero),
+                (key: HeroClass.Rancher, visualClass: VisualClass.Hero),
+                (key: HeroClass.Sawbones, visualClass: VisualClass.Hero),
+                (key: MonsterType.Shambler, visualClass: VisualClass.Monster),
+                (key: MonsterType.Ravager, visualClass: VisualClass.Monster),
+                (key: MonsterType.Spitter, visualClass: VisualClass.Monster),
+                (key: MonsterType.Burrower, visualClass: VisualClass.Monster),
+                (key: MonsterType.BullBehemoth, visualClass: VisualClass.Monster),
                 (key: ShellArtKeys.RevolverShotIcon, visualClass: VisualClass.Placeable),
                 (key: ShellArtKeys.ButtonFrame, visualClass: VisualClass.Placeable),
             };
 
-            Assert.That(expectations.Select(e => e.key).Distinct().Count(), Is.EqualTo(4),
-                "sanity: four distinct representatives, one per delivered asset class");
+            Assert.That(expectations.Select(e => e.key).Distinct().Count(), Is.EqualTo(expectations.Length),
+                "sanity: each keeper is a distinct catalog key");
 
             var resolver = new ArtVisualResolver(catalog, new PlaceholderVisualResolver());
 

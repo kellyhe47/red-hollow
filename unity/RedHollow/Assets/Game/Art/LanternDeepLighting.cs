@@ -22,7 +22,7 @@ namespace RedHollow.Game.Art
     public static class LanternDeepLighting
     {
         /// <summary>Near-black umber ambient: dark, warm, and a color — never void-black.</summary>
-        private static readonly Color AmbientUmber = new Color(0.10f, 0.065f, 0.035f);
+        private static readonly Color AmbientUmber = new Color(0.22f, 0.14f, 0.07f);
 
         /// <summary>Dust under lamplight — warm haze, never a blue night mist.</summary>
         private static readonly Color FogDust = new Color(0.16f, 0.10f, 0.06f);
