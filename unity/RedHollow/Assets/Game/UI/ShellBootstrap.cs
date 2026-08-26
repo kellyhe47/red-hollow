@@ -236,6 +236,34 @@ namespace RedHollow.Game.UI
             }
         }
 
+        /// <summary>
+        /// Ticket 023 (T-23) — S1's model: the callsign→profile load and the join-code inline
+        /// error. Alive from birth (the title screen exists before anything is hosted).
+        /// </summary>
+        public TitleScreenModel Title =>
+            throw new NotImplementedException("ticket 023 — the shell does not own S1's model yet");
+
+        /// <summary>
+        /// Ticket 023 (T-23) — S2's model for the local peer: class picks, ready, and the
+        /// all-ready auto-start its Update performs. Refreshed by the pump while a lobby is open.
+        /// </summary>
+        public LobbyScreenModel Lobby =>
+            throw new NotImplementedException("ticket 023 — the shell does not own S2's model yet");
+
+        /// <summary>
+        /// Ticket 023 (T-23) — S3's model for the live match (null without one, like
+        /// <see cref="Hud"/>): shop, ghost placement, sell, ready-up. Refreshed by the pump.
+        /// </summary>
+        public PlanningScreenModel Planning =>
+            throw new NotImplementedException("ticket 023 — the shell does not own S3's model yet");
+
+        /// <summary>
+        /// Ticket 023 (T-23) — the interactive controls (buttons, input fields, the pointer
+        /// wiring seam), built beside the labels under the same screen roots.
+        /// </summary>
+        public ShellControls Controls =>
+            throw new NotImplementedException("ticket 023 — the shell has no interactive controls yet");
+
         /// <summary>One presentation frame. See the class doc for the six-step contract.</summary>
         public void Pump(double deltaSeconds)
         {

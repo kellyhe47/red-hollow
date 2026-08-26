@@ -24,6 +24,18 @@ namespace RedHollow.Game.Input
         Q,
         E,
 
+        /// <summary>
+        /// Ticket 023 / R-62 — the level-up picker hotkey. A UI key: it must never produce a
+        /// gameplay intent.
+        /// </summary>
+        L,
+
+        /// <summary>
+        /// Ticket 023 / R-55 — opens the ESC overlay (never a pause). A UI key: it must never
+        /// produce a gameplay intent.
+        /// </summary>
+        Escape,
+
         /// <summary>R-30 — reserved for UI. Must never produce a gameplay intent.</summary>
         MouseLeft,
 
