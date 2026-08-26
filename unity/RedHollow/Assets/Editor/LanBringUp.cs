@@ -206,8 +206,8 @@ namespace RedHollow.EditorTools
                 ? party.Shell.Router.Screen.ToString()
                 : "null";
             var label = party.Shell != null && party.Shell.Controls != null
-                && party.Shell.Controls.JoinCodeLabel != null
-                ? party.Shell.Controls.JoinCodeLabel.text
+                && party.Shell.Controls.LobbyJoinCodeLabel != null
+                ? party.Shell.Controls.LobbyJoinCodeLabel.text
                 : "";
             var joinCode = party.JoinCode ?? "";
             var titleRoot = party.Shell != null && party.Shell.Ui != null

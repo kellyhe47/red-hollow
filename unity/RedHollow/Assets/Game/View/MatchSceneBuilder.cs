@@ -98,7 +98,7 @@ namespace RedHollow.Game.View
         private static readonly Color FogDust = new Color(0.46f, 0.26f, 0.12f);
 
         /// <summary>Near-black umber ambient: dark, warm, and a color — never daylight.</summary>
-        private static readonly Color AmbientUmber = new Color(0.22f, 0.14f, 0.07f);
+        private static readonly Color AmbientUmber = new Color(0.24f, 0.16f, 0.08f);
 
         /// <summary>
         /// Compose the scene the session is played in: a tilted top-down camera, the colony floor,
@@ -308,17 +308,17 @@ namespace RedHollow.Game.View
         /// Soft shadows on sourced lanterns. llvmpipe may hitch or go black with cubemap
         /// point shadows; flip this off and keep the extra lights if PlayCapture dies.
         /// </summary>
-        private const bool LanternSoftShadows = true;
+        private const bool LanternSoftShadows = false;
 
         /// <summary>
         /// Hung above 4-story stacks (peak ~y=32) so the lamp is not inside a cube.
         /// Range must exceed height or the pool never reaches the street
         /// (range 26 at y=36 missed the floor last time).
         /// </summary>
-        private const float ClusterLanternHeight = 36f;
+        private const float ClusterLanternHeight = 16f;
 
         /// <summary>Sphere radius from the cluster lamp; 48 clears y=0 with a street pool.</summary>
-        private const float ClusterLanternRange = 48f;
+        private const float ClusterLanternRange = 34f;
 
         /// <summary>Spawn / shelter keys hang over open courtyards, below the 4-story peak.</summary>
         private const float KeyLanternHeight = 28f;
@@ -361,7 +361,7 @@ namespace RedHollow.Game.View
                     }
 
                     AddLantern(root, "Lantern_Fill_" + n, new Vec2(x, z), ClusterLanternHeight,
-                        amber, ClusterLanternRange, 80f, LightShadows.None);
+                        amber, ClusterLanternRange, 140f, LightShadows.None);
                     n++;
                 }
             }
