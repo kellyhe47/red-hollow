@@ -311,14 +311,13 @@ namespace RedHollow.Game.View
         private const bool LanternSoftShadows = false;
 
         /// <summary>
-        /// Hung above 4-story stacks (peak ~y=32) so the lamp is not inside a cube.
-        /// Range must exceed height or the pool never reaches the street
-        /// (range 26 at y=36 missed the floor last time).
+        /// Street-mast height. High lamps (y=16+) left umber holes between habs because
+        /// inverse-square died before the floor; keep the pool on the pavement.
         /// </summary>
-        private const float ClusterLanternHeight = 16f;
+        private const float ClusterLanternHeight = 8f;
 
-        /// <summary>Sphere radius from the cluster lamp; 48 clears y=0 with a street pool.</summary>
-        private const float ClusterLanternRange = 34f;
+        /// <summary>Sphere radius from the cluster lamp; must clear height plus a street radius.</summary>
+        private const float ClusterLanternRange = 24f;
 
         /// <summary>Spawn / shelter keys hang over open courtyards, below the 4-story peak.</summary>
         private const float KeyLanternHeight = 28f;
@@ -351,9 +350,9 @@ namespace RedHollow.Game.View
             }
 
             var n = 0;
-            for (var x = -40; x <= 40; x += 20)
+            for (var x = -40; x <= 40; x += 16)
             {
-                for (var z = -40; z <= 40; z += 20)
+                for (var z = -40; z <= 40; z += 16)
                 {
                     if (x == 0 && z == 0)
                     {
@@ -361,7 +360,7 @@ namespace RedHollow.Game.View
                     }
 
                     AddLantern(root, "Lantern_Fill_" + n, new Vec2(x, z), ClusterLanternHeight,
-                        amber, ClusterLanternRange, 140f, LightShadows.None);
+                        amber, ClusterLanternRange, 220f, LightShadows.None);
                     n++;
                 }
             }
