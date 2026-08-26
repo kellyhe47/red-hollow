@@ -65,6 +65,7 @@ namespace RedHollow.Tests.EditMode
         [SetUp]
         public void SnapshotEventSystems()
         {
+            GameEntryBehaviour.BootSuppressed = false;
             _preExistingEventSystems = UnityEngine.Object.FindObjectsOfType<EventSystem>();
         }
 

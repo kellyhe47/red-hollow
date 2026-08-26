@@ -47,6 +47,10 @@ namespace RedHollow.EditorTools
             EditorApplication.update += Tick;
             Application.logMessageReceived -= OnLog;
             Application.logMessageReceived += OnLog;
+            if (File.Exists(ArmedPath))
+            {
+                GameEntryBehaviour.BootSuppressed = true;
+            }
         }
 
         private static void OnLog(string message, string stack, LogType type)
@@ -118,10 +122,12 @@ namespace RedHollow.EditorTools
                 EditorSceneManager.OpenScene(MatchScene);
             }
 
+            GameEntryBehaviour.BootSuppressed = true;
             var entry = UnityEngine.Object.FindFirstObjectByType<GameEntryBehaviour>();
             if (entry != null)
             {
                 entry.enabled = false;
+                entry.gameObject.SetActive(false);
             }
 
             try
@@ -133,8 +139,11 @@ namespace RedHollow.EditorTools
             {
                 if (entry != null)
                 {
+                    entry.gameObject.SetActive(true);
                     entry.enabled = true;
                 }
+
+                GameEntryBehaviour.BootSuppressed = false;
 
                 WriteStatus("fail arm: " + ex.Message + "\n");
                 return;
@@ -152,6 +161,7 @@ namespace RedHollow.EditorTools
 
             if (!_spawned)
             {
+                SuppressSoloEntry();
                 var go = new GameObject("RedHollow_LanParty");
                 go.AddComponent<LanPartyBehaviour>();
                 _spawned = true;
@@ -200,9 +210,18 @@ namespace RedHollow.EditorTools
                 ? party.Shell.Controls.JoinCodeLabel.text
                 : "";
             var joinCode = party.JoinCode ?? "";
+            var titleRoot = party.Shell != null && party.Shell.Ui != null
+                ? party.Shell.Ui.ScreenRoot(UiScreen.Title)
+                : null;
+            var lobbyRoot = party.Shell != null && party.Shell.Ui != null
+                ? party.Shell.Ui.ScreenRoot(UiScreen.Lobby)
+                : null;
+            var titleOn = titleRoot != null && titleRoot.activeInHierarchy;
+            var lobbyOn = lobbyRoot != null && lobbyRoot.activeInHierarchy;
 
             var lobbyPainted = _hosted && running
                 && screen == UiScreen.Lobby.ToString()
+                && lobbyOn && !titleOn
                 && joinCode.IndexOf("LAN", StringComparison.OrdinalIgnoreCase) >= 0
                 && label.IndexOf("LAN", StringComparison.OrdinalIgnoreCase) >= 0
                 && elapsed >= PaintSettleSeconds;
@@ -225,6 +244,8 @@ namespace RedHollow.EditorTools
                     + " shot=" + ShotPath
                     + " shotExists=" + File.Exists(ShotPath)
                     + " elapsed=" + elapsed.ToString("0.00")
+                    + " titleActive=" + titleOn
+                    + " lobbyActive=" + lobbyOn
                     + "\n--- console ---\n" + Logs);
                 EditorApplication.isPlaying = false;
                 return;
@@ -278,8 +299,11 @@ namespace RedHollow.EditorTools
                 FindObjectsInactive.Include);
             if (entry != null)
             {
+                entry.gameObject.SetActive(true);
                 entry.enabled = true;
             }
+
+            GameEntryBehaviour.BootSuppressed = false;
 
             _hosted = false;
             _spawned = false;
@@ -345,6 +369,12 @@ namespace RedHollow.EditorTools
                 canvas.planeDistance = 2f;
             }
 
+            for (var i = 0; i < restored.Count; i++)
+            {
+                CullInactiveScreenRoots(restored[i]);
+            }
+
+            Canvas.ForceUpdateCanvases();
             camera.targetTexture = rt;
             camera.Render();
             RenderTexture.active = rt;
@@ -411,6 +441,67 @@ namespace RedHollow.EditorTools
             {
                 try { transport.Shutdown(); } catch (Exception) { }
                 UnityEngine.Object.DestroyImmediate(ngo);
+            }
+        }
+
+        /// <summary>
+        /// Overlay dumps park ScreenSpaceOverlay canvases onto the camera. Inactive Screen_*
+        /// children still batch unless their CanvasRenderers are culled — the S1-on-S2 gap.
+        /// </summary>
+        private static void CullInactiveScreenRoots(Canvas canvas)
+        {
+            if (canvas == null)
+            {
+                return;
+            }
+
+            var t = canvas.transform;
+            for (var i = 0; i < t.childCount; i++)
+            {
+                var child = t.GetChild(i);
+                if (child == null || child.gameObject.activeSelf)
+                {
+                    continue;
+                }
+
+                var name = child.name;
+                if (!name.StartsWith("Screen_", StringComparison.Ordinal)
+                    && name != "HUD_TopBar"
+                    && name != "HUD_SelfBar")
+                {
+                    continue;
+                }
+
+                var renderers = child.GetComponentsInChildren<CanvasRenderer>(true);
+                for (var r = 0; r < renderers.Length; r++)
+                {
+                    if (renderers[r] != null)
+                    {
+                        renderers[r].cull = true;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// GameEntry.Awake still runs on a disabled behaviour. Tear down any solo shell that
+        /// raced Play so only LanParty's S2 paints.
+        /// </summary>
+        private static void SuppressSoloEntry()
+        {
+            GameEntryBehaviour.BootSuppressed = true;
+            var entry = UnityEngine.Object.FindFirstObjectByType<GameEntryBehaviour>(
+                FindObjectsInactive.Include);
+            if (entry == null)
+            {
+                return;
+            }
+
+            entry.enabled = false;
+            entry.gameObject.SetActive(false);
+            if (entry.Shell != null)
+            {
+                entry.Shell.TearDown();
             }
         }
 

@@ -1302,6 +1302,45 @@ namespace RedHollow.EditorTools
                 .Append(" exists=").Append(File.Exists(HotspotFrontsPath)).Append('\n');
         }
 
+        /// <summary>
+        /// Overlay dumps park ScreenSpaceOverlay canvases onto the camera. Inactive Screen_*
+        /// children still batch unless their CanvasRenderers are culled — the S1-on-S2 gap.
+        /// </summary>
+        private static void CullInactiveScreenRoots(Canvas canvas)
+        {
+            if (canvas == null)
+            {
+                return;
+            }
+
+            var t = canvas.transform;
+            for (var i = 0; i < t.childCount; i++)
+            {
+                var child = t.GetChild(i);
+                if (child == null || child.gameObject.activeSelf)
+                {
+                    continue;
+                }
+
+                var name = child.name;
+                if (!name.StartsWith("Screen_", StringComparison.Ordinal)
+                    && name != "HUD_TopBar"
+                    && name != "HUD_SelfBar")
+                {
+                    continue;
+                }
+
+                var renderers = child.GetComponentsInChildren<CanvasRenderer>(true);
+                for (var r = 0; r < renderers.Length; r++)
+                {
+                    if (renderers[r] != null)
+                    {
+                        renderers[r].cull = true;
+                    }
+                }
+            }
+        }
+
         private static void DumpCamera(Camera camera, string path)
         {
             if (camera == null)
@@ -1339,6 +1378,12 @@ namespace RedHollow.EditorTools
                 canvas.planeDistance = 2f;
             }
 
+            for (var i = 0; i < restored.Count; i++)
+            {
+                CullInactiveScreenRoots(restored[i]);
+            }
+
+            Canvas.ForceUpdateCanvases();
             camera.targetTexture = rt;
             camera.Render();
             RenderTexture.active = rt;

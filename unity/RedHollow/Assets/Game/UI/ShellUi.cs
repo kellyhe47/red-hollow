@@ -215,24 +215,29 @@ namespace RedHollow.Game.UI
 
             foreach (UiScreen screen in Enum.GetValues(typeof(UiScreen)))
             {
-                var screenGo = new GameObject("Screen_" + screen, typeof(RectTransform));
+                var screenGo = new GameObject(
+                    "Screen_" + screen, typeof(RectTransform), typeof(CanvasGroup));
                 screenGo.transform.SetParent(canvasGo.transform, false);
                 UiStyle.Stretch((RectTransform)screenGo.transform);
                 screenGo.SetActive(false);
+                var group = screenGo.GetComponent<CanvasGroup>();
+                group.alpha = 0f;
+                group.interactable = false;
+                group.blocksRaycasts = false;
                 ui._screenRoots[screen] = screenGo;
             }
 
             // T-27 — the HUD splits into the wireframes' regions: TOP BAR (wave · scrip ·
             // monsters · shelters) hangs from the top edge; the SELF bar (HP) sits in the bottom
-            // band, above the planning shop bar's strip.
-            ui.HudPanel = new GameObject("HUD_TopBar", typeof(RectTransform));
+            // band, above the planning shop bar's strip. Hidden on S1/S2 — combat chrome.
+            ui.HudPanel = new GameObject("HUD_TopBar", typeof(RectTransform), typeof(CanvasGroup));
             ui.HudPanel.transform.SetParent(canvasGo.transform, false);
             UiStyle.Anchor((RectTransform)ui.HudPanel.transform, 0f, 0.93f, 1f, 1f);
             var hudFace = ui.HudPanel.AddComponent<Image>();
             hudFace.color = UiStyle.PanelDark;
             hudFace.raycastTarget = false;
 
-            ui.SelfBar = new GameObject("HUD_SelfBar", typeof(RectTransform));
+            ui.SelfBar = new GameObject("HUD_SelfBar", typeof(RectTransform), typeof(CanvasGroup));
             ui.SelfBar.transform.SetParent(canvasGo.transform, false);
             UiStyle.Anchor((RectTransform)ui.SelfBar.transform, 0.01f, 0.17f, 0.2f, 0.25f);
             var selfFace = ui.SelfBar.AddComponent<Image>();
@@ -287,15 +292,60 @@ namespace RedHollow.Game.UI
             }
         }
 
-        /// <summary>R-60 — exactly the routed screen's root is active; everything else is off.</summary>
+        /// <summary>
+        /// R-60 — exactly the routed screen's root is active; everything else is off.
+        /// Also culls CanvasRenderers and zeros CanvasGroup alpha on the hidden roots:
+        /// ScreenSpaceOverlay dumps that park the canvas on a camera still batch inactive
+        /// children, which stacked S1 HOST GAME / callsign chrome onto S2.
+        /// </summary>
         internal void SetActiveScreen(UiScreen active)
         {
             foreach (var pair in _screenRoots)
             {
-                var shouldBeActive = pair.Key == active;
-                if (pair.Value != null && pair.Value.activeSelf != shouldBeActive)
+                ApplyScreenVisibility(pair.Value, pair.Key == active);
+            }
+
+            // HUD is S3/S4/S5 chrome (wireframes); hide the empty bars on title and lobby.
+            var hudOn = active == UiScreen.Planning
+                || active == UiScreen.Combat
+                || active == UiScreen.WaveInterstitial;
+            ApplyScreenVisibility(HudPanel, hudOn);
+            ApplyScreenVisibility(SelfBar, hudOn);
+        }
+
+        /// <summary>
+        /// Show or hide one screen (or HUD) root so both the Game view and an overlay-to-camera
+        /// dump agree. SetActive alone is not enough: Camera.Render of a ScreenSpaceCamera
+        /// canvas still paints CanvasRenderers on inactive children.
+        /// </summary>
+        private static void ApplyScreenVisibility(GameObject root, bool visible)
+        {
+            if (root == null)
+            {
+                return;
+            }
+
+            if (root.activeSelf != visible)
+            {
+                root.SetActive(visible);
+            }
+
+            var group = root.GetComponent<CanvasGroup>();
+            if (group == null)
+            {
+                group = root.AddComponent<CanvasGroup>();
+            }
+
+            group.alpha = visible ? 1f : 0f;
+            group.interactable = visible;
+            group.blocksRaycasts = visible;
+
+            var renderers = root.GetComponentsInChildren<CanvasRenderer>(true);
+            for (var i = 0; i < renderers.Length; i++)
+            {
+                if (renderers[i] != null)
                 {
-                    pair.Value.SetActive(shouldBeActive);
+                    renderers[i].cull = !visible;
                 }
             }
         }

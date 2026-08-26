@@ -43,6 +43,13 @@ namespace RedHollow.Game.UI
         /// <summary>T-26 — the colony scene this entry composed and owns (the shell only reads it).</summary>
         private MatchScene _matchScene;
 
+        /// <summary>
+        /// LAN bring-up sets this before Play so Awake (which still runs on a disabled
+        /// behaviour) does not compose a second S1 shell under the lobby. Static, not an
+        /// instance field — T-22's thin-pump count stays on the instance members.
+        /// </summary>
+        public static bool BootSuppressed;
+
         /// <summary>The shell this entry constructed on Awake. Readable, never assignable.</summary>
         public ShellBootstrap Shell => _shell;
 
@@ -60,6 +67,14 @@ namespace RedHollow.Game.UI
 
         private void Awake()
         {
+            // Awake runs even when this behaviour is disabled. LAN host-listen disables the
+            // entry so LanPartyBehaviour is the only shell — skip composition or S1 chrome
+            // (HOST GAME / callsign) stacks on S2.
+            if (!enabled || BootSuppressed)
+            {
+                return;
+            }
+
             // Loopback by default — every option null except identity and the device seam, which
             // only a scene entry can own (ShellBootstrap deliberately has no device default).
             _shell = new ShellBootstrap(new ShellBootstrapOptions
