@@ -1,10 +1,10 @@
 ---
 id: 026
 title: Placeable views — placed defenses render and show damage
-status: pending
+status: green
 depends_on: [025]
 touches: [unity/RedHollow/Assets/Game/View/, unity/RedHollow/Assets/Game/UI/]
-iterations: 0
+iterations: 1
 test_files: [unity/RedHollow/Assets/Tests/EditMode/T26_PlaceableViewTests.cs]
 branch: ""
 board_id: T-26
@@ -31,9 +31,9 @@ Adds placeable view binding through the existing resolver seam:
 
 ## Acceptance criteria
 
-- [ ] a purchased placeable appears at its position through the resolver seam
-- [ ] sold, broken and destroyed placeables disappear
-- [ ] a damaged barricade shows a damage readout driven by sim state; Cecil invariant holds
+- [x] a purchased placeable appears at its position through the resolver seam
+- [x] sold, broken and destroyed placeables disappear
+- [x] a damaged barricade shows a damage readout driven by sim state; Cecil invariant holds
 
 ## Test plan
 
@@ -90,6 +90,11 @@ T16/T19/T21 tests untouched and green at red time.
 ## Attempt log
 
 _(created 2026-08-26 by the orchestrator at 025 close.)_
+
+- 2026-08-26 green in 1 pass. Red 15/15 verified; green verified by orchestrator: EditMode
+  252/252, dotnet 371/371. Play rebuilds the colony through the real art resolver at Awake
+  (baked scene copy superseded). Flare decay is phase-gated; marker/damage presentation is
+  state-only — animation/tint is feel-layer polish, deliberately unpinned.
 
 ## Handoff notes
 
