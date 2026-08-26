@@ -450,6 +450,24 @@
         "loopback transport still works with no UGS id configured",
         "a 2-player co-op session across two real machines completes a 10-wave match with victory, defeat and rematch exercised (hand-verified; DoD item 3)"
       ]
+    },
+    {
+      "id": "T-21",
+      "title": "Runtime binding: UI screens, feel router and art resolver into the playable shell",
+      "owns_requirements": [],
+      "grades_fixtures": [],
+      "depends_on": [
+        "T-12",
+        "T-13",
+        "T-19"
+      ],
+      "scope": "The Section-5 pattern recurred in the shell run: 012's screen models, 013's FeelRouter and ArtVisualResolver are implemented and locked-tested but nothing in the runtime constructs them. No Canvas renders any wireframe screen; sim events never reach the feel layer; MatchViewBinder defaults to the placeholder resolver with no ArtVisualResolver chained. Binds all three into the playable bootstrap so a launched build actually shows S1-S7, plays feel effects, and resolves real art.",
+      "acceptance": [
+        "a launched scene renders the UI screens through the 012 models (visible UI elements bound to model state, screen switching driven by UiRouter)",
+        "the host's sim event stream reaches FeelRouter and feel state is applied to views each frame",
+        "MatchViewBinder receives an ArtVisualResolver whose catalog registers the imported representative assets, chained over the placeholder",
+        "the Cecil invariant still holds (UI/feel MonoBehaviours never write sim state)"
+      ]
     }
   ]
 }
