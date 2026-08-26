@@ -618,13 +618,10 @@ namespace RedHollow.Game.UI
         }
 
         /// <summary>
-        /// R-15 — the default catalog: the four imported representative assets
-        /// (Assets/Game/Art/{Textures,Characters,Icons,UI}/, the exact files T13's seam tests pin)
-        /// registered under the <see cref="ShellArtKeys"/> spellings, each with a factory that
-        /// instantiates a renderable GameObject carrying that asset. Loaded through Resources
-        /// copies (Assets/Game/UI/Resources/RedHollowArt/) — a mechanism that works in EditMode
-        /// AND a build, never AssetDatabase; T13's imported originals stay untouched where its
-        /// locked tests read them.
+        /// R-15 — the default catalog: the four T-13 representative assets plus the delivered
+        /// keepers bound to the keys the views actually resolve (HeroClass / MonsterType /
+        /// PlaceableType literals, hotspot ids). Resources copies live under
+        /// Assets/Game/UI/Resources/RedHollowArt/; T13's AssetDatabase originals stay put.
         /// </summary>
         public static ArtCatalog LoadRepresentativeArt()
         {
@@ -634,6 +631,25 @@ namespace RedHollow.Game.UI
             RegisterResourceArt(catalog, ShellArtKeys.GunslingerCharacter, "RedHollowArt/gunslinger");
             RegisterResourceArt(catalog, ShellArtKeys.RevolverShotIcon, "RedHollowArt/gs-revolver-shot");
             RegisterResourceArt(catalog, ShellArtKeys.ButtonFrame, "RedHollowArt/button-normal");
+
+            RegisterResourceArt(catalog, HeroClass.Rancher, "RedHollowArt/rancher");
+            RegisterResourceArt(catalog, HeroClass.Sawbones, "RedHollowArt/sawbones");
+
+            RegisterResourceArt(catalog, MonsterType.Shambler, "RedHollowArt/shambler");
+            RegisterResourceArt(catalog, MonsterType.Ravager, "RedHollowArt/ravager");
+            RegisterResourceArt(catalog, MonsterType.Spitter, "RedHollowArt/spitter");
+            RegisterResourceArt(catalog, MonsterType.Burrower, "RedHollowArt/burrower");
+            RegisterResourceArt(catalog, MonsterType.BullBehemoth, "RedHollowArt/bull-behemoth");
+
+            RegisterResourceArt(catalog, PlaceableType.Barricade, "RedHollowArt/barricade");
+            RegisterResourceArt(catalog, PlaceableType.SpikeTrap, "RedHollowArt/spike-trap");
+            RegisterResourceArt(catalog, PlaceableType.DynamiteTrap, "RedHollowArt/dynamite-trap");
+            RegisterResourceArt(catalog, PlaceableType.Turret, "RedHollowArt/turret");
+            RegisterResourceArt(catalog, PlaceableType.MedStation, "RedHollowArt/med-station");
+
+            RegisterResourceArt(catalog, "hs_saloon", "RedHollowArt/saloon-facade");
+            RegisterResourceArt(catalog, "hs_chapel", "RedHollowArt/chapel-facade");
+            RegisterResourceArt(catalog, "hs_homestead", "RedHollowArt/homestead-facade");
 
             return catalog;
         }
@@ -1243,6 +1259,8 @@ namespace RedHollow.Game.UI
                 _ui.WaveLabel.text = string.Empty;
                 _ui.ScripLabel.text = string.Empty;
                 _ui.HpLabel.text = string.Empty;
+                _ui.QLabel.text = string.Empty;
+                _ui.ELabel.text = string.Empty;
                 _ui.MonstersRemainingLabel.text = string.Empty;
                 _ui.EnsureHotspotLabels(0);
                 return;
@@ -1251,16 +1269,18 @@ namespace RedHollow.Game.UI
             _ui.WaveLabel.text = "Wave "
                 + _hud.WaveNumber.ToString(CultureInfo.InvariantCulture)
                 + "/" + _hud.TotalWaves.ToString(CultureInfo.InvariantCulture);
-            _ui.ScripLabel.text = _hud.Scrip.ToString(CultureInfo.InvariantCulture);
-            _ui.HpLabel.text = ((int)_hud.Hp).ToString(CultureInfo.InvariantCulture);
+            _ui.ScripLabel.text = _hud.Scrip.ToString(CultureInfo.InvariantCulture) + " scrip";
+            _ui.HpLabel.text = ((int)_hud.Hp).ToString(CultureInfo.InvariantCulture) + " HP";
             _ui.MonstersRemainingLabel.text =
-                _hud.MonstersRemaining.ToString(CultureInfo.InvariantCulture);
+                _hud.MonstersRemaining.ToString(CultureInfo.InvariantCulture) + " left";
+            _ui.QLabel.text = HudCopy.SlotFace(_hud.SlotFor(AbilitySlot.Q));
+            _ui.ELabel.text = HudCopy.SlotFace(_hud.SlotFor(AbilitySlot.E));
 
             var hotspots = _hud.Hotspots;
             _ui.EnsureHotspotLabels(hotspots.Count);
             for (var i = 0; i < hotspots.Count; i++)
             {
-                _ui.HotspotLabelList[i].text = hotspots[i].HotspotId + ": "
+                _ui.HotspotLabelList[i].text = HudCopy.HotspotName(hotspots[i].HotspotId) + ": "
                     + hotspots[i].Civilians.ToString(CultureInfo.InvariantCulture);
             }
         }
@@ -1308,6 +1328,10 @@ namespace RedHollow.Game.UI
                 var go = new GameObject("art_" + artKey.Replace('/', '_'));
                 var renderer = go.AddComponent<SpriteRenderer>();
                 renderer.sprite = sprite;
+                // Catalog sprites live on XY (facing +Z). The match camera looks down -Y, so
+                // without this they render edge-on as a one-pixel line. Face +Y, onto XZ.
+                go.transform.localRotation = Quaternion.LookRotation(Vector3.up, Vector3.forward);
+                go.transform.localPosition = new Vector3(0f, 0.05f, 0f);
                 return go;
             });
         }

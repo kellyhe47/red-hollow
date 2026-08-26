@@ -79,6 +79,15 @@ namespace RedHollow.Game.UI
             var baked = GameObject.Find("RedHollow_Match");
             if (baked != null)
             {
+                // Destroy is deferred in play mode: an enabled baked camera (Skybox + Unity
+                // default slate) keeps rendering beside the runtime one for a frame and
+                // letterboxes the Game view. Disable every camera first.
+                foreach (var cam in baked.GetComponentsInChildren<Camera>(true))
+                {
+                    cam.enabled = false;
+                    cam.gameObject.SetActive(false);
+                }
+
                 DestroyGameObjectCompat(baked);
             }
 

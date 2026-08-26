@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using RedHollow.Sim;
 using UnityEngine;
+using UnityEngine.Rendering.Universal;
 
 namespace RedHollow.Game.View
 {
@@ -54,6 +55,15 @@ namespace RedHollow.Game.View
         /// <summary>Unity's built-in Plane primitive is ten world units across at scale 1.</summary>
         private const float PlanePrimitiveSize = 10f;
 
+        /// <summary>Warm cavern clear — not Unity's default slate, not void-black (R-15 umber).</summary>
+        private static readonly Color CavernClear = new Color(0.14f, 0.08f, 0.045f);
+
+        /// <summary>Sourced lantern amber (R-15 — no sun).</summary>
+        private static readonly Color LanternAmber = new Color(1.0f, 0.62f, 0.28f);
+
+        /// <summary>How far above the floor the hotspot/spawn lanterns hang.</summary>
+        private const float LanternHeight = 5f;
+
         /// <summary>
         /// Compose the scene the session is played in: a top-down camera, the colony floor, the
         /// team spawn (R-33) and one marker per shelter (R-10).
@@ -83,6 +93,8 @@ namespace RedHollow.Game.View
 
             scene.Ground = BuildGround(scene.Root.transform, resolver, playArea);
 
+            PlaceLanterns(scene.Root.transform, map);
+
             // R-33 — one team spawn, where heroes enter at wave 1 and come back after a death.
             scene.TeamSpawn = Marker(
                 scene.Root.transform, resolver, VisualClass.Placeable, "TeamSpawn", map.TeamSpawn);
@@ -97,7 +109,8 @@ namespace RedHollow.Game.View
                 }
 
                 var hotspotMarker = Marker(
-                    scene.Root.transform, resolver, VisualClass.Hotspot, "Hotspot_" + spec.Id, spec.Pos);
+                    scene.Root.transform, resolver, VisualClass.Hotspot, "Hotspot_" + spec.Id,
+                    spec.Pos, spec.Id);
 
                 // T-26 / S4 — the observable lost-state component, named by the sim's own id.
                 // Not lost at build: the colony starts with everyone alive; the shell pump mirrors
@@ -142,6 +155,29 @@ namespace RedHollow.Game.View
             camera.orthographicSize = Mathf.Max(playArea.extents.x, playArea.extents.z) + ViewMargin;
             camera.nearClipPlane = 0.1f;
             camera.farClipPlane = CameraHeight * 2f;
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = CavernClear;
+            camera.depth = 10;
+            try
+            {
+                go.tag = "MainCamera";
+            }
+            catch (UnityException)
+            {
+                // Builtin tags are always present in the player; EditMode hosts can lack them.
+            }
+
+            try
+            {
+                var additional = camera.GetUniversalAdditionalCameraData();
+                additional.renderType = CameraRenderType.Base;
+                additional.renderPostProcessing = false;
+            }
+            catch (Exception)
+            {
+                // URP additional-camera data is best-effort: SolidColor + MainCamera already
+                // make the Game view playable if the component cannot be added here.
+            }
 
             go.transform.position = new Vector3(
                 playArea.center.x, SimSpace.GroundHeight + CameraHeight, playArea.center.z);
@@ -153,8 +189,9 @@ namespace RedHollow.Game.View
             return camera;
         }
 
-        // The pre-013 placeholder KeyLight (a directional light) is retired: R-15 forbids any
-        // sun-like light, and RedHollow.Game.Art.LanternDeepLighting now lights the scene.
+        // No directional KeyLight: R-15 forbids a sun. Sourced amber point lights are raised
+        // in PlaceLanterns. LanternDeepLighting.Apply is NOT called at Play — it also raises
+        // the cavern dome, which sits under the camera at y=60 and would occlude the colony.
 
         /// <summary>
         /// The colony floor: one placeholder plane, stretched to cover the whole play area so no
@@ -166,17 +203,78 @@ namespace RedHollow.Game.View
             ground.transform.SetParent(root, false);
             ground.transform.position = new Vector3(playArea.center.x, SimSpace.GroundHeight, playArea.center.z);
 
-            var visual = visuals.Resolve(VisualClass.Ground, null);
+            // ShellArtKeys.GroundTile — the cavern floor, not a western street tile.
+            var visual = visuals.Resolve(VisualClass.Ground, "textures/cavern-ground");
             ViewRig.Attach(ground.transform, visual);
 
             if (visual != null && visual.Instance != null)
             {
-                var span = Mathf.Max(playArea.size.x, playArea.size.z) + (ViewMargin * 2f);
-                var scale = span / PlanePrimitiveSize;
-                visual.Instance.transform.localScale = new Vector3(scale, 1f, scale);
+                // Cover a wide Game view (Free Aspect) so the floor is cavern, not letterbox void.
+                var playSpan = Mathf.Max(playArea.size.x, playArea.size.z) + (ViewMargin * 2f);
+                FitGroundVisual(visual.Instance, playSpan * 2f);
             }
 
             return ground;
+        }
+
+        /// <summary>
+        /// Stretch the ground visual to cover <paramref name="span"/> world units. Plane
+        /// placeholders use the primitive's 10-unit size; catalog sprites are already rotated
+        /// onto XZ and must NOT inherit that 10-unit formula — their authored pixel size is
+        /// the right denominator.
+        /// </summary>
+        private static void FitGroundVisual(GameObject instance, float span)
+        {
+            if (instance.GetComponentInChildren<SpriteRenderer>() != null)
+            {
+                var renderer = instance.GetComponentInChildren<Renderer>();
+                var size = renderer.bounds.size;
+                var current = Mathf.Max(size.x, size.z);
+                if (current > 0.001f)
+                {
+                    var factor = span / current;
+                    instance.transform.localScale *= factor;
+                }
+
+                return;
+            }
+
+            var scale = span / PlanePrimitiveSize;
+            instance.transform.localScale = new Vector3(scale, 1f, scale);
+        }
+
+        /// <summary>
+        /// R-15 sourced light without <c>LanternDeepLighting.Apply</c> (that call also raises
+        /// the cavern dome, which sits under the camera at y=60 and would occlude the colony).
+        /// A handful of amber point lights over spawn and the three shelters.
+        /// </summary>
+        private static void PlaceLanterns(Transform root, ColonyMap map)
+        {
+            PlaceLantern(root, "Lantern_Spawn", map.TeamSpawn, 18f);
+
+            foreach (var spec in map.Hotspots)
+            {
+                if (spec == null || string.IsNullOrEmpty(spec.Id))
+                {
+                    continue;
+                }
+
+                PlaceLantern(root, "Lantern_" + spec.Id, spec.Pos, 14f);
+            }
+        }
+
+        private static void PlaceLantern(Transform root, string name, Vec2 pos, float range)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(root, false);
+            go.transform.position = SimSpace.ToWorld(pos) + (Vector3.up * LanternHeight);
+
+            var light = go.AddComponent<Light>();
+            light.type = LightType.Point;
+            light.color = LanternAmber;
+            light.intensity = 4f;
+            light.range = range;
+            light.shadows = LightShadows.None;
         }
 
         /// <summary>
@@ -185,13 +283,14 @@ namespace RedHollow.Game.View
         /// placeholder's own vertical offset never moves the point the sim meant.
         /// </summary>
         private static GameObject Marker(
-            Transform root, IVisualResolver visuals, VisualClass visualClass, string name, Vec2 pos)
+            Transform root, IVisualResolver visuals, VisualClass visualClass, string name, Vec2 pos,
+            string artKey = null)
         {
             var marker = new GameObject(name);
             marker.transform.SetParent(root, false);
             marker.transform.position = SimSpace.ToWorld(pos);
 
-            ViewRig.Attach(marker.transform, visuals.Resolve(visualClass, null));
+            ViewRig.Attach(marker.transform, visuals.Resolve(visualClass, artKey));
 
             return marker;
         }
