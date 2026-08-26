@@ -73,7 +73,7 @@ namespace RedHollow.Game.View
         private static readonly Color FogDust = new Color(0.40f, 0.22f, 0.10f);
 
         /// <summary>Near-black umber ambient: dark, warm, and a color — never daylight.</summary>
-        private static readonly Color AmbientUmber = new Color(0.10f, 0.065f, 0.035f);
+        private static readonly Color AmbientUmber = new Color(0.18f, 0.115f, 0.055f);
 
         /// <summary>
         /// Compose the scene the session is played in: a tilted top-down camera, the colony floor,
@@ -111,8 +111,8 @@ namespace RedHollow.Game.View
             ApplyCavernAtmosphere();
             scene.CavernDome = CavernBlockout.BuildShell(scene.Root.transform, playArea);
 
-            // Modest sourced lanterns for leftover lit mats. Named and typed as lanterns
-            // (never Directional) so the no-sun tests still pass.
+            // Sourced amber lanterns that shade URP Lit habs/ground/walls. Named and typed
+            // as lanterns (never Directional) so the no-sun tests still pass.
             RaiseLanterns(scene.Root.transform, map);
 
             // R-33 — one team spawn, where heroes enter at wave 1 and come back after a death.
@@ -223,7 +223,7 @@ namespace RedHollow.Game.View
             RenderSettings.fogColor = FogDust;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
             // Dense enough to haze the far wall / lift shaft; the playable square stays readable.
-            RenderSettings.fogDensity = 0.012f;
+            RenderSettings.fogDensity = 0.008f;
 
             RenderSettings.skybox = null;
             RenderSettings.sun = null;
@@ -293,10 +293,10 @@ namespace RedHollow.Game.View
         /// </summary>
         private static void RaiseLanterns(Transform root, ColonyMap map)
         {
-            const float height = 14f;
+            const float height = 22f;
             var amber = new Color(1.0f, 0.62f, 0.28f);
 
-            AddLantern(root, "Lantern_Spawn", map.TeamSpawn, height, amber, 36f, 16f);
+            AddLantern(root, "Lantern_Spawn", map.TeamSpawn, height, amber, 56f, 110f);
 
             foreach (var spec in map.Hotspots)
             {
@@ -305,12 +305,12 @@ namespace RedHollow.Game.View
                     continue;
                 }
 
-                AddLantern(root, "Lantern_" + spec.Id, spec.Pos, height, amber, 30f, 14f);
+                AddLantern(root, "Lantern_" + spec.Id, spec.Pos, height, amber, 48f, 85f);
             }
 
             for (var i = 0; i < map.EntryTunnels.Count; i++)
             {
-                AddLantern(root, "Lantern_Tunnel_" + i, map.EntryTunnels[i], 8f, amber, 18f, 8f);
+                AddLantern(root, "Lantern_Tunnel_" + i, map.EntryTunnels[i], 10f, amber, 36f, 36f);
             }
         }
 
@@ -325,9 +325,13 @@ namespace RedHollow.Game.View
             var light = go.AddComponent<Light>();
             light.type = LightType.Point;
             light.color = color;
+            light.lightUnit = LightUnit.Candela;
             light.intensity = intensity;
             light.range = range;
             light.shadows = LightShadows.None;
+            light.renderMode = LightRenderMode.ForcePixel;
+            // URP additional-light data so the 8 lanterns are realtime punctual, not baked.
+            light.GetUniversalAdditionalLightData();
         }
 
         /// <summary>

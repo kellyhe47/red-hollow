@@ -6,11 +6,108 @@ using UnityEngine.Rendering;
 namespace RedHollow.Game.View
 {
     /// <summary>
-    /// Shared unlit materials and primitive hygiene for the runtime colony blockout.
-    /// Presentation only — no sim types.
+    /// Shared materials and primitive hygiene for the runtime colony blockout.
+    /// Habs / ground / cavern walls use URP Lit so the 8 sourced lanterns shade them.
+    /// Characters stay Unlit billboards. Presentation only — no sim types.
     /// </summary>
     public static class ViewLook
     {
+        public const string UrpLitName = "Universal Render Pipeline/Lit";
+        public const string UrpSimpleLitName = "Universal Render Pipeline/Simple Lit";
+        public const string UrpUnlitName = "Universal Render Pipeline/Unlit";
+
+        /// <summary>Shader Lit() actually bound, or "none" if both URP Lit shaders were missing.</summary>
+        public static string LitShaderName
+        {
+            get
+            {
+                var shader = FindLitShader();
+                return shader != null ? shader.name : "none";
+            }
+        }
+
+        public static bool IsLitShader(Material material)
+        {
+            if (material == null || material.shader == null)
+            {
+                return false;
+            }
+
+            var name = material.shader.name;
+            return name == UrpLitName || name == UrpSimpleLitName;
+        }
+
+        private static Shader FindLitShader()
+        {
+            var shader = Shader.Find(UrpLitName);
+            if (shader != null)
+            {
+                return shader;
+            }
+
+            return Shader.Find(UrpSimpleLitName);
+        }
+
+        /// <summary>
+        /// URP Lit (Simple Lit if Lit is missing) so amber point lights shade the mesh.
+        /// Environment reflections off — Lantern Deep has no skybox/probes, and a black IBL
+        /// is how Lit went void in the first playtest. Metallic 0, low smoothness (dust).
+        /// Falls back to Unlit only if neither Lit shader exists, never as the happy path.
+        /// </summary>
+        public static Material Lit(
+            Color color, Texture albedo = null, Texture normal = null, float smoothness = 0.18f)
+        {
+            var shader = FindLitShader();
+            if (shader == null)
+            {
+                return Unlit(color, albedo);
+            }
+
+            var material = new Material(shader);
+            Tint(material, color);
+            BindTexture(material, albedo != null ? albedo : Texture2D.whiteTexture);
+
+            if (material.HasProperty("_Metallic"))
+            {
+                material.SetFloat("_Metallic", 0f);
+            }
+
+            if (material.HasProperty("_Smoothness"))
+            {
+                material.SetFloat("_Smoothness", smoothness);
+            }
+
+            if (material.HasProperty("_EnvironmentReflections"))
+            {
+                material.SetFloat("_EnvironmentReflections", 0f);
+            }
+
+            material.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
+
+            if (material.HasProperty("_ReceiveShadows"))
+            {
+                material.SetFloat("_ReceiveShadows", 1f);
+            }
+
+            if (normal != null && material.HasProperty("_BumpMap"))
+            {
+                material.SetTexture("_BumpMap", normal);
+                material.EnableKeyword("_NORMALMAP");
+                if (material.HasProperty("_BumpScale"))
+                {
+                    material.SetFloat("_BumpScale", 1f);
+                }
+            }
+
+            // Cubes/planes have outward normals; back-face cull so wall slabs shade correctly.
+            if (material.HasProperty("_Cull"))
+            {
+                material.SetFloat("_Cull", 2f);
+            }
+
+            return material;
+        }
+
         public static Material Unlit(Color color, Texture texture = null)
         {
             var shader = Shader.Find("Universal Render Pipeline/Unlit");
@@ -147,7 +244,8 @@ namespace RedHollow.Game.View
 
             renderer.sharedMaterial = material;
             renderer.shadowCastingMode = ShadowCastingMode.Off;
-            renderer.receiveShadows = false;
+            // Lit meshes must receive the lanterns; Unlit ignores lights either way.
+            renderer.receiveShadows = IsLitShader(material);
         }
 
         /// <summary>

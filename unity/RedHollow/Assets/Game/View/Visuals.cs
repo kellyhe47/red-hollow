@@ -229,9 +229,10 @@ namespace RedHollow.Game.View
         }
 
         /// <summary>
-        /// Distinct UNLIT albedo per class so a y-down camera can tell a hero from a monster from
-        /// the floor even with no lights. Default-Material is lit URP Lit — without a light it
-        /// renders black, which is how a Play session became a void. T16 pins none of the colours.
+        /// Ground / hotspot / placeable placeholders are URP Lit so the 8 lanterns shade them.
+        /// Heroes and monsters never reach here (UnitBillboard is Unlit). T16 pins none of the
+        /// colours. Default-Material-with-zero-lights was the first-playtest black; we Lit only
+        /// now that sourced point lights actually exist.
         /// </summary>
         private static void TintPlaceholder(GameObject go, VisualClass visualClass, string artKey)
         {
@@ -242,17 +243,10 @@ namespace RedHollow.Game.View
             }
 
             var color = ColorFor(visualClass, artKey);
-            var shader = Shader.Find("Universal Render Pipeline/Unlit");
-            if (shader == null)
+            var material = ViewLook.Lit(color);
+            if (material != null)
             {
-                shader = Shader.Find("Unlit/Color");
-            }
-
-            if (shader != null)
-            {
-                var material = new Material(shader);
-                ApplyColor(material, color);
-                renderer.sharedMaterial = material;
+                ViewLook.Paint(go, material);
                 return;
             }
 

@@ -37,6 +37,7 @@ namespace RedHollow.EditorTools
         private const string EndShotPath = "/workspace/unity/shots/wave10-end.png";
         private const string HotspotFrontsPath = "/workspace/unity/shots/hotspot-fronts.png";
         private const string LookPath = "/workspace/unity/shots/lykos-look.png";
+        private const string LitPath = "/workspace/unity/shots/lykos-lit.png";
         private const double MatchTimeoutSeconds = 240.0;
 
         private static double _enteredAt;
@@ -177,7 +178,7 @@ namespace RedHollow.EditorTools
             var timedOut = elapsed >= MatchTimeoutSeconds;
             var matchOver = MatchIsOver();
             var frontsOnlyDone = _playMode == "fronts" && _hotspotFrontsCaptured;
-            var lookOnlyDone = _playMode == "look" && _lookCaptured;
+            var lookOnlyDone = (_playMode == "look" || _playMode == "lit") && _lookCaptured;
             // Turret last-hit is already proven. Stay in Play until victory, defeat, or timeout
             // so autoplay can finish a 10-wave run (or dump the leak if it cannot).
             // "fronts" mode exits after the hotspot-front dump so art wiring can be checked
@@ -1291,12 +1292,15 @@ namespace RedHollow.EditorTools
                 return;
             }
 
-            DumpCamera(Camera.main, LookPath);
+            var lookPath = _playMode == "lit" ? LitPath : LookPath;
+            DumpCamera(Camera.main, lookPath);
             _lookCaptured = true;
-            PurchaseLog.Add("lykos-look shot elapsed=" + elapsed.ToString("0.00")
+            PurchaseLog.Add("lykos-look shot path=" + lookPath
+                + " elapsed=" + elapsed.ToString("0.00")
                 + " phase=" + match.State.Phase
                 + " wave=" + match.State.Wave.Number
-                + " living=" + match.State.Wave.LivingMonsterIds.Count);
+                + " living=" + match.State.Wave.LivingMonsterIds.Count
+                + " litShader=" + ViewLook.LitShaderName);
         }
 
         private static void DumpFacades(StringBuilder sb)
@@ -1337,6 +1341,50 @@ namespace RedHollow.EditorTools
                 .Append(" exists=").Append(File.Exists(HotspotFrontsPath)).Append('\n');
             sb.Append("lykosLookShot=").Append(LookPath)
                 .Append(" exists=").Append(File.Exists(LookPath)).Append('\n');
+            sb.Append("lykosLitShot=").Append(LitPath)
+                .Append(" exists=").Append(File.Exists(LitPath)).Append('\n');
+            DumpShaders(sb);
+        }
+
+        private static void DumpShaders(StringBuilder sb)
+        {
+            sb.Append("litShader=").Append(ViewLook.LitShaderName).Append('\n');
+            var names = new[]
+            {
+                "Ground", "Wall_North", "Body", "Roof", "Plaza", "billboard", "Cliff_North_W",
+            };
+            for (var i = 0; i < names.Length; i++)
+            {
+                var go = GameObject.Find(names[i]);
+                sb.Append("mesh ").Append(names[i]).Append(" present=").Append(go != null);
+                if (go != null)
+                {
+                    var renderer = go.GetComponentInChildren<Renderer>();
+                    var mat = renderer != null ? renderer.sharedMaterial : null;
+                    var shader = mat != null && mat.shader != null ? mat.shader.name : "null";
+                    sb.Append(" shader=").Append(shader)
+                        .Append(" receive=").Append(renderer != null && renderer.receiveShadows);
+                }
+
+                sb.Append('\n');
+            }
+
+            var lights = UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None);
+            for (var i = 0; i < lights.Length; i++)
+            {
+                var light = lights[i];
+                if (light == null || !light.enabled || light.type != LightType.Point)
+                {
+                    continue;
+                }
+
+                sb.Append("lantern ").Append(light.gameObject.name)
+                    .Append(" intensity=").Append(light.intensity.ToString("0.0"))
+                    .Append(" range=").Append(light.range.ToString("0.0"))
+                    .Append(" unit=").Append(light.lightUnit)
+                    .Append(" pos=").Append(light.transform.position)
+                    .Append('\n');
+            }
         }
 
         /// <summary>

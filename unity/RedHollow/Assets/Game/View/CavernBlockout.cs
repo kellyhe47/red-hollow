@@ -35,12 +35,12 @@ namespace RedHollow.Game.View
         private static readonly Color AmberGlow = new Color(1.0f, 0.72f, 0.32f);
         private static readonly Color LostTint = new Color(0.18f, 0.10f, 0.06f);
         private static readonly Color LiveTint = Color.white;
-        // Unlit albedo tints: contrast has to live in the texture*color product
-        // because lanterns do not shade Unlit meshes.
-        private static readonly Color RoofTint = new Color(0.28f, 0.15f, 0.08f);
-        private static readonly Color HabWallTint = new Color(1.10f, 0.92f, 0.66f);
-        private static readonly Color CavernTint = new Color(0.46f, 0.27f, 0.14f);
-        private static readonly Color RockTint = new Color(0.26f, 0.14f, 0.08f);
+        // Lit albedo tints: lanterns do the shading. Roof stays darker than walls so
+        // the 62° camera still reads a separate roof plane.
+        private static readonly Color RoofTint = new Color(0.32f, 0.18f, 0.10f);
+        private static readonly Color HabWallTint = new Color(1.00f, 0.84f, 0.60f);
+        private static readonly Color CavernTint = new Color(0.62f, 0.38f, 0.20f);
+        private static readonly Color RockTint = new Color(0.38f, 0.22f, 0.12f);
 
         /// <summary>
         /// Raise the cavern shell (wall ring + ceiling) around the play square. Camera at
@@ -244,7 +244,7 @@ namespace RedHollow.Game.View
             Box(hab.transform, "LanternMast",
                 new Vector3(mast.x, 3.4f, mast.z),
                 new Vector3(0.28f, 6.8f, 0.28f),
-                ViewLook.Unlit(MetalDark));
+                DarkMetalMaterial());
             Box(hab.transform, "LanternHead",
                 new Vector3(mast.x, 6.9f, mast.z),
                 new Vector3(0.7f, 0.7f, 0.7f),
@@ -311,7 +311,7 @@ namespace RedHollow.Game.View
 
             var metal = HabitatMaterial();
             var roof = RoofMaterial();
-            var dark = ViewLook.Unlit(MetalDark);
+            var dark = DarkMetalMaterial();
             var deck = DeckingMaterial();
             var brass = ViewLook.Unlit(Brass);
 
@@ -517,7 +517,7 @@ namespace RedHollow.Game.View
             HidePlaceholders(marker);
 
             var deck = DeckingMaterial();
-            var dark = ViewLook.Unlit(MetalDark);
+            var dark = DarkMetalMaterial();
             var brass = ViewLook.Unlit(Brass);
 
             var pad = new GameObject("SpawnPad");
@@ -801,7 +801,7 @@ namespace RedHollow.Game.View
             var tex = ViewLook.LoadTexture("RedHollowArt/hab-block-roof")
                 ?? ViewLook.LoadTexture("RedHollowArt/colony-decking")
                 ?? ViewLook.LoadTexture("RedHollowArt/hab-block-cladding");
-            var mat = ViewLook.Unlit(tex != null ? RoofTint : Roof, tex);
+            var mat = ViewLook.Lit(tex != null ? RoofTint : Roof, tex, smoothness: 0.12f);
             if (mat != null && tex != null)
             {
                 ViewLook.SetTiling(mat, new Vector2(1.6f, 1.6f));
@@ -817,7 +817,7 @@ namespace RedHollow.Game.View
                 ?? ViewLook.LoadTexture("RedHollowArt/colony-wall")
                 ?? ViewLook.LoadTexture("RedHollowArt/metal-floor-plate")
                 ?? ViewLook.LoadTexture("RedHollowArt/cavern-ground");
-            var mat = ViewLook.Unlit(tex != null ? HabWallTint : Metal, tex);
+            var mat = ViewLook.Lit(tex != null ? HabWallTint : Metal, tex, smoothness: 0.16f);
             if (mat != null && tex != null)
             {
                 ViewLook.SetTiling(mat, new Vector2(1.05f, 1.35f));
@@ -835,7 +835,8 @@ namespace RedHollow.Game.View
         private static Material TrimMaterial()
         {
             var tex = ViewLook.LoadTexture("RedHollowArt/wood-trim");
-            return ViewLook.Unlit(tex != null ? new Color(0.75f, 0.55f, 0.32f) : WoodTrim, tex);
+            return ViewLook.Lit(tex != null ? new Color(0.75f, 0.55f, 0.32f) : WoodTrim, tex,
+                smoothness: 0.22f);
         }
 
         private static Material Tiled(string resourcePath, Color tint, Vector2 scale,
@@ -843,13 +844,20 @@ namespace RedHollow.Game.View
         {
             var tex = ViewLook.LoadTexture(resourcePath)
                 ?? (altPath != null ? ViewLook.LoadTexture(altPath) : null);
-            var mat = ViewLook.Unlit(tint, tex);
+            var mat = ViewLook.Lit(tint, tex, smoothness: 0.14f);
             if (mat != null && tex != null)
             {
                 ViewLook.SetTiling(mat, scale);
             }
 
             return mat;
+        }
+
+        private static Material DarkMetalMaterial()
+        {
+            var tex = ViewLook.LoadTexture("RedHollowArt/hab-block-cladding")
+                ?? ViewLook.LoadTexture("RedHollowArt/metal-floor-plate");
+            return ViewLook.Lit(MetalDark, tex, smoothness: 0.28f);
         }
 
         private static GameObject Box(Transform parent, string name, Vector3 localPos, Vector3 scale, Material material)

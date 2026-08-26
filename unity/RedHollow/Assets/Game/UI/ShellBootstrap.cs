@@ -1402,6 +1402,30 @@ namespace RedHollow.Game.UI
 
             catalog.Register(artKey, () =>
             {
+                if (artKey == ShellArtKeys.GroundTile)
+                {
+                    // A SpriteRenderer is Unlit and has no world-space normals — lanterns
+                    // cannot shade it. A Plane + URP Lit is the same albedo, real 3D lighting.
+                    var groundTex = Resources.Load<Texture2D>(resourcePath);
+                    if (groundTex == null)
+                    {
+                        return null;
+                    }
+
+                    var plane = GameObject.CreatePrimitive(PrimitiveType.Plane);
+                    plane.name = "art_" + artKey.Replace('/', '_');
+                    ViewLook.StripCollider(plane);
+                    var groundMat = ViewLook.Lit(new Color(0.82f, 0.58f, 0.38f), groundTex,
+                        smoothness: 0.12f);
+                    if (groundMat != null)
+                    {
+                        ViewLook.SetTiling(groundMat, new Vector2(8f, 8f));
+                        ViewLook.Paint(plane, groundMat);
+                    }
+
+                    return plane;
+                }
+
                 if (sprite == null)
                 {
                     var texture = Resources.Load<Texture2D>(resourcePath);
@@ -1410,8 +1434,7 @@ namespace RedHollow.Game.UI
                         return null;
                     }
 
-                    var standing = artKey != ShellArtKeys.GroundTile
-                        && artKey != ShellArtKeys.RevolverShotIcon
+                    var standing = artKey != ShellArtKeys.RevolverShotIcon
                         && artKey != ShellArtKeys.ButtonFrame;
                     sprite = standing
                         ? ViewLook.CreateStandingSprite(texture)
@@ -1429,13 +1452,6 @@ namespace RedHollow.Game.UI
                 var go = new GameObject("art_" + artKey.Replace('/', '_'));
                 var renderer = go.AddComponent<SpriteRenderer>();
                 renderer.sprite = sprite;
-
-                if (artKey == ShellArtKeys.GroundTile)
-                {
-                    // SpriteRenderer faces +Z (XY plane). Lay the tile on the colony floor.
-                    go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-                    return go;
-                }
 
                 var across = Mathf.Max(sprite.bounds.size.x, sprite.bounds.size.y);
                 const float characterSpan = 7.2f;
