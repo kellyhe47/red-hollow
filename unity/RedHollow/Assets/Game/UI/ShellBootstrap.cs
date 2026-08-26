@@ -91,6 +91,49 @@ namespace RedHollow.Game.UI
     }
 
     /// <summary>
+    /// Ticket 025 (T-25) — the shell's read of one Q/E cast's <see cref="AbilityCastOutcome"/>,
+    /// surfaced on <see cref="ShellBootstrap.LastAbilityOutcome"/>. A presentation VIEW and not
+    /// the sim type itself for one concrete reason: the sim's outcome carries public FIELDS, and
+    /// the UI layer (NUnit property constraints included) reads presentation state through
+    /// PROPERTIES. Every value is copied verbatim at cast time — the shell translates nothing
+    /// (R-31: `ability_locked` / `ability_cooling` ride through exactly as the sim spelled them).
+    /// </summary>
+    public sealed class AbilityOutcomeView
+    {
+        public AbilityOutcomeView(AbilityCastOutcome outcome)
+        {
+            Accepted = outcome.Accepted;
+            CasterId = outcome.CasterId;
+            Slot = outcome.Slot;
+            Ability = outcome.Ability;
+            Rank = outcome.Rank;
+            RejectionReason = outcome.RejectionReason;
+            CooldownReadyAt = outcome.CooldownReadyAt;
+            TotalDamage = outcome.TotalDamage;
+        }
+
+        /// <summary>R-31/R-32 — did the sim accept the cast?</summary>
+        public bool Accepted { get; }
+
+        public string CasterId { get; }
+
+        /// <summary>The <see cref="AbilitySlot"/> that was pressed.</summary>
+        public string Slot { get; }
+
+        /// <summary>The <see cref="AbilityName"/> the caster's class binds to that slot.</summary>
+        public string Ability { get; }
+
+        public int Rank { get; }
+
+        /// <summary>The sim's own fixture-shaped reason, untranslated. Null when accepted.</summary>
+        public string RejectionReason { get; }
+
+        public double CooldownReadyAt { get; }
+
+        public double TotalDamage { get; }
+    }
+
+    /// <summary>
     /// Ticket 021 (T-21) — the shell composition root: the one place that constructs at runtime
     /// what tickets 012, 013 and 019 built and locked but nothing ever assembled. It owns:
     ///
@@ -196,6 +239,32 @@ namespace RedHollow.Game.UI
         /// </summary>
         private bool _pointerMouseWasDown;
 
+        // ---- T-25 combat action routing state ------------------------------------------------
+
+        /// <summary>T-25 — the combat tunables this shell was composed with (never null).</summary>
+        private readonly CombatActionConfig _combatActions;
+
+        /// <summary>T-25 — was SPACE held on the PREVIOUS pump (same edge pattern as T-24's mouse)?</summary>
+        private bool _attackWasDown;
+
+        /// <summary>T-25 — was Q held on the previous pump?</summary>
+        private bool _qWasDown;
+
+        /// <summary>T-25 — was E held on the previous pump?</summary>
+        private bool _eWasDown;
+
+        /// <summary>
+        /// T-25 — pumped seconds since the last basic attack fired while SPACE stays held. The
+        /// press itself fires immediately (edge); this only paces the re-fire at the cadence.
+        /// </summary>
+        private double _attackClock;
+
+        /// <summary>T-25 — the most recent Q/E cast's outcome (null before the first press).</summary>
+        private AbilityOutcomeView _lastAbilityOutcome;
+
+        /// <summary>Scratch list the kill reap scans the living roster through (no per-kill LINQ).</summary>
+        private readonly List<string> _reapScratch = new List<string>();
+
         public ShellBootstrap(ShellBootstrapOptions options = null)
         {
             options = options ?? new ShellBootstrapOptions();
@@ -209,6 +278,9 @@ namespace RedHollow.Game.UI
             // rematch needs no rewiring.
             _input = options.InputSource;
             _heroIntents = new LocalHeroIntentSource(this);
+
+            // T-25 — combat tunables are shell policy: composed, never constants in the routing.
+            _combatActions = options.CombatActions ?? new CombatActionConfig();
 
             // R-15 — real art by default; the placeholder answers for everything unregistered.
             _catalog = options.ArtCatalog ?? LoadRepresentativeArt();
@@ -275,8 +347,7 @@ namespace RedHollow.Game.UI
         /// the <see cref="ShellBootstrapOptions.CombatActions"/> it was composed with, or the
         /// shipped defaults when none was.
         /// </summary>
-        public CombatActionConfig CombatActions =>
-            throw new NotImplementedException("T-25: combat action routing not implemented yet.");
+        public CombatActionConfig CombatActions => _combatActions;
 
         /// <summary>
         /// Ticket 025 (T-25) / R-31 / R-32 — the outcome of the most recent Q/E cast this shell's
@@ -285,8 +356,7 @@ namespace RedHollow.Game.UI
         /// (ability_locked, ability_cooling) both land here for the UI to surface — and a
         /// rejection never breaks the pump.
         /// </summary>
-        public AbilityCastOutcome LastAbilityOutcome =>
-            throw new NotImplementedException("T-25: combat action routing not implemented yet.");
+        public AbilityOutcomeView LastAbilityOutcome => _lastAbilityOutcome;
 
         /// <summary>
         /// R-61 — the combat HUD model for the local account. Null until a match is live; rebuilt
@@ -433,6 +503,12 @@ namespace RedHollow.Game.UI
             // seam. Planning-only; combat never routes a mouse button anywhere (R-30).
             HandlePlanningPointer();
 
+            // T-25 / R-30/R-31/R-32 — the combat action path: held SPACE fires one basic attack
+            // per cadence window along the cursor aim line (the press fires immediately), Q/E
+            // press-edges issue one HeroAbilityRequest each. Runs BEFORE the pre-step drain so the
+            // commands' events ride this same pump's routing.
+            HandleCombatActions(deltaSeconds);
+
             // 1 — collect BEFORE stepping: events of commands issued directly between pumps are
             // still sitting in LastObservation until the step's first command overwrites it.
             if (_tap != null)
@@ -556,6 +632,14 @@ namespace RedHollow.Game.UI
 
             _boundMatch = match;
 
+            // T-25 — combat routing state is per match: a fresh match starts with no ability
+            // outcome, no cadence in flight, and no key remembered as held from the old one.
+            _lastAbilityOutcome = null;
+            _attackClock = 0.0;
+            _attackWasDown = false;
+            _qWasDown = false;
+            _eWasDown = false;
+
             // T-23 / DEC-RUN-11 — the lobby model is rebuilt whenever the match changes hands: a
             // rematch returns the party to S2 with the picks retained (they live on the seats)
             // but with NOBODY ready — a stale ready flag would start the next match on arrival.
@@ -628,6 +712,11 @@ namespace RedHollow.Game.UI
             _stats = null;
             _zoneOracle = null;
             _pointerMouseWasDown = false;
+            _lastAbilityOutcome = null;
+            _attackClock = 0.0;
+            _attackWasDown = false;
+            _qWasDown = false;
+            _eWasDown = false;
             _taps.Clear();
         }
 
@@ -731,6 +820,248 @@ namespace RedHollow.Game.UI
             {
                 _controls.ClickPlaceable(picked);
             }
+        }
+
+        /// <summary>
+        /// T-25 — the combat action path (see <see cref="Pump"/>). Each in-match pump reads SPACE,
+        /// Q and E off the same snapshot seam as every other input ticket:
+        ///
+        ///  * <b>SPACE</b> (R-30/R-26): a FRESH press fires one <c>ResolveHeroAttack</c>
+        ///    immediately; holding re-fires exactly once per
+        ///    <see cref="CombatActionConfig.AttackCadenceSeconds"/> of pumped time, never once per
+        ///    pump. Damage is the class's catalog <c>BasicAttackDamage</c> (per-pellet for the
+        ///    Rancher, DEC-RUN-8) and the line is <see cref="AimLine"/> along the cursor.
+        ///  * <b>Q/E</b> (R-31/R-32): press-EDGE only — one <c>HeroAbilityRequest</c> per press,
+        ///    outcome (accepted or the sim's own rejection) surfaced on
+        ///    <see cref="LastAbilityOutcome"/>. Cooldowns, locks and ranks stay sim-side; the
+        ///    shell never client-side-gates a cast.
+        ///
+        /// The was-down flags update in EVERY phase (T-24's precedent), so a key held through
+        /// planning does not read as a fresh press the moment combat returns — and the sim's
+        /// COMBAT phase gates all issuing: SPACE/Q/E during planning route nothing (a routed
+        /// planning basic would still advance the Gunslinger crit rhythm as a miss).
+        ///
+        /// Kill accounting: <c>ResolveHeroAttack</c> and the ability effects deliberately never
+        /// kill at 0 HP — <c>RecordMonsterKill</c> is the sim's kill command (alive flip, roster,
+        /// R-20 bounty) and nothing else shipped issues it for hero damage, so this routing reaps
+        /// after every request it lands (see <see cref="ReapDeadMonsters"/>).
+        /// </summary>
+        private void HandleCombatActions(double deltaSeconds)
+        {
+            if (_input == null || _session.Phase != NetSessionPhase.InMatch || _boundMatch == null)
+            {
+                return;
+            }
+
+            var snapshot = _input.Sample();
+            if (snapshot == null)
+            {
+                return;
+            }
+
+            var spaceDown = snapshot.Pressed.Contains(PlayerKey.Space);
+            var qDown = snapshot.Pressed.Contains(PlayerKey.Q);
+            var eDown = snapshot.Pressed.Contains(PlayerKey.E);
+            var spaceFresh = spaceDown && !_attackWasDown;
+            var qFresh = qDown && !_qWasDown;
+            var eFresh = eDown && !_eWasDown;
+            _attackWasDown = spaceDown;
+            _qWasDown = qDown;
+            _eWasDown = eDown;
+
+            var state = _boundMatch.State;
+            if (state == null || state.Phase != MatchPhase.Combat)
+            {
+                // Phase-dead keys: nothing is issued outside combat, and the cadence does not
+                // accrue toward a free shot the moment combat returns.
+                _attackClock = 0.0;
+                return;
+            }
+
+            var hero = LocalHeroOf(state);
+            if (hero == null || !hero.Alive)
+            {
+                // No seated local hero (headless) — or a downed one (R-33: dead heroes spectate).
+                _attackClock = 0.0;
+                return;
+            }
+
+            var cursor = new Vec2(snapshot.CursorGroundPoint.x, snapshot.CursorGroundPoint.y);
+            var sim = _boundMatch.Sim;
+
+            if (spaceDown)
+            {
+                if (spaceFresh)
+                {
+                    // The press fires immediately (T-24's pump-edge precedent); the cadence only
+                    // paces the re-fire from here.
+                    _attackClock = 0.0;
+                    FireBasicAttack(sim, state, hero, cursor);
+                }
+                else
+                {
+                    _attackClock += deltaSeconds;
+                    if (_attackClock >= _combatActions.AttackCadenceSeconds)
+                    {
+                        _attackClock -= _combatActions.AttackCadenceSeconds;
+                        FireBasicAttack(sim, state, hero, cursor);
+                    }
+                }
+            }
+            else
+            {
+                _attackClock = 0.0;
+            }
+
+            if (qFresh)
+            {
+                CastAbilitySlot(sim, state, hero, cursor, AbilitySlot.Q);
+            }
+
+            if (eFresh)
+            {
+                CastAbilitySlot(sim, state, hero, cursor, AbilitySlot.E);
+            }
+        }
+
+        /// <summary>
+        /// One basic attack: catalog damage (the kit's per-pellet quantum for the Rancher —
+        /// DEC-RUN-8 makes the sim's spread ride the same line), the honest <see cref="AimLine"/>
+        /// report, and the kill reap after. Draining the tap after each command keeps every event
+        /// (monster_damaged, monster_killed, xp_awarded) in this pump's feed — the sim's
+        /// LastObservation is per-command and the next command would overwrite it.
+        /// </summary>
+        private void FireBasicAttack(MatchSim sim, MatchState state, Hero hero, Vec2 cursor)
+        {
+            var kit = sim.Config.HeroKits.KitFor(hero.HeroClass);
+            var line = AimLine.EntitiesAlong(
+                state, hero.Id, hero.Pos, cursor,
+                _combatActions.AimLineLength, _combatActions.AimLineWidth);
+
+            sim.ResolveHeroAttack(new HeroAttackRequest
+            {
+                AttackerId = hero.Id,
+                AttackerClass = hero.HeroClass,
+                Damage = kit.BasicAttackDamage,
+                EntitiesOnLine = line,
+            });
+            DrainTap();
+
+            ReapDeadMonsters(sim, state, hero);
+        }
+
+        /// <summary>
+        /// One Q/E press-edge: the request carries the same honest aim line (a skillshot reads it,
+        /// a self-AoE ignores it) plus the normalized aim direction for the dash classes; TargetId
+        /// stays null — the sim's own nearest-on-line fallback resolves single-target casts. The
+        /// outcome — accepted or the sim's fixture-shaped rejection — lands on
+        /// <see cref="LastAbilityOutcome"/>, and a rejection never breaks the pump.
+        /// </summary>
+        private void CastAbilitySlot(MatchSim sim, MatchState state, Hero hero, Vec2 cursor, string slot)
+        {
+            var line = AimLine.EntitiesAlong(
+                state, hero.Id, hero.Pos, cursor,
+                _combatActions.AimLineLength, _combatActions.AimLineWidth);
+
+            var dx = cursor.X - hero.Pos.X;
+            var dy = cursor.Y - hero.Pos.Y;
+            var magnitude = Math.Sqrt((dx * dx) + (dy * dy));
+            var aimDirection = magnitude > 0.0
+                ? new Vec2(dx / magnitude, dy / magnitude)
+                : new Vec2(0.0, 0.0);
+
+            var outcome = sim.CastAbility(new HeroAbilityRequest
+            {
+                CasterId = hero.Id,
+                Slot = slot,
+                AimDirection = aimDirection,
+                EntitiesOnLine = line,
+            });
+            DrainTap();
+
+            if (outcome == null)
+            {
+                return;
+            }
+
+            _lastAbilityOutcome = new AbilityOutcomeView(outcome);
+            if (outcome.Accepted)
+            {
+                ReapDeadMonsters(sim, state, hero);
+            }
+        }
+
+        /// <summary>
+        /// T-25 / R-02 / R-20 / R-40 — the kill accounting the sim deliberately leaves to its
+        /// caller: <c>ResolveHeroAttack</c> (and the ability damage helper) clamp a monster to
+        /// 0 HP without killing it, and <c>RecordMonsterKill</c> is the one command that flips
+        /// `alive`, shrinks the wave roster and pays the catalog bounty — exactly once, because
+        /// only monsters still on the living roster with their HP emptied are reaped, and the kill
+        /// itself removes them from that roster. The kill's XP credits the attacker's account
+        /// (R-40 — the shell answers "who is credited" before the sim is called).
+        /// </summary>
+        private void ReapDeadMonsters(MatchSim sim, MatchState state, Hero attacker)
+        {
+            _reapScratch.Clear();
+            _reapScratch.AddRange(state.Wave.LivingMonsterIds);
+
+            for (var i = 0; i < _reapScratch.Count; i++)
+            {
+                var monsterId = _reapScratch[i];
+                if (!state.Monsters.TryGetValue(monsterId, out var monster)
+                    || monster == null || !monster.Alive || monster.Hp > 0.0)
+                {
+                    continue;
+                }
+
+                // TryGet, not StatsFor: a reap must never throw mid-frame for an archetype with
+                // no catalog row — a rowless kill still dies, it just pays nothing.
+                var stats = sim.Config.Monsters.TryGet(monster.Type);
+                var kill = new MonsterKillRequest
+                {
+                    MonsterId = monsterId,
+                    MonsterType = monster.Type,
+                    Bounty = stats == null ? 0 : stats.Bounty,
+                    KillerHeroId = attacker.Id,
+                };
+
+                sim.RecordMonsterKill(kill);
+                DrainTap();
+
+                if (!string.IsNullOrEmpty(attacker.AccountId))
+                {
+                    sim.AwardKillXp(kill, attacker.AccountId);
+                    DrainTap();
+                }
+            }
+        }
+
+        /// <summary>Capture the just-issued command's events before the next command overwrites them.</summary>
+        private void DrainTap()
+        {
+            if (_tap != null)
+            {
+                _tap.Drain();
+            }
+        }
+
+        /// <summary>The seated hero whose AccountId is this shell's account (null when none is).</summary>
+        private Hero LocalHeroOf(MatchState state)
+        {
+            if (state == null || string.IsNullOrEmpty(_accountId))
+            {
+                return null;
+            }
+
+            foreach (var hero in state.Heroes.Values)
+            {
+                if (hero != null && string.Equals(hero.AccountId, _accountId, StringComparison.Ordinal))
+                {
+                    return hero;
+                }
+            }
+
+            return null;
         }
 
         // ---- presentation refresh -------------------------------------------------------------
