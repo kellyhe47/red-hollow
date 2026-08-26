@@ -32,6 +32,16 @@
     <Compile Include="../../unity/RedHollow/Assets/Game/Host/PartyRoster.cs" />
     <Compile Include="../../unity/RedHollow/Assets/Game/Host/ClientPrediction.cs" />
     <Compile Include="../../unity/RedHollow/Assets/Game/UI/SimEventTap.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/UI/CombatActionConfig.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/UI/CombatHudModel.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/UI/HudCopy.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/UI/LobbyScreenModel.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/UI/PlacementZoneOracle.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/UI/PlanningScreenModel.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/UI/PostMatchModel.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/UI/TitleScreenModel.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/UI/UiRouter.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/UI/WaveInterstitialModel.cs" />
     <Compile Include="../../unity/RedHollow/Assets/Game/Net/ColonyMatchFactory.cs" />
     <Compile Include="../../unity/RedHollow/Assets/Game/Net/HostedMatch.cs" />
     <Compile Include="../../unity/RedHollow/Assets/Game/Net/INetTransport.cs" />
@@ -48,6 +58,9 @@
     <Compile Include="../../unity/RedHollow/Assets/Tests/EditMode/T11_SessionTests.cs" />
     <Compile Include="../../unity/RedHollow/Assets/Tests/EditMode/T14_TimingTests.cs" />
     <Compile Include="../../unity/RedHollow/Assets/Tests/EditMode/T14_NonGoalTests.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Tests/EditMode/T20_NgoTransportTests.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Tests/EditMode/T12_UiScreensTests.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Tests/EditMode/T12_UiHudTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
