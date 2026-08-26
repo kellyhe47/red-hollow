@@ -153,13 +153,8 @@ namespace RedHollow.EditorTools
 
             var timedOut = elapsed >= MatchTimeoutSeconds;
             var matchOver = MatchIsOver();
-            // Stay in Play until a turret LAST-HIT is reaped (HP to 0 + roster/bounty)
-            // with SPACE released. After that, keep driving until victory, defeat, or timeout.
-            if (!timedOut && !_proofPhaseDone)
-            {
-                return;
-            }
-
+            // Turret last-hit is already proven. Stay in Play until victory, defeat, or timeout
+            // so autoplay can finish a 10-wave run (or dump the leak if it cannot).
             if (!timedOut && !matchOver)
             {
                 return;
@@ -313,11 +308,6 @@ namespace RedHollow.EditorTools
                 {
                     shell.Planning.ReadyUp();
                     _readySent = true;
-                    if (match.State.Wave.Number <= 2)
-                    {
-                        _holdFire = true;
-                    }
-
                     _readiedWave = match.State.Wave.Number;
                     PurchaseLog.Add("ready-up wave=" + match.State.Wave.Number);
                 }
@@ -327,9 +317,7 @@ namespace RedHollow.EditorTools
             {
                 DumpCamera(Camera.main, Wave2Path);
                 _wave2Captured = true;
-                _holdFire = true;
                 _wave2CombatSince = EditorApplication.timeSinceStartup;
-                _holdFireSince = EditorApplication.timeSinceStartup;
                 SnapshotLivingHp(match.State);
             }
 
@@ -514,9 +502,13 @@ namespace RedHollow.EditorTools
             var oracle = ZoneOracleFor(match);
             var cart = new[]
             {
+                // Wave-2 tunnels are west+east: wall those first, then a turret, then the
+                // remaining lanes. Four walls before a turret spent the opening stake and
+                // left wave 2 with no gun covering the chew.
                 PlaceableType.Barricade, PlaceableType.Barricade,
+                PlaceableType.Turret,
                 PlaceableType.Barricade, PlaceableType.Barricade,
-                PlaceableType.Turret, PlaceableType.Turret,
+                PlaceableType.Turret,
                 PlaceableType.SpikeTrap, PlaceableType.SpikeTrap,
                 PlaceableType.SpikeTrap, PlaceableType.SpikeTrap,
                 PlaceableType.DynamiteTrap, PlaceableType.DynamiteTrap,
