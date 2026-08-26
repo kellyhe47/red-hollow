@@ -435,6 +435,21 @@
         "a driven session reaches defeat when monsters are left to reach the shelters",
         "no game rule enters a MonoBehaviour - ticket 010's Cecil invariant stays green"
       ]
+    },
+    {
+      "id": "T-20",
+      "title": "Real networking: NGO transport, Unity Lobby and Relay",
+      "owns_requirements": [],
+      "grades_fixtures": [],
+      "depends_on": [
+        "T-11"
+      ],
+      "scope": "Ticket 011 delivered the full session lifecycle over LoopbackNetTransport (in-process by design); actual networking is deliberately unclaimed. Implement INetTransport over Netcode for GameObjects 2.13.2 with Unity Lobby (join codes) and Relay, keeping loopback working without a UGS project id. UGS project ac5dd937-4e73-44e8-8ac5-fb148787ce3b (org kellyqhe47) is linked in ProjectSettings. NGO 2.x API surface, not 1.x tutorials.",
+      "acceptance": [
+        "INetTransport implemented over NGO 2.13.2 + Lobby + Relay behind the existing seam",
+        "loopback transport still works with no UGS id configured",
+        "a 2-player co-op session across two real machines completes a 10-wave match with victory, defeat and rematch exercised (hand-verified; DoD item 3)"
+      ]
     }
   ]
 }
