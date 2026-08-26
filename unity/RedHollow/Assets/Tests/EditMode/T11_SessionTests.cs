@@ -285,6 +285,69 @@ namespace RedHollow.Tests.EditMode
                 + "RETRY lives");
         }
 
+        /// <summary>
+        /// R-16 / B-002 in a FACTORY-BUILT match: a barricade across wave 1's lane redirects the
+        /// whole wave onto itself, is chewed down, and its collapse releases the lane. G-004 locks
+        /// the sim rule through <see cref="DeclaredPathOracle"/>; what nothing locked was the
+        /// production answerer, so <see cref="ColonyMatchFactory"/> ran on
+        /// <see cref="OpenPathOracle"/> and a purchased wall was scenery no monster ever attacked.
+        /// This is the pin that the shipped composition actually blocks.
+        /// </summary>
+        [Test]
+        public void A_barricade_across_the_lane_redirects_the_wave_until_it_falls()
+        {
+            var lobby = NewTwoPlayerLoopbackLobby();
+            Assert.That(lobby.Session.TryStartMatch(HostPeerId), Is.True, "the host starts the match");
+            var match = lobby.Session.Match;
+
+            // Wave 1 pours out of breach 0; its nearest valid target is the saloon (the heroes at
+            // team spawn stand further). The wall sits mid-lane, seeded directly because R-21
+            // gates purchases to planning and what is under test is the block, not the buy.
+            var mouth = ColonyMap.V1().EntryTunnels[0];
+            var shelter = match.State.Hotspots["hs_saloon"].Pos;
+            match.State.Placeables["wall"] = new Placeable
+            {
+                Id = "wall",
+                Type = PlaceableType.Barricade,
+                Pos = new Vec2((mouth.X + shelter.X) / 2.0, (mouth.Y + shelter.Y) / 2.0),
+                OwnerPlayerId = match.State.Players[0].Id,
+                PurchaseCost = 100,
+                Hp = 300.0,
+                Exists = true,
+            };
+
+            lobby.Session.Step(Step60Hz);
+
+            var living = match.State.Monsters.Values.Where(m => m.Alive).ToList();
+            Assert.That(living, Is.Not.Empty, "sanity (R-19): wave 1 is in the colony");
+            foreach (var monster in living)
+            {
+                Assert.That(monster.TargetId, Is.EqualTo("wall"),
+                    "R-16/B-002: the wall across the lane IS the target — with OpenPathOracle "
+                    + "(the pre-028 wiring) every monster walks past it at the shelter");
+            }
+
+            // The wave walks to the wall and chews it down (~10s at six shamblers): R-16's
+            // "until destroyed" through the real contact gate and ApplyPlaceableDamage.
+            var wall = match.State.Placeables["wall"];
+            var fell = DriveUntil(
+                lobby.Session, match.Clock, () => !wall.Exists, budgetSeconds: 40.0);
+
+            Assert.That(fell, Is.True,
+                "R-16/R-23: the redirected wave must actually destroy the wall — walking to it "
+                + "and standing politely means the contact gate never routed a placeable hit");
+
+            // The collapse releases the lane: the survivors' next retarget answers the shelter.
+            var survivor = match.State.Monsters.Values.FirstOrDefault(m => m.Alive);
+            Assert.That(survivor, Is.Not.Null,
+                "sanity: a 300 HP wall does not outlive six shamblers' patience with none dying");
+
+            lobby.Session.Step(Step60Hz);
+            Assert.That(survivor.TargetId, Is.EqualTo("hs_saloon"),
+                "R-16 'until destroyed': rubble blocks nothing, so the wave resumes its walk at "
+                + "the shelter behind it");
+        }
+
         // ==========================================================================================
         //  AC3 — rematch (R-07)
         // ==========================================================================================
