@@ -620,7 +620,8 @@ namespace RedHollow.Game.UI
         /// <summary>
         /// R-15 — the default catalog: the four T-13 representative assets plus the delivered
         /// keepers bound to the keys the views actually resolve (HeroClass / MonsterType /
-        /// PlaceableType literals, hotspot ids). Resources copies live under
+        /// PlaceableType literals). Hotspot markers stay cavern-brown volumes — western facade
+        /// art is for characters, not the environment. Resources copies live under
         /// Assets/Game/UI/Resources/RedHollowArt/; T13's AssetDatabase originals stay put.
         /// </summary>
         public static ArtCatalog LoadRepresentativeArt()
@@ -646,10 +647,6 @@ namespace RedHollow.Game.UI
             RegisterResourceArt(catalog, PlaceableType.DynamiteTrap, "RedHollowArt/dynamite-trap");
             RegisterResourceArt(catalog, PlaceableType.Turret, "RedHollowArt/turret");
             RegisterResourceArt(catalog, PlaceableType.MedStation, "RedHollowArt/med-station");
-
-            RegisterResourceArt(catalog, "hs_saloon", "RedHollowArt/saloon-facade");
-            RegisterResourceArt(catalog, "hs_chapel", "RedHollowArt/chapel-facade");
-            RegisterResourceArt(catalog, "hs_homestead", "RedHollowArt/homestead-facade");
 
             return catalog;
         }
@@ -1300,40 +1297,78 @@ namespace RedHollow.Game.UI
         // ---- plumbing -------------------------------------------------------------------------
 
         /// <summary>
-        /// One representative asset entry: load the Resources copy, stand it up as a sprite. A
-        /// missing resource returns null, which the catalog answers with the resolver's fallback —
-        /// the seam stays total (R-30's delivery constraint).
+        /// One representative asset entry: load the Resources copy and stand it up as an unlit
+        /// XZ quad (not a SpriteRenderer). Sprite.Create on non-readable textures throws in Play
+        /// and the catalog treats that as absence — which is how heroes stayed tiny placeholders
+        /// while the rust plane still showed. A missing resource returns null (fallback).
         /// </summary>
         private static void RegisterResourceArt(ArtCatalog catalog, string artKey, string resourcePath)
         {
-            Sprite sprite = null;
+            Texture2D texture = null;
+            var textureAttempted = false;
 
             catalog.Register(artKey, () =>
             {
-                if (sprite == null)
+                if (!textureAttempted)
                 {
-                    var texture = Resources.Load<Texture2D>(resourcePath);
-                    if (texture == null)
-                    {
-                        return null;
-                    }
-
-                    sprite = Sprite.Create(
-                        texture,
-                        new Rect(0f, 0f, texture.width, texture.height),
-                        new Vector2(0.5f, 0.5f),
-                        100f);
+                    textureAttempted = true;
+                    texture = Resources.Load<Texture2D>(resourcePath);
                 }
 
-                var go = new GameObject("art_" + artKey.Replace('/', '_'));
-                var renderer = go.AddComponent<SpriteRenderer>();
-                renderer.sprite = sprite;
-                // Catalog sprites live on XY (facing +Z). The match camera looks down -Y, so
-                // without this they render edge-on as a one-pixel line. Face +Y, onto XZ.
-                go.transform.localRotation = Quaternion.LookRotation(Vector3.up, Vector3.forward);
-                go.transform.localPosition = new Vector3(0f, 0.05f, 0f);
-                return go;
+                if (texture == null)
+                {
+                    return null;
+                }
+
+                var isGround = artKey == ShellArtKeys.GroundTile;
+                if (isGround)
+                {
+                    var plane = GameObject.CreatePrimitive(PrimitiveType.Plane);
+                    plane.name = "art_" + artKey.Replace('/', '_');
+                    TopDownArt.Paint(plane, TopDownArt.Rust, texture, 1f);
+                    return plane;
+                }
+
+                return TopDownArt.QuadOnXz(
+                    "art_" + artKey.Replace('/', '_'),
+                    FootprintForArtKey(artKey),
+                    texture,
+                    Color.white);
             });
+        }
+
+        private static float FootprintForArtKey(string artKey)
+        {
+            if (artKey == HeroClass.Gunslinger
+                || artKey == HeroClass.Rancher
+                || artKey == HeroClass.Sawbones)
+            {
+                return TopDownArt.HeroFootprint;
+            }
+
+            if (artKey == MonsterType.BullBehemoth)
+            {
+                return TopDownArt.MonsterFootprint * 1.5f;
+            }
+
+            if (artKey == MonsterType.Shambler
+                || artKey == MonsterType.Ravager
+                || artKey == MonsterType.Spitter
+                || artKey == MonsterType.Burrower)
+            {
+                return TopDownArt.MonsterFootprint;
+            }
+
+            if (artKey == PlaceableType.Barricade
+                || artKey == PlaceableType.SpikeTrap
+                || artKey == PlaceableType.DynamiteTrap
+                || artKey == PlaceableType.Turret
+                || artKey == PlaceableType.MedStation)
+            {
+                return TopDownArt.PlaceableFootprint;
+            }
+
+            return TopDownArt.HeroFootprint;
         }
 
         private static void DestroyGameObject(GameObject go)

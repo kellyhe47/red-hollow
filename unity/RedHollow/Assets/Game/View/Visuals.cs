@@ -122,10 +122,10 @@ namespace RedHollow.Game.View
         }
 
         /// <summary>
-        /// A visible primitive for the class. <see cref="GameObject.CreatePrimitive"/> is the happy
-        /// path; the catch is not defensive habit but the seam's contract — this method has no
-        /// permission to fail, so an engine that refuses a primitive still has to yield something
-        /// with a <see cref="Renderer"/> on it.
+        /// A visible primitive for the class. Capsules read as a one-unit speck under a y-down
+        /// camera; heroes, monsters and shelters are squat discs with a real XZ footprint so
+        /// they stay readable at the match ortho size. Shape is presentation — T16 pins a
+        /// Renderer, not a mesh.
         /// </summary>
         private static GameObject CreatePlaceholder(VisualClass visualClass)
         {
@@ -133,136 +133,27 @@ namespace RedHollow.Game.View
 
             try
             {
-                var primitive = GameObject.CreatePrimitive(PrimitiveFor(visualClass));
-                primitive.name = name;
-                primitive.transform.localPosition = StandingOffsetFor(visualClass);
-                PaintUnlit(primitive, ColorFor(visualClass));
-                return primitive;
+                if (visualClass == VisualClass.Ground)
+                {
+                    var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
+                    ground.name = name;
+                    TopDownArt.Paint(ground, TopDownArt.Rust);
+                    return ground;
+                }
+
+                var disc = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                disc.name = name;
+                var diameter = TopDownArt.FootprintFor(visualClass);
+                var height = visualClass == VisualClass.Hotspot ? 1.2f : 0.7f;
+                TopDownArt.FlattenCylinder(disc, diameter, height);
+                TopDownArt.Paint(disc, TopDownArt.ColorFor(visualClass));
+                return disc;
             }
             catch (Exception)
             {
                 var bare = BareRenderable(name);
-                PaintUnlit(bare, ColorFor(visualClass));
+                TopDownArt.Paint(bare, TopDownArt.ColorFor(visualClass));
                 return bare;
-            }
-        }
-
-        /// <summary>
-        /// Distinct, unlit colours so a y-down camera can read the colony with no directional
-        /// light (R-15 forbids a sun). Default-Material is URP Lit — without a light every
-        /// primitive is a black silhouette against a black clear.
-        /// </summary>
-        private static Color ColorFor(VisualClass visualClass)
-        {
-            switch (visualClass)
-            {
-                case VisualClass.Ground:
-                    return new Color(0.55f, 0.28f, 0.14f);
-
-                case VisualClass.Hero:
-                    return new Color(1.0f, 0.72f, 0.28f);
-
-                case VisualClass.Monster:
-                    return new Color(0.32f, 0.62f, 0.26f);
-
-                case VisualClass.Hotspot:
-                    return new Color(0.42f, 0.26f, 0.14f);
-
-                default:
-                    return new Color(0.50f, 0.38f, 0.18f);
-            }
-        }
-
-        /// <summary>
-        /// Swap Default-Material (lit) for an unlit colour so the stand-in is visible from
-        /// above even when the scene has no sun. Shared material is never mutated — that would
-        /// recolour every primitive in the editor.
-        /// </summary>
-        internal static void PaintUnlit(GameObject go, Color color)
-        {
-            if (go == null)
-            {
-                return;
-            }
-
-            var shader = UnlitShader();
-            if (shader == null)
-            {
-                return;
-            }
-
-            var material = new Material(shader);
-            ApplyColor(material, color);
-
-            foreach (var renderer in go.GetComponentsInChildren<Renderer>(true))
-            {
-                renderer.sharedMaterial = material;
-                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                renderer.receiveShadows = false;
-            }
-        }
-
-        private static Shader UnlitShader()
-        {
-            return Shader.Find("Universal Render Pipeline/Unlit")
-                ?? Shader.Find("Unlit/Color")
-                ?? Shader.Find("Sprites/Default")
-                ?? Shader.Find("Hidden/InternalErrorShader");
-        }
-
-        private static void ApplyColor(Material material, Color color)
-        {
-            if (material.HasProperty("_BaseColor"))
-            {
-                material.SetColor("_BaseColor", color);
-            }
-
-            if (material.HasProperty("_Color"))
-            {
-                material.SetColor("_Color", color);
-            }
-
-            material.color = color;
-        }
-
-        private static PrimitiveType PrimitiveFor(VisualClass visualClass)
-        {
-            switch (visualClass)
-            {
-                case VisualClass.Ground:
-                    return PrimitiveType.Plane;
-
-                case VisualClass.Hero:
-                case VisualClass.Monster:
-                    return PrimitiveType.Capsule;
-
-                case VisualClass.Hotspot:
-                    return PrimitiveType.Cylinder;
-
-                default:
-                    return PrimitiveType.Cube;
-            }
-        }
-
-        /// <summary>
-        /// How far up the primitive sits so it stands on the floor instead of sinking half into it.
-        /// Presentation only — every position assertion in this ticket is horizontal, and the
-        /// vertical axis is the one <see cref="SimSpace"/> leaves free for exactly this.
-        /// </summary>
-        private static Vector3 StandingOffsetFor(VisualClass visualClass)
-        {
-            switch (visualClass)
-            {
-                case VisualClass.Ground:
-                    return Vector3.zero;
-
-                case VisualClass.Hero:
-                case VisualClass.Monster:
-                case VisualClass.Hotspot:
-                    return new Vector3(0f, 1f, 0f);
-
-                default:
-                    return new Vector3(0f, 0.5f, 0f);
             }
         }
 

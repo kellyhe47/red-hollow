@@ -110,7 +110,7 @@ namespace RedHollow.Game.View
 
                 var hotspotMarker = Marker(
                     scene.Root.transform, resolver, VisualClass.Hotspot, "Hotspot_" + spec.Id,
-                    spec.Pos, spec.Id);
+                    spec.Pos);
 
                 // T-26 / S4 — the observable lost-state component, named by the sim's own id.
                 // Not lost at build: the colony starts with everyone alive; the shell pump mirrors
@@ -203,44 +203,70 @@ namespace RedHollow.Game.View
             ground.transform.SetParent(root, false);
             ground.transform.position = new Vector3(playArea.center.x, SimSpace.GroundHeight, playArea.center.z);
 
-            // ShellArtKeys.GroundTile — the cavern floor, not a western street tile.
+            // Cavern floor — cavern-ground (or rust placeholder), never western street/plank tiles.
             var visual = visuals.Resolve(VisualClass.Ground, "textures/cavern-ground");
             ViewRig.Attach(ground.transform, visual);
 
             if (visual != null && visual.Instance != null)
             {
-                // Cover a wide Game view (Free Aspect) so the floor is cavern, not letterbox void.
-                var playSpan = Mathf.Max(playArea.size.x, playArea.size.z) + (ViewMargin * 2f);
-                FitGroundVisual(visual.Instance, playSpan * 2f);
+                FitGroundVisual(visual.Instance, WidescreenCover(playArea));
             }
 
             return ground;
         }
 
         /// <summary>
+        /// World span that fills a 16:9 Game view at the match ortho size, with extra so a
+        /// wider Free Aspect panel still shows cavern instead of black pillarbox.
+        /// </summary>
+        private static float WidescreenCover(Bounds playArea)
+        {
+            var ortho = Mathf.Max(playArea.extents.x, playArea.extents.z) + ViewMargin;
+            var viewHeight = 2f * ortho;
+            var viewWidth16x9 = viewHeight * (16f / 9f);
+            return Mathf.Max(viewWidth16x9, viewHeight) * 1.5f;
+        }
+
+        /// <summary>
         /// Stretch the ground visual to cover <paramref name="span"/> world units. Plane
-        /// placeholders use the primitive's 10-unit size; catalog sprites are already rotated
-        /// onto XZ and must NOT inherit that 10-unit formula — their authored pixel size is
-        /// the right denominator.
+        /// placeholders use the primitive's 10-unit size; catalog sprites/quads use their
+        /// authored bounds — never the Plane span/10 formula on a sprite.
         /// </summary>
         private static void FitGroundVisual(GameObject instance, float span)
         {
+            var renderer = instance.GetComponentInChildren<Renderer>();
+            var current = 0f;
+            if (renderer != null)
+            {
+                var size = renderer.bounds.size;
+                current = Mathf.Max(size.x, size.z);
+            }
+
             if (instance.GetComponentInChildren<SpriteRenderer>() != null)
             {
-                var renderer = instance.GetComponentInChildren<Renderer>();
-                var size = renderer.bounds.size;
-                var current = Mathf.Max(size.x, size.z);
                 if (current > 0.001f)
                 {
-                    var factor = span / current;
-                    instance.transform.localScale *= factor;
+                    instance.transform.localScale *= span / current;
                 }
 
                 return;
             }
 
-            var scale = span / PlanePrimitiveSize;
-            instance.transform.localScale = new Vector3(scale, 1f, scale);
+            if (current > 0.001f)
+            {
+                var factor = span / current;
+                instance.transform.localScale *= factor;
+            }
+            else
+            {
+                var scale = span / PlanePrimitiveSize;
+                instance.transform.localScale = new Vector3(scale, 1f, scale);
+            }
+
+            if (renderer != null)
+            {
+                TopDownArt.TileAlbedo(renderer, span);
+            }
         }
 
         /// <summary>
