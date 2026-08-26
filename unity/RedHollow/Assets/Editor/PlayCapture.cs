@@ -71,6 +71,7 @@ namespace RedHollow.EditorTools
         private static bool _hotspotFrontsCaptured;
         private static bool _lookCaptured;
         private static bool _combatProofCaptured;
+        private static bool _spawnShotCaptured;
         private static bool _hitObserved;
         private static bool _bodyStopped;
         private static int _stallFrames;
@@ -159,6 +160,7 @@ namespace RedHollow.EditorTools
                 _hotspotFrontsCaptured = false;
                 _lookCaptured = false;
                 _combatProofCaptured = false;
+                _spawnShotCaptured = false;
                 _hitObserved = false;
                 _bodyStopped = false;
                 _stallFrames = 0;
@@ -282,6 +284,34 @@ namespace RedHollow.EditorTools
             OverlayInputSource.CursorOverride = new Vector2((float)target.Pos.X, (float)target.Pos.Y);
             if (hero == null)
             {
+                return;
+            }
+
+            // Spawn-figure pose: stand NORTH of Lantern_Spawn so the lantern sits
+            // between the 55 follow-cam and the duster (lights the camera-facing
+            // coat), off the string-light centerline. Face the camera (south).
+            if (IsCombatProofMode() && !_spawnShotCaptured)
+            {
+                OverlayInputSource.ExtraHeld.Remove(PlayerKey.A);
+                OverlayInputSource.ExtraHeld.Remove(PlayerKey.D);
+                OverlayInputSource.ExtraHeld.Remove(PlayerKey.W);
+                OverlayInputSource.ExtraHeld.Remove(PlayerKey.S);
+                if (hero.Pos.X < 2.5)
+                {
+                    OverlayInputSource.ExtraHeld.Add(PlayerKey.D);
+                }
+                else if (hero.Pos.X > 3.2)
+                {
+                    OverlayInputSource.ExtraHeld.Add(PlayerKey.A);
+                }
+
+                if (hero.Pos.Y < 3.6)
+                {
+                    OverlayInputSource.ExtraHeld.Add(PlayerKey.W);
+                }
+
+                OverlayInputSource.CursorOverride = new Vector2(
+                    (float)hero.Pos.X, (float)hero.Pos.Y - 10.0f);
                 return;
             }
 
@@ -1258,6 +1288,96 @@ namespace RedHollow.EditorTools
                 var child = views.transform.GetChild(i);
                 sb.Append("view ").Append(child.name)
                     .Append(" pos=").Append(child.position).Append('\n');
+                DumpFigure(sb, child);
+            }
+        }
+
+        private static void DumpMatLine(GameObject go, string tag)
+        {
+            if (go == null)
+            {
+                PurchaseLog.Add("mat " + tag + " missing");
+                return;
+            }
+
+            var renderer = go.GetComponent<Renderer>();
+            if (renderer == null)
+            {
+                renderer = go.GetComponentInChildren<Renderer>();
+            }
+
+            if (renderer == null || renderer.sharedMaterial == null)
+            {
+                PurchaseLog.Add("mat " + tag + " no renderer");
+                return;
+            }
+
+            var m = renderer.sharedMaterial;
+            var sh = m.shader != null ? m.shader.name : "null";
+            var baseCol = m.HasProperty("_BaseColor") ? m.GetColor("_BaseColor") : m.color;
+            var emitCol = m.HasProperty("_EmissionColor") ? m.GetColor("_EmissionColor") : Color.black;
+            PurchaseLog.Add("mat " + tag
+                + " shader=" + sh
+                + " base=" + baseCol
+                + " emit=" + emitCol
+                + " addLit=" + m.IsKeywordEnabled("_ADDITIONAL_LIGHTS")
+                + " emissionKw=" + m.IsKeywordEnabled("_EMISSION")
+                + " receive=" + renderer.receiveShadows
+                + " enabled=" + renderer.enabled
+                + " bounds=" + renderer.bounds);
+        }
+
+        private static void DumpFigure(StringBuilder sb, Transform view)
+        {
+            if (view == null)
+            {
+                return;
+            }
+
+            Transform figure = null;
+            for (var i = 0; i < view.childCount; i++)
+            {
+                var c = view.GetChild(i);
+                if (c != null && (c.name.StartsWith("art_") || c.name.StartsWith("placeholder_")))
+                {
+                    figure = c;
+                    break;
+                }
+            }
+
+            if (figure == null)
+            {
+                return;
+            }
+
+            var renderers = figure.GetComponentsInChildren<Renderer>();
+            Bounds bounds;
+            if (renderers.Length > 0)
+            {
+                bounds = renderers[0].bounds;
+                for (var i = 1; i < renderers.Length; i++)
+                {
+                    bounds.Encapsulate(renderers[i].bounds);
+                }
+            }
+            else
+            {
+                bounds = new Bounds(figure.position, Vector3.zero);
+            }
+
+            sb.Append("figure ").Append(figure.name)
+                .Append(" parts=").Append(figure.childCount)
+                .Append(" renderers=").Append(renderers.Length)
+                .Append(" size=").Append(bounds.size)
+                .Append(" center=").Append(bounds.center)
+                .Append('\n');
+            for (var i = 0; i < figure.childCount; i++)
+            {
+                var part = figure.GetChild(i);
+                sb.Append("  part ").Append(part.name)
+                    .Append(" local=").Append(part.localPosition)
+                    .Append(" scale=").Append(part.localScale)
+                    .Append('\n');
             }
         }
 
@@ -1519,6 +1639,36 @@ namespace RedHollow.EditorTools
                 }
             }
 
+            if (!_spawnShotCaptured)
+            {
+                if (hero == null || Camera.main == null)
+                {
+                    return;
+                }
+
+                if (elapsed < 6.0 && (elapsed < 2.2 || hero.Pos.X < 2.3 || hero.Pos.Y < 3.4))
+                {
+                    return;
+                }
+
+                MatchSceneBuilder.PlaceOver(Camera.main, SimSpace.ToWorld(hero.Pos));
+                var clean = "/workspace/unity/shots/units-visible-clean.png";
+                DumpCamera(Camera.main, clean);
+                DumpCamera(Camera.main, UnitsPath);
+                _spawnShotCaptured = true;
+                var brim = GameObject.Find("hat_brim");
+                var brimVp = brim != null
+                    ? Camera.main.WorldToViewportPoint(brim.transform.position)
+                    : Vector3.zero;
+                PurchaseLog.Add("spawn-figure shot elapsed=" + elapsed.ToString("0.00")
+                    + " hero=" + hero.Pos.X.ToString("0.00") + "," + hero.Pos.Y.ToString("0.00")
+                    + " facingN hold=True brimVp=" + brimVp);
+                DumpMatLine(brim, "hat_brim");
+                DumpMatLine(GameObject.Find("duster_back"), "duster_back");
+                DumpMatLine(GameObject.Find("Wall_North"), "Wall_North");
+                return;
+            }
+
             var timed = elapsed >= 45.0;
             if (hero != null && !timed && !(_hitObserved && _bodyStopped))
             {
@@ -1532,8 +1682,6 @@ namespace RedHollow.EditorTools
             }
 
             DumpCamera(cam, ProofPath);
-            var clean = "/workspace/unity/shots/units-visible-clean.png";
-            DumpCamera(cam, clean);
             DumpCamera(cam, UnitsPath);
             var stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
             try

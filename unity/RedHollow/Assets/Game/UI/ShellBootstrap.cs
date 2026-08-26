@@ -1597,9 +1597,9 @@ namespace RedHollow.Game.UI
 
         /// <summary>
         /// One representative asset entry: load the Resources copy and stand it up. Heroes
-        /// and monsters are world-facing Lit volumes (canon albedo on a capsule/hat)
-        /// in the 3D cavern — never camera-facing Unlit postcards, never XZ-flat sprites.
-        /// Turret / barricade / med station stand as cards; floor traps stay XZ decals.
+        /// and monsters are constructed Lit figures (torso/head/hat/coat), never camera-facing
+        /// Unlit postcards, never XZ-flat sprites. Turret / barricade / med station stand as
+        /// cards; floor traps stay XZ decals.
         /// </summary>
         private static void RegisterResourceArt(ArtCatalog catalog, string artKey, string resourcePath)
         {
@@ -1640,19 +1640,9 @@ namespace RedHollow.Game.UI
 
                 if (IsCharacterKey(artKey))
                 {
-                    Texture2D punched = texture;
-                    var standing = ViewLook.CreateStandingSprite(texture);
-                    if (standing != null && standing.texture != null)
-                    {
-                        punched = standing.texture as Texture2D;
-                        if (punched == null)
-                        {
-                            punched = texture;
-                        }
-                    }
-
+                    // Mesh figure, not a punched standing card wrapped on a capsule.
                     return UnitBillboard.CreateFromCanon(
-                        name, punched, artKey, CharacterHeight(artKey));
+                        name, texture, artKey, CharacterHeight(artKey));
                 }
 
                 if (IsStandingSprite(artKey))

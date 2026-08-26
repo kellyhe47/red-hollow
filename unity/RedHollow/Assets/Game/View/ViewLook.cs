@@ -84,6 +84,8 @@ namespace RedHollow.Game.View
             }
 
             material.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
+            material.EnableKeyword("_ADDITIONAL_LIGHTS");
+            material.EnableKeyword("_ADDITIONAL_LIGHTS_VERTEX");
 
             if (material.HasProperty("_ReceiveShadows"))
             {
@@ -122,7 +124,10 @@ namespace RedHollow.Game.View
                 }
                 else
                 {
-                    material.DisableKeyword("_EMISSION");
+                    // Keep the _EMISSION variant (black colour). Stripping that
+                    // keyword drops the additional-lights pass, which is how the
+                    // gunslinger fell back to ambient-only RGB~25 under lanterns.
+                    material.EnableKeyword("_EMISSION");
                     material.SetColor("_EmissionColor", Color.black);
                     if (material.HasProperty("_EmissionMap"))
                     {
