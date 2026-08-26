@@ -1,10 +1,10 @@
 ---
 id: 027
 title: Visible, clickable UI — fonts, graphics and layout for the real player
-status: pending
+status: green
 depends_on: [026]
 touches: [unity/RedHollow/Assets/Game/UI/]
-iterations: 0
+iterations: 1
 test_files: [unity/RedHollow/Assets/Tests/EditMode/T27_VisibleUiTests.cs]
 branch: ""
 board_id: T-27
@@ -34,12 +34,12 @@ Adds the visible-presentation contract:
 
 ## Acceptance criteria
 
-- [ ] every uGUI Text in the built shell has a non-null font, readable size and a
+- [x] every uGUI Text in the built shell has a non-null font, readable size and a
       non-degenerate rect
-- [ ] every Button has an enabled raycastable Graphic; greyed shop items and the ghost
+- [x] every Button has an enabled raycastable Graphic; greyed shop items and the ghost
       invalid tint are visually distinct states
-- [ ] the canvas has a CanvasScaler; screens lay out per the wireframe regions
-- [ ] booting to S1 yields visible title text and buttons (pinned via font/rect/graphic
+- [x] the canvas has a CanvasScaler; screens lay out per the wireframe regions
+- [x] booting to S1 yields visible title text and buttons (pinned via font/rect/graphic
       checks in EditMode — not screenshots)
 
 ## Test plan
@@ -92,6 +92,11 @@ gap), ESC-overlay regional placement.
 ## Attempt log
 
 _(created 2026-08-26 by the orchestrator after the owner's Play test showed an invisible UI.)_
+
+- 2026-08-26 green in 1 pass. Red 13/14 verified; green verified by orchestrator: EditMode
+  266/266, dotnet 371/371. Explicit fonts at both Text-creation sites (play mode never
+  auto-assigns). Picker card-row layout implemented but only play-exercised — worth an eye
+  during the owner's session.
 
 ## Handoff notes
 
