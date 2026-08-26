@@ -246,15 +246,10 @@ namespace RedHollow.Game.View
 
         private static void ApplyFlashTint(MonsterView view, bool flashing)
         {
-            var tint = flashing ? new Color(1.6f, 0.42f, 0.16f) : Color.white;
-            var renderers = view.GetComponentsInChildren<Renderer>(true);
-            for (var i = 0; i < renderers.Length; i++)
-            {
-                if (renderers[i] != null && renderers[i].gameObject.name != "fx_hit_burst")
-                {
-                    ViewLook.TintBlock(renderers[i], tint);
-                }
-            }
+            // Whole-mesh orange multiply read as a sticker on the unit (Kelly rejected).
+            // Flash state still lives on EntityFeelState; the visible hit is sparks.
+            _ = view;
+            _ = flashing;
         }
 
         private static void ApplyHitBurst(MonsterView view, bool flashing)
@@ -267,21 +262,28 @@ namespace RedHollow.Game.View
                     return;
                 }
 
-                var burst = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                burst.name = "fx_hit_burst";
+                var burst = new GameObject("fx_hit_burst");
                 burst.transform.SetParent(view.transform, false);
-                burst.transform.localPosition = new Vector3(0f, 1.9f, 0f);
-                burst.transform.localScale = Vector3.one * 1.25f;
-                ViewLook.StripCollider(burst);
-                ViewLook.Paint(burst, ViewLook.Unlit(new Color(1f, 0.30f, 0.08f)));
+                burst.transform.localPosition = new Vector3(0f, 1.05f, 0f);
+                var hot = ViewLook.Unlit(new Color(1f, 0.88f, 0.45f));
+                for (var i = 0; i < 5; i++)
+                {
+                    var spark = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    spark.name = "spark_" + i;
+                    spark.transform.SetParent(burst.transform, false);
+                    var a = i * 1.2566f;
+                    spark.transform.localPosition = new Vector3(
+                        Mathf.Cos(a) * 0.10f, (i % 3) * 0.04f, Mathf.Sin(a) * 0.10f);
+                    spark.transform.localScale = Vector3.one * 0.05f;
+                    spark.transform.localRotation = Quaternion.Euler(i * 37f, i * 51f, i * 19f);
+                    ViewLook.StripCollider(spark);
+                    ViewLook.Paint(spark, hot);
+                }
+
                 return;
             }
 
             t.gameObject.SetActive(flashing);
-            if (flashing)
-            {
-                t.localScale = Vector3.one * 1.25f;
-            }
         }
     }
 }

@@ -10,12 +10,11 @@ namespace RedHollow.Game.View
     /// </summary>
     public static class UnitBillboard
     {
-        // Street-scale person: ~1/7 of the 55° follow-cam frame, not a postage
-        // stamp and not a 4.5u giant smear. Hat brim is wide so the 55° look
-        // reads a disk, not a sliver.
-        public const float HeroWidth = 1.90f;
-        public const float HeroHeight = 4.05f;
-        public const float HeroDepth = 1.35f;
+        // Street-scale PERSON, not a tan fridge: ~1.8–2.2m tall, ~0.6–0.8m across.
+        // Hat brim is a dark disk so the 55° follow-cam reads a silhouette, not a lump.
+        public const float HeroWidth = 0.72f;
+        public const float HeroHeight = 1.95f;
+        public const float HeroDepth = 0.38f;
         public const float MonsterWidth = 1.28f;
         public const float MonsterHeight = 2.55f;
         public const float MonsterDepth = 1.02f;
@@ -36,9 +35,9 @@ namespace RedHollow.Game.View
         }
 
         /// <summary>
-        /// Constructed 3D figure. <paramref name="albedo"/> is accepted for call-site
-        /// compatibility but is NOT wrapped onto the mesh — a painted standing sheet
-        /// on a capsule is the smear Kelly rejected. Solid Lit materials catch lanterns.
+        /// Constructed 3D figure. <paramref name="albedo"/> is stamped as a world-yawed
+        /// front decal on torso/face (never camera-billboarded, never wrapping the mesh).
+        /// Solid Lit materials catch lanterns.
         /// </summary>
         public static GameObject CreateFromCanon(
             string name, Texture2D albedo, string artKey, float height)
@@ -84,170 +83,201 @@ namespace RedHollow.Game.View
                 height = HeroHeight;
             }
 
-            _ = albedo;
-
             var root = new GameObject(name);
 
             var pick = root.AddComponent<CapsuleCollider>();
             pick.isTrigger = true;
-            pick.radius = Mathf.Max(0.38f, width * 0.42f);
+            pick.radius = Mathf.Max(0.28f, width * 0.42f);
             pick.height = height;
             pick.center = new Vector3(0f, height * 0.5f, 0f);
 
             if (cowboyHat)
             {
-                BuildGunslinger(root.transform, height, width, depth);
+                BuildGunslinger(root.transform, height, width, depth, albedo);
             }
             else
             {
                 BuildCreature(root.transform, height, width, depth, bodyColor);
             }
 
-            AttachBlobShadow(root.transform, Mathf.Max(0.55f, width * 0.78f));
+            AttachBlobShadow(root.transform, Mathf.Max(0.40f, width * 0.78f));
             return root;
         }
 
         /// <summary>
-        /// Readable gunslinger: two legs, torso, two arms, head, wide brim, crown,
-        /// duster with thickness and a flared hem. Lit planes, not a cube blob.
+        /// Person-scale gunslinger from the 55° follow-cam: dark hat disk, thin duster,
+        /// visible arms/legs/boots, cream shirt, skin head, rifle along +Z in the right hand.
+        /// High-contrast Lit materials — not one tan appliance.
         /// </summary>
-        private static void BuildGunslinger(Transform root, float height, float width, float depth)
+        private static void BuildGunslinger(
+            Transform root, float height, float width, float depth, Texture albedo)
         {
-            var coat = ViewLook.Lit(new Color(0.86f, 0.60f, 0.34f), smoothness: 0.14f, emit: false);
-            var coatDark = ViewLook.Lit(new Color(0.64f, 0.42f, 0.22f), smoothness: 0.12f, emit: false);
-            var hat = ViewLook.Lit(new Color(0.36f, 0.24f, 0.14f), smoothness: 0.10f, emit: false);
-            var hatLit = ViewLook.Lit(new Color(0.72f, 0.50f, 0.28f), smoothness: 0.18f, emit: false);
-            var skin = ViewLook.Lit(new Color(0.78f, 0.58f, 0.44f), smoothness: 0.18f, emit: false);
-            var vest = ViewLook.Lit(new Color(0.60f, 0.42f, 0.26f), smoothness: 0.12f, emit: false);
-            var pants = ViewLook.Lit(new Color(0.38f, 0.26f, 0.16f), smoothness: 0.10f, emit: false);
-            var boots = ViewLook.Lit(new Color(0.22f, 0.14f, 0.09f), smoothness: 0.16f, emit: false);
-            var gloves = ViewLook.Lit(new Color(0.28f, 0.18f, 0.12f), smoothness: 0.14f, emit: false);
-            var kerchief = ViewLook.Lit(new Color(0.58f, 0.28f, 0.16f), smoothness: 0.12f, emit: false);
-            var belt = ViewLook.Lit(new Color(0.36f, 0.22f, 0.12f), smoothness: 0.20f, emit: false);
-            var wood = ViewLook.Lit(new Color(0.52f, 0.34f, 0.18f), smoothness: 0.22f, emit: false);
-            var iron = ViewLook.Lit(new Color(0.42f, 0.38f, 0.34f), smoothness: 0.35f, emit: false);
+            var coat = ViewLook.Lit(new Color(0.14f, 0.08f, 0.05f), smoothness: 0.16f, emit: false);
+            var coatDark = ViewLook.Lit(new Color(0.10f, 0.06f, 0.04f), smoothness: 0.12f, emit: false);
+            var hat = ViewLook.Lit(new Color(0.16f, 0.09f, 0.05f), smoothness: 0.10f, emit: false);
+            var shirt = ViewLook.Lit(new Color(0.93f, 0.87f, 0.74f), smoothness: 0.14f, emit: false);
+            var skin = ViewLook.Lit(new Color(0.82f, 0.62f, 0.48f), smoothness: 0.20f, emit: false);
+            var pants = ViewLook.Lit(new Color(0.16f, 0.22f, 0.36f), smoothness: 0.10f, emit: false);
+            var boots = ViewLook.Lit(new Color(0.10f, 0.07f, 0.04f), smoothness: 0.18f, emit: false);
+            var gloves = ViewLook.Lit(new Color(0.12f, 0.08f, 0.05f), smoothness: 0.14f, emit: false);
+            var belt = ViewLook.Lit(new Color(0.22f, 0.12f, 0.07f), smoothness: 0.22f, emit: false);
+            var wood = ViewLook.Lit(new Color(0.28f, 0.16f, 0.09f), smoothness: 0.22f, emit: false);
+            var iron = ViewLook.Lit(new Color(0.38f, 0.36f, 0.34f), smoothness: 0.38f, emit: false);
 
-            var hipY = height * 0.30f;
-            var chestY = height * 0.52f;
-            var shoulderY = height * 0.64f;
-            var neckY = height * 0.72f;
-            var headY = height * 0.80f;
-            var brimY = height * 0.88f;
+            var hipY = height * 0.48f;
+            var chestY = height * 0.62f;
+            var shoulderY = height * 0.72f;
+            var neckY = height * 0.80f;
+            var headY = height * 0.86f;
+            var brimY = height * 0.91f;
             var crownY = height * 0.97f;
 
+            var stance = 0.11f;
+            var legR = 0.085f;
+            var torsoW = Mathf.Clamp(width * 0.42f, 0.28f, 0.36f);
+            var torsoD = Mathf.Clamp(depth * 0.52f, 0.16f, 0.22f);
+            const float coatT = 0.045f;
+
             // Legs + boots — readable under the hem from 55°.
+            var legHalf = hipY * 0.46f;
             Part(root, "leg_L", PrimitiveType.Cylinder,
-                new Vector3(-0.16f, hipY * 0.52f, 0.02f),
-                new Vector3(0.22f, hipY * 0.48f, 0.22f),
+                new Vector3(-stance, hipY * 0.50f, 0.02f),
+                new Vector3(legR * 2f, legHalf, legR * 2f),
                 Quaternion.identity, pants);
             Part(root, "leg_R", PrimitiveType.Cylinder,
-                new Vector3(0.16f, hipY * 0.52f, 0.02f),
-                new Vector3(0.22f, hipY * 0.48f, 0.22f),
+                new Vector3(stance, hipY * 0.50f, 0.02f),
+                new Vector3(legR * 2f, legHalf, legR * 2f),
                 Quaternion.identity, pants);
             Part(root, "boot_L", PrimitiveType.Cube,
-                new Vector3(-0.16f, 0.10f, 0.06f),
-                new Vector3(0.24f, 0.18f, 0.38f),
+                new Vector3(-stance, 0.07f, 0.05f),
+                new Vector3(0.13f, 0.12f, 0.22f),
                 Quaternion.identity, boots);
             Part(root, "boot_R", PrimitiveType.Cube,
-                new Vector3(0.16f, 0.10f, 0.06f),
-                new Vector3(0.24f, 0.18f, 0.38f),
+                new Vector3(stance, 0.07f, 0.05f),
+                new Vector3(0.13f, 0.12f, 0.22f),
                 Quaternion.identity, boots);
 
-            // Torso / vest — the body inside the coat.
-            Part(root, "torso", PrimitiveType.Capsule,
-                new Vector3(0f, chestY, 0.04f),
-                new Vector3(width * 0.52f, height * 0.18f, depth * 0.48f),
-                Quaternion.identity, vest);
+            // Cream shirt — the chest read, not buried in a wrapping cube.
+            Part(root, "torso", PrimitiveType.Cube,
+                new Vector3(0f, chestY, 0.02f),
+                new Vector3(torsoW, height * 0.22f, torsoD),
+                Quaternion.identity, shirt);
 
-            // Duster: upper shell + flared hem + back panel so the coat has THICKNESS,
-            // not one cube wrapping the whole person.
-            Part(root, "duster", PrimitiveType.Cube,
-                new Vector3(0f, shoulderY * 0.82f, 0.02f),
-                new Vector3(width * 0.98f, height * 0.28f, depth * 0.78f),
-                Quaternion.identity, coat);
-            Part(root, "duster_hem", PrimitiveType.Cube,
-                new Vector3(0f, height * 0.26f, -0.02f),
-                new Vector3(width * 1.32f, height * 0.34f, depth * 1.05f),
-                Quaternion.identity, coat);
+            // Thin duster: open front flaps + back panel. Thickness is a few cm, not a fridge.
             Part(root, "duster_back", PrimitiveType.Cube,
-                new Vector3(0f, height * 0.42f, -depth * 0.48f),
-                new Vector3(width * 1.08f, height * 0.62f, depth * 0.40f),
+                new Vector3(0f, chestY - 0.04f, -torsoD * 0.55f - coatT * 0.5f),
+                new Vector3(torsoW + 0.10f, height * 0.36f, coatT),
+                Quaternion.identity, coat);
+            Part(root, "duster_L", PrimitiveType.Cube,
+                new Vector3(-(torsoW * 0.42f + 0.04f), chestY - 0.06f, 0.04f),
+                new Vector3(coatT + 0.02f, height * 0.34f, torsoD + 0.04f),
+                Quaternion.Euler(0f, 0f, 8f), coat);
+            Part(root, "duster_R", PrimitiveType.Cube,
+                new Vector3(torsoW * 0.42f + 0.04f, chestY - 0.06f, 0.04f),
+                new Vector3(coatT + 0.02f, height * 0.34f, torsoD + 0.04f),
+                Quaternion.Euler(0f, 0f, -8f), coat);
+            Part(root, "duster_hem", PrimitiveType.Cube,
+                new Vector3(0f, hipY * 0.62f, -torsoD * 0.58f - coatT * 0.5f),
+                new Vector3(torsoW + 0.16f, 0.10f, coatT),
                 Quaternion.identity, coatDark);
             Part(root, "duster_shoulder_L", PrimitiveType.Cube,
-                new Vector3(-width * 0.42f, shoulderY, 0.02f),
-                new Vector3(0.38f, 0.16f, depth * 0.62f),
-                Quaternion.Euler(0f, 0f, 18f), coat);
+                new Vector3(-torsoW * 0.48f, shoulderY, 0.01f),
+                new Vector3(0.16f, 0.07f, torsoD + 0.04f),
+                Quaternion.Euler(0f, 0f, 16f), coat);
             Part(root, "duster_shoulder_R", PrimitiveType.Cube,
-                new Vector3(width * 0.42f, shoulderY, 0.02f),
-                new Vector3(0.38f, 0.16f, depth * 0.62f),
-                Quaternion.Euler(0f, 0f, -18f), coat);
+                new Vector3(torsoW * 0.48f, shoulderY, 0.01f),
+                new Vector3(0.16f, 0.07f, torsoD + 0.04f),
+                Quaternion.Euler(0f, 0f, -16f), coat);
             Part(root, "collar_L", PrimitiveType.Cube,
-                new Vector3(-0.14f, neckY, 0.10f),
-                new Vector3(0.16f, 0.22f, 0.18f),
-                Quaternion.Euler(18f, -22f, -12f), coatDark);
+                new Vector3(-0.06f, neckY - 0.02f, 0.05f),
+                new Vector3(0.08f, 0.10f, 0.08f),
+                Quaternion.Euler(18f, -18f, -10f), coatDark);
             Part(root, "collar_R", PrimitiveType.Cube,
-                new Vector3(0.14f, neckY, 0.10f),
-                new Vector3(0.16f, 0.22f, 0.18f),
-                Quaternion.Euler(18f, 22f, 12f), coatDark);
+                new Vector3(0.06f, neckY - 0.02f, 0.05f),
+                new Vector3(0.08f, 0.10f, 0.08f),
+                Quaternion.Euler(18f, 18f, 10f), coatDark);
 
             Part(root, "belt", PrimitiveType.Cube,
-                new Vector3(0f, hipY + 0.06f, 0.06f),
-                new Vector3(width * 0.72f, 0.10f, depth * 0.58f),
+                new Vector3(0f, hipY + 0.02f, 0.03f),
+                new Vector3(torsoW + 0.04f, 0.06f, torsoD + 0.03f),
                 Quaternion.identity, belt);
             Part(root, "holster", PrimitiveType.Cube,
-                new Vector3(0.28f, hipY - 0.04f, 0.12f),
-                new Vector3(0.12f, 0.28f, 0.16f),
+                new Vector3(0.14f, hipY - 0.06f, 0.06f),
+                new Vector3(0.07f, 0.16f, 0.08f),
                 Quaternion.Euler(12f, 0f, 8f), belt);
 
-            // Arms — the silhouette of a person, not a coat-box.
-            var armTilt = Quaternion.Euler(12f, 0f, 16f);
+            // Arms — silhouette of a person, not a coat-box.
             Part(root, "arm_L", PrimitiveType.Cylinder,
-                new Vector3(-width * 0.48f, chestY - 0.02f, 0.06f),
-                new Vector3(0.18f, height * 0.16f, 0.18f),
-                armTilt, coat);
+                new Vector3(-torsoW * 0.62f - 0.05f, chestY - 0.04f, 0.03f),
+                new Vector3(0.09f, height * 0.12f, 0.09f),
+                Quaternion.Euler(12f, 0f, 18f), coat);
             Part(root, "glove_L", PrimitiveType.Sphere,
-                new Vector3(-width * 0.58f, chestY - height * 0.20f, 0.16f),
-                Vector3.one * 0.16f,
+                new Vector3(-torsoW * 0.72f - 0.06f, chestY - height * 0.16f, 0.10f),
+                Vector3.one * 0.09f,
                 Quaternion.identity, gloves);
-            var armTiltR = Quaternion.Euler(18f, 0f, -12f);
             Part(root, "arm_R", PrimitiveType.Cylinder,
-                new Vector3(width * 0.46f, chestY - 0.04f, 0.10f),
-                new Vector3(0.18f, height * 0.15f, 0.18f),
-                armTiltR, coat);
+                new Vector3(torsoW * 0.58f + 0.05f, chestY - 0.02f, 0.08f),
+                new Vector3(0.09f, height * 0.11f, 0.09f),
+                Quaternion.Euler(22f, 0f, -14f), coat);
             Part(root, "glove_R", PrimitiveType.Sphere,
-                new Vector3(width * 0.52f, chestY - height * 0.18f, 0.22f),
-                Vector3.one * 0.16f,
+                new Vector3(torsoW * 0.62f + 0.07f, chestY - height * 0.13f, 0.18f),
+                Vector3.one * 0.09f,
                 Quaternion.identity, gloves);
 
-            // Rifle in the right hand, along facing (+Z).
+            // Rifle in the right hand, along facing (+Z). Barrel is the muzzle socket.
             Part(root, "rifle_stock", PrimitiveType.Cube,
-                new Vector3(width * 0.42f, chestY - height * 0.12f, 0.38f),
-                new Vector3(0.07f, 0.12f, 0.42f),
-                Quaternion.Euler(18f, -8f, 0f), wood);
+                new Vector3(torsoW * 0.50f + 0.05f, chestY - height * 0.10f, 0.22f),
+                new Vector3(0.05f, 0.08f, 0.22f),
+                Quaternion.Euler(12f, -6f, 0f), wood);
             Part(root, "rifle_barrel", PrimitiveType.Cylinder,
-                new Vector3(width * 0.40f, chestY - height * 0.04f, 0.72f),
-                new Vector3(0.06f, 0.38f, 0.06f),
-                Quaternion.Euler(78f, 0f, 0f), iron);
+                new Vector3(torsoW * 0.48f + 0.05f, chestY - height * 0.04f, 0.48f),
+                new Vector3(0.035f, 0.28f, 0.035f),
+                Quaternion.Euler(90f, 0f, 0f), iron);
 
             Part(root, "head", PrimitiveType.Sphere,
-                new Vector3(0f, headY, 0.06f),
-                Vector3.one * 0.36f,
+                new Vector3(0f, headY, 0.03f),
+                Vector3.one * 0.22f,
                 Quaternion.identity, skin);
-            Part(root, "kerchief", PrimitiveType.Sphere,
-                new Vector3(0f, neckY + 0.02f, 0.08f),
-                new Vector3(0.28f, 0.16f, 0.28f),
-                Quaternion.identity, kerchief);
 
-            // Wide brim — THE read from 55°. Diameter ~1.5 so it is a disk, not a speck.
-            var brimD = 1.38f;
+            // Dark hat brim + crown — THE read from 55°. Disk, not a sliver, not a tan lid.
+            var brimD = 0.78f;
             Part(root, "hat_brim", PrimitiveType.Cylinder,
-                new Vector3(0f, brimY, 0.04f),
-                new Vector3(brimD, 0.05f, brimD),
-                Quaternion.identity, hatLit);
-            Part(root, "hat_crown", PrimitiveType.Cube,
-                new Vector3(0f, crownY, 0.04f),
-                new Vector3(0.70f, 0.34f, 0.76f),
+                new Vector3(0f, brimY, 0.02f),
+                new Vector3(brimD, 0.025f, brimD),
                 Quaternion.identity, hat);
+            Part(root, "hat_crown", PrimitiveType.Cube,
+                new Vector3(0f, crownY, 0.02f),
+                new Vector3(0.28f, 0.14f, 0.32f),
+                Quaternion.identity, hat);
+
+            StampFrontDecal(root, albedo, height, torsoW, chestY, headY, torsoD);
+        }
+
+        /// <summary>
+        /// Canon albedo as a WORLD-YAWED front-plane decal on torso/face. Parent yaw (aim)
+        /// turns it; it never faces the camera.
+        /// </summary>
+        private static void StampFrontDecal(
+            Transform root, Texture albedo, float height, float torsoW,
+            float chestY, float headY, float torsoD)
+        {
+            if (albedo == null)
+            {
+                return;
+            }
+
+            var card = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            card.name = "canon_decal";
+            card.transform.SetParent(root, false);
+            var cardH = height * 0.40f;
+            var cardW = Mathf.Clamp(torsoW * 1.15f, 0.30f, 0.46f);
+            card.transform.localPosition = new Vector3(
+                0f, (chestY + headY) * 0.50f, torsoD * 0.55f + 0.03f);
+            card.transform.localRotation = Quaternion.identity;
+            card.transform.localScale = new Vector3(cardW, cardH, 1f);
+            ViewLook.StripCollider(card);
+            var mat = ViewLook.LitCutout(Color.white, albedo, emit: false);
+            ViewLook.Paint(card, mat, castShadows: false);
         }
 
         /// <summary>
