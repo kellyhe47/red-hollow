@@ -133,6 +133,7 @@ namespace RedHollow.Game.View
                 var tunnelMarker = Marker(
                     scene.Root.transform, resolver, VisualClass.Hotspot, "EntryTunnel_" + i,
                     map.EntryTunnels[i]);
+                CavernEnvironment.AttachBreachMouth(tunnelMarker.transform);
                 tunnelMarker.AddComponent<EntryTunnelMarkerView>().Bind(i);
                 scene.EntryTunnelMarkers[i] = tunnelMarker;
             }

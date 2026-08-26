@@ -35,9 +35,10 @@
 
 This is a **tilted 3D top-down / isometric** scene (~60–70° down), not straight bird's-eye and not a 2D tilemap.
 
-- **Environment:** simple 3D meshes with **real height** (habitat stacks, gantries, carved cliffs) + URP Lit, amber **point** lanterns, fog, rock-dome as sky. Comfy tiles are **albedo / normal / AO for those mesh UVs**.
+- **Environment:** simple 3D meshes with **real height** (habitat stacks with window glow, gantries + string lights, carved cliffs, cave-mouth breaches) + URP Lit, amber **point** lanterns, fog, rock-dome as sky. Comfy tiles are **albedo / normal / AO for those mesh UVs**.
 - **Camera:** ~60–70° down so **side walls and roof edges** read (DestroyMyGame-style tilt). Bird's-eye is the wrong target.
 - **Characters (v1):** **camera-facing upright billboards** + **blob shadow**, lantern tint/haze. One canon sheet. **Not** XZ-flat sprites, **not** 8-dir cycles, **not** sculpted 3D meshes. A later 3D hero swaps the view mesh only.
+- **Placeables (v1):** turret / barricade / med station are the same **camera-facing cards**; spike and dynamite traps stay floor decals. Destroyed placeables stay gone (rebuy); they do not auto-respawn.
 - **Western 30%:** wood/brass/lantern wear on Mars hulls + western 2.5D characters. Not the map silhouette.
 
 ## Prompt contract

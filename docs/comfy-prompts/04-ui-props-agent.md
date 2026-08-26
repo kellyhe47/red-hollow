@@ -3,7 +3,7 @@
 ## Mission
 Build and commit a ComfyUI (cloud.comfy.org) pipeline producing **UI chrome and world prop art** for The Red Hollow. Read `docs/comfy-prompts/00-shared-style.md` first; obey its style tail ("Lantern Deep", DEC-025), sampler locks, and process rules.
 
-**Western mix (DEC-026, ~70/30):** UI chrome may keep **wood/brass** — that is the 30% (character-side HUD + lantern hardware), not cavern scenery. In-world props that *are* the map (lantern masts, antenna, lift, habitat fronts) are **Mars colony industrial**; wood/brass is trim. Hotspot **building fronts** are stacked rusted habitat modules with height, not a western main street. Screens: `docs/ui-wireframes.html` (S1–S7) and `docs/PRD.md` §10.
+**Western mix (DEC-026, ~70/30):** UI chrome may keep **wood/brass** — that is the 30% (character-side HUD + lantern hardware), not cavern scenery. In-world props that *are* the map (lantern masts, antenna, lift, habitat fronts) are **Mars colony industrial**; wood/brass is trim. Hotspot **building fronts** are stacked rusted habitat modules with height, not a western main street. Unity v1: turret / barricade / med station render as **camera-facing cards**; traps as floor decals. Screens: `docs/ui-wireframes.html` (S1–S7) and `docs/PRD.md` §10.
 
 ## Failure mode you own (from the art plan)
 This is the **hardest class to get clean**: it needs **real transparency and exact pixel sizes**. Diffusion models fake alpha with checkerboards and halos. Your mandatory alpha workflow:

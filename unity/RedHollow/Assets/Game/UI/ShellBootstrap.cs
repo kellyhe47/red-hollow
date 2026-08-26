@@ -620,9 +620,10 @@ namespace RedHollow.Game.UI
         /// <summary>
         /// R-15 — the default catalog: the four T-13 representative assets plus the delivered
         /// keepers bound to the keys the views actually resolve (HeroClass / MonsterType /
-        /// PlaceableType literals). Hotspot markers stay cavern-brown volumes — western facade
-        /// art is for characters, not the environment. Resources copies live under
-        /// Assets/Game/UI/Resources/RedHollowArt/; T13's AssetDatabase originals stay put.
+        /// PlaceableType literals). Hotspot markers are industrial lantern pylons on Mars
+        /// habitat stacks — western facade art is for characters, not the environment. Resources
+        /// copies live under Assets/Game/UI/Resources/RedHollowArt/; T13's AssetDatabase originals
+        /// stay put.
         /// </summary>
         public static ArtCatalog LoadRepresentativeArt()
         {
@@ -1299,8 +1300,9 @@ namespace RedHollow.Game.UI
         /// <summary>
         /// One representative asset entry: load the Resources copy and stand it up. Heroes
         /// and monsters are camera-facing upright cards (blob shadow, lantern tint) in the
-        /// 3D cavern — never XZ-flat sprites. Placeables stay XZ decals. The cavern-ground
-        /// tile is still registered (T21) but is not the match floor.
+        /// 3D cavern — never XZ-flat sprites. Turret / barricade / med station stand as
+        /// cards too; floor traps stay XZ decals. The cavern-ground tile is still registered
+        /// (T21) but is not the match floor.
         /// </summary>
         private static void RegisterResourceArt(ArtCatalog catalog, string artKey, string resourcePath)
         {
@@ -1347,7 +1349,10 @@ namespace RedHollow.Game.UI
                 || artKey == MonsterType.Ravager
                 || artKey == MonsterType.Spitter
                 || artKey == MonsterType.Burrower
-                || artKey == MonsterType.BullBehemoth;
+                || artKey == MonsterType.BullBehemoth
+                || artKey == PlaceableType.Barricade
+                || artKey == PlaceableType.Turret
+                || artKey == PlaceableType.MedStation;
         }
 
         private static float FootprintForArtKey(string artKey)

@@ -11,10 +11,12 @@ namespace RedHollow.Game.View
     /// </summary>
     internal static class TopDownArt
     {
-        internal const float HeroFootprint = 3.4f;
-        internal const float MonsterFootprint = 2.8f;
+        internal const float HeroFootprint = 4.0f;
+        internal const float MonsterFootprint = 3.2f;
         internal const float HotspotFootprint = 1.8f;
-        internal const float PlaceableFootprint = 2.2f;
+        internal const float PlaceableFootprint = 2.4f;
+
+        private static Texture2D _rustPlate;
 
         internal static readonly Color Rust = new Color(0.55f, 0.28f, 0.14f);
         internal static readonly Color Amber = new Color(1.0f, 0.72f, 0.28f);
@@ -106,6 +108,94 @@ namespace RedHollow.Game.View
             card.AddComponent<SpriteBillboard>();
 
             return root;
+        }
+
+        /// <summary>
+        /// Hotspot / spawn marker: an industrial lantern pylon, not a western signpost.
+        /// Lost-state tinting hangs off this object's renderers (DEC-026).
+        /// </summary>
+        internal static GameObject LanternPylon(string name)
+        {
+            var root = new GameObject(name);
+
+            var pole = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            pole.name = name + "_pole";
+            StripCollider(pole);
+            pole.transform.SetParent(root.transform, false);
+            pole.transform.localScale = new Vector3(0.28f, 4.6f, 0.28f);
+            pole.transform.localPosition = new Vector3(0f, 2.3f, 0f);
+            Paint(pole, new Color(0.20f, 0.12f, 0.08f));
+
+            var arm = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            arm.name = name + "_arm";
+            StripCollider(arm);
+            arm.transform.SetParent(root.transform, false);
+            arm.transform.localScale = new Vector3(1.4f, 0.16f, 0.16f);
+            arm.transform.localPosition = new Vector3(0.55f, 4.4f, 0f);
+            Paint(arm, Brass);
+
+            var lamp = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            lamp.name = name + "_lamp";
+            StripCollider(lamp);
+            lamp.transform.SetParent(root.transform, false);
+            lamp.transform.localScale = new Vector3(0.45f, 0.45f, 0.45f);
+            lamp.transform.localPosition = new Vector3(1.15f, 4.2f, 0f);
+            Paint(lamp, Amber);
+
+            return root;
+        }
+
+        /// <summary>
+        /// Riveted rust-plate albedo for habitat hulls when no Comfy metal tile is bound.
+        /// Deterministic — no <see cref="Random"/>.
+        /// </summary>
+        internal static Texture2D RustPlate()
+        {
+            if (_rustPlate != null)
+            {
+                return _rustPlate;
+            }
+
+            const int n = 64;
+            var tex = new Texture2D(n, n, TextureFormat.RGB24, false)
+            {
+                name = "lykos-rust-plate",
+                wrapMode = TextureWrapMode.Repeat,
+                filterMode = FilterMode.Bilinear,
+            };
+
+            var pixels = new Color[n * n];
+            for (var y = 0; y < n; y++)
+            {
+                for (var x = 0; x < n; x++)
+                {
+                    var n0 = Noise(x, y);
+                    var n1 = Noise(x + 17, y * 3);
+                    var seam = (x % 8 == 0 || y % 8 == 0) ? -0.10f : 0f;
+                    var panel = (((x / 8) + (y / 8)) & 1) == 0 ? 0.05f : 0f;
+                    var rust = 0.30f + n0 * 0.22f + n1 * 0.10f + seam + panel;
+                    pixels[y * n + x] = new Color(
+                        Mathf.Clamp01(rust + 0.10f),
+                        Mathf.Clamp01(rust * 0.52f),
+                        Mathf.Clamp01(rust * 0.28f),
+                        1f);
+                }
+            }
+
+            tex.SetPixels(pixels);
+            tex.Apply(false, false);
+            _rustPlate = tex;
+            return tex;
+        }
+
+        internal static float Noise(int x, int z)
+        {
+            unchecked
+            {
+                var n = (uint)(x * 374761393 + z * 668265263);
+                n = (n ^ (n >> 13)) * 1274126177u;
+                return (n & 0xFFFF) / 65535f;
+            }
         }
 
         /// <summary>A squat 3D token — placeholder heroes/monsters/lamps, not sculpted characters.</summary>

@@ -212,9 +212,10 @@ isometric ~60–70° down — DestroyMyGame-style camera, Mars setting). Mix **~
 habitat / ~30% western accents**: stacked rusted utilitarian blocks, gantries, carved-rock
 walls, lantern masts, lift shaft — **not** a western town in a cave, **not** suburban
 apocalypse. 2.5D heroes/monsters = camera-facing upright billboards + blob shadows (not
-XZ-flat, not 8-dir, not sculpted meshes). No sun; amber point lanterns + haze. Environment
-Comfy tiles are albedo/normal/AO for those meshes. **URP 17.5.0** is the active pipeline.
-Read `docs/comfy-prompts/00-shared-style.md` before touching visuals.
+XZ-flat, not 8-dir, not sculpted meshes). Turret / barricade / med = standing cards;
+traps = floor decals. Destroyed placeables stay gone (rebuy). No sun; amber point lanterns
++ haze. Environment Comfy tiles are albedo/normal/AO for those meshes. **URP 17.5.0** is
+the active pipeline. Read `docs/comfy-prompts/00-shared-style.md` before touching visuals.
 
 R-64 feel targets hang off these sim events: `monster_damaged`, `hero_damaged`, `hero_died`,
 `hero_respawned`, `civilians_killed`, `hotspot_emptied`, `placeable_created`,

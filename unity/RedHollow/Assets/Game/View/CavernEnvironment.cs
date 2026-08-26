@@ -43,6 +43,11 @@ namespace RedHollow.Game.View
             var cavernAlbedo = Resources.Load<Texture2D>("RedHollowArt/cavern-ground");
             TopDownArt.BindAlbedo(rock, cavernAlbedo, 5f);
             TopDownArt.BindAlbedo(rockDeep, cavernAlbedo, 7f);
+            var rust = TopDownArt.RustPlate();
+            TopDownArt.BindAlbedo(hull, rust, 3.2f);
+            TopDownArt.BindAlbedo(hullDark, rust, 4.1f);
+            TopDownArt.BindAlbedo(dust, rust, 2.4f);
+            TopDownArt.BindAlbedo(roof, rust, 2.0f);
 
             var half = coverSpan * 0.5f;
             var mats = new ColonyMats
@@ -58,6 +63,7 @@ namespace RedHollow.Game.View
             };
 
             LayRockFloor(ground.transform, half, rock, rockDeep);
+            RaisePlaza(ground.transform, mats);
             RaiseCliffs(ground.transform, half, rockDeep);
             RaiseColony(ground.transform, map, half, mats);
             RaiseLiftShaft(ground.transform, mats);
@@ -120,6 +126,20 @@ namespace RedHollow.Game.View
             Box(parent, "cliff_east", rock,
                 new Vector3(half + wall * 0.35f, height * 0.5f, 0f),
                 new Vector3(wall, height, length));
+        }
+
+        /// <summary>Industrial landing pad at team spawn — metal deck, not a town square.</summary>
+        private static void RaisePlaza(Transform parent, ColonyMats mats)
+        {
+            Box(parent, "plaza_deck", mats.Hull,
+                new Vector3(0f, -0.12f, 0f),
+                new Vector3(16f, 0.24f, 16f));
+            Box(parent, "plaza_ring", mats.Brass,
+                new Vector3(0f, 0.08f, 0f),
+                new Vector3(9.2f, 0.12f, 9.2f));
+            Box(parent, "plaza_core", mats.Glow,
+                new Vector3(0f, 0.16f, 0f),
+                new Vector3(2.2f, 0.08f, 2.2f));
         }
 
         /// <summary>
@@ -230,6 +250,17 @@ namespace RedHollow.Game.View
                     parent, name + "_s" + s, mat,
                     new Vector3(x, y + h * 0.5f, z),
                     new Vector3(w, h, d));
+
+                // Camera looks north: south (−Z) faces carry window glow so walls read occupied.
+                if (s > 0 && s < storeys - 1)
+                {
+                    Box(
+                        parent, name + "_win" + s, mats.Glow,
+                        new Vector3(x + (Hash(s, Stable(name)) - 0.5f) * w * 0.25f,
+                            y + h * 0.55f, z - d * 0.51f),
+                        new Vector3(Mathf.Min(1.1f, w * 0.28f), Mathf.Min(1.4f, h * 0.38f), 0.12f));
+                }
+
                 y += h;
             }
 
@@ -311,6 +342,8 @@ namespace RedHollow.Game.View
                     var y = 11f + i * 2.5f;
                     Beam(parent, "gantry_" + i, mats.HullDark,
                         new Vector3(a.x, y, a.z), new Vector3(b.x, y, b.z), 0.32f);
+                    StringLights(parent, "gantry_" + i + "_lamps", mats.Glow,
+                        new Vector3(a.x, y + 0.35f, a.z), new Vector3(b.x, y + 0.35f, b.z));
                 }
             }
 
@@ -318,6 +351,8 @@ namespace RedHollow.Game.View
             var lift = SimSpace.ToWorld(LiftShaft);
             Beam(parent, "gantry_lift", mats.Hull,
                 new Vector3(0f, 13f, 0f), new Vector3(lift.x, 16f, lift.z), 0.28f);
+            StringLights(parent, "gantry_lift_lamps", mats.Glow,
+                new Vector3(0f, 13.4f, 0f), new Vector3(lift.x, 16.4f, lift.z));
 
             Mast(parent, "mast_plaza", 7.5f, -6.5f, 11f, mats);
             Mast(parent, "mast_west", -half * 0.35f, 8f, 13f, mats);
@@ -381,6 +416,77 @@ namespace RedHollow.Game.View
                 (from + to) * 0.5f,
                 new Vector3(thickness, thickness, length),
                 Quaternion.LookRotation(delta / length, Vector3.up));
+        }
+
+        private static void StringLights(
+            Transform parent, string name, Material glow, Vector3 from, Vector3 to)
+        {
+            var delta = to - from;
+            var length = delta.magnitude;
+            if (length < 1f)
+            {
+                return;
+            }
+
+            var count = Mathf.Max(2, (int)(length / 7f));
+            for (var i = 1; i < count; i++)
+            {
+                var t = i / (float)count;
+                Box(
+                    parent, name + "_" + i, glow,
+                    Vector3.Lerp(from, to, t),
+                    new Vector3(0.32f, 0.32f, 0.32f));
+            }
+        }
+
+        /// <summary>
+        /// Cave-mouth geometry parented under an entry-tunnel marker so pulse/flare tints
+        /// the breach. Faces the spawn plaza. Does not move the marker (T16 pins position).
+        /// </summary>
+        internal static void AttachBreachMouth(Transform marker)
+        {
+            if (marker == null)
+            {
+                return;
+            }
+
+            var pos = marker.position;
+            var toCenter = new Vector3(-pos.x, 0f, -pos.z);
+            if (toCenter.sqrMagnitude < 0.01f)
+            {
+                toCenter = Vector3.forward;
+            }
+
+            var inward = toCenter.normalized;
+            var right = Vector3.Cross(Vector3.up, inward).normalized;
+            var facing = Quaternion.LookRotation(inward, Vector3.up);
+
+            var rock = TopDownArt.LitMaterial(new Color(0.10f, 0.055f, 0.03f), 0.04f);
+            TopDownArt.BindAlbedo(
+                rock, Resources.Load<Texture2D>("RedHollowArt/cavern-ground"), 4f);
+            var hull = TopDownArt.LitMaterial(new Color(0.22f, 0.12f, 0.08f), 0.10f);
+            TopDownArt.BindAlbedo(hull, TopDownArt.RustPlate(), 3f);
+            var glow = TopDownArt.EmissiveMaterial(new Color(1.0f, 0.55f, 0.18f), 2.8f);
+            var throat = TopDownArt.LitMaterial(new Color(0.04f, 0.02f, 0.012f), 0.02f);
+
+            Box(marker, "breach_pillar_l", hull,
+                pos + (right * -2.4f) + (Vector3.up * 4.2f),
+                new Vector3(1.1f, 8.4f, 1.4f), facing);
+            Box(marker, "breach_pillar_r", hull,
+                pos + (right * 2.4f) + (Vector3.up * 4.2f),
+                new Vector3(1.1f, 8.4f, 1.4f), facing);
+            Box(marker, "breach_lintel", hull,
+                pos + (Vector3.up * 8.5f),
+                new Vector3(6.2f, 1.1f, 1.6f), facing);
+            Box(marker, "breach_throat", throat,
+                pos - (inward * 2.8f) + (Vector3.up * 4.0f),
+                new Vector3(5.4f, 8.0f, 4.2f), facing);
+            Box(marker, "breach_rim", glow,
+                pos + (inward * 0.15f) + (Vector3.up * 3.6f),
+                new Vector3(4.6f, 0.22f, 0.22f), facing);
+            Box(marker, "breach_sill", rock,
+                pos - (inward * 0.4f) + (Vector3.up * 0.4f),
+                new Vector3(6.4f, 0.8f, 2.4f), facing);
         }
 
         private static void Box(
