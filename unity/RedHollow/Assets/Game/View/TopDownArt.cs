@@ -4,19 +4,17 @@ using UnityEngine.Rendering;
 namespace RedHollow.Game.View
 {
     /// <summary>
-    /// Presentation sizes and unlit paint for a y-down camera. Capsules and default cubes
-    /// collapse to a one-unit speck at ortho ~34; these footprints are the readable stand-ins
-    /// (and the world size catalog quads are scaled to).
+    /// Presentation sizes and paint for a y-down camera. The cavern itself is 3D meshes
+    /// (see <see cref="CavernEnvironment"/>); heroes and monsters are 2.5D cards standing
+    /// in that space. Capsules collapse to a speck at ortho ~34 — footprints stay large
+    /// enough to read, small enough that stacked colony blocks still dwarf them.
     /// </summary>
     internal static class TopDownArt
     {
-        internal const float HeroFootprint = 6f;
-        internal const float MonsterFootprint = 5f;
-        internal const float HotspotFootprint = 12f;
-        internal const float PlaceableFootprint = 3f;
-
-        /// <summary>How many world units one cavern-ground tile should cover when tiled.</summary>
-        internal const float GroundTileWorldSize = 12f;
+        internal const float HeroFootprint = 3.4f;
+        internal const float MonsterFootprint = 2.8f;
+        internal const float HotspotFootprint = 1.8f;
+        internal const float PlaceableFootprint = 2.2f;
 
         internal static readonly Color Rust = new Color(0.55f, 0.28f, 0.14f);
         internal static readonly Color Amber = new Color(1.0f, 0.72f, 0.28f);
@@ -59,31 +57,65 @@ namespace RedHollow.Game.View
         }
 
         /// <summary>
-        /// A 1×1 quad lying on XZ, facing +Y, so a y-down camera sees the texture (not an edge).
+        /// A 1×1 quad lying on XZ, facing +Y. Placeables and icons stay floor-decals;
+        /// heroes/monsters use <see cref="StandingCard"/>.
         /// </summary>
         internal static GameObject QuadOnXz(string name, float footprint, Texture texture, Color tint)
         {
             var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
             go.name = name;
-            var collider = go.GetComponent<Collider>();
-            if (collider != null)
-            {
-                Object.DestroyImmediate(collider);
-            }
+            StripCollider(go);
             go.transform.localRotation = Quaternion.Euler(-90f, 0f, 0f);
             go.transform.localScale = new Vector3(footprint, footprint, 1f);
-            go.transform.localPosition = new Vector3(0f, 0.04f, 0f);
+            go.transform.localPosition = new Vector3(0f, 0.08f, 0f);
             Paint(go, tint, texture, 1f);
             return go;
         }
 
-        /// <summary>Squash a Unity cylinder into a disc of <paramref name="diameter"/> on XZ.</summary>
-        internal static void FlattenCylinder(GameObject cylinder, float diameter, float height)
+        /// <summary>
+        /// 2.5D sprite card: leaned toward the camera so a y-down view still reads the art,
+        /// while the quad occupies vertical space among the 3D colony (not a floor sticker).
+        /// Parent Y-rotation (hero facing) turns the lean with the aim.
+        /// </summary>
+        internal static GameObject StandingCard(string name, float footprint, Texture texture, Color tint)
         {
-            // Default cylinder: radius 0.5? Unity cylinder is 1m radius, 2m tall.
-            // scale.x/z = diameter, scale.y = height/2.
-            cylinder.transform.localScale = new Vector3(diameter, height * 0.5f, diameter);
-            cylinder.transform.localPosition = new Vector3(0f, height * 0.5f, 0f);
+            var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            go.name = name;
+            StripCollider(go);
+            // -58° from identity: mostly facing +Y (readable from above), a bit of height.
+            go.transform.localRotation = Quaternion.Euler(-58f, 0f, 0f);
+            go.transform.localScale = new Vector3(footprint, footprint * 1.2f, 1f);
+            go.transform.localPosition = new Vector3(0f, footprint * 0.38f, 0f);
+            Paint(go, tint, texture, 1f);
+            return go;
+        }
+
+        /// <summary>A squat 3D token — placeholder heroes/monsters/lamps, not sculpted characters.</summary>
+        internal static GameObject BlockToken(string name, float width, float height, Color color)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            go.name = name;
+            StripCollider(go);
+            go.transform.localScale = new Vector3(width, height, width * 0.7f);
+            go.transform.localPosition = new Vector3(0f, height * 0.5f, 0f);
+            Paint(go, color);
+            return go;
+        }
+
+        internal static void StripCollider(GameObject go)
+        {
+            if (go == null)
+            {
+                return;
+            }
+
+            var collider = go.GetComponent<Collider>();
+            if (collider == null)
+            {
+                return;
+            }
+
+            Object.DestroyImmediate(collider);
         }
 
         internal static void Paint(GameObject go, Color color, Texture texture = null, float tile = 1f)
@@ -114,17 +146,6 @@ namespace RedHollow.Game.View
             }
         }
 
-        internal static void TileAlbedo(Renderer renderer, float worldSpan)
-        {
-            if (renderer == null || renderer.sharedMaterial == null)
-            {
-                return;
-            }
-
-            var tiles = Mathf.Max(2f, worldSpan / GroundTileWorldSize);
-            ApplyTexture(renderer.sharedMaterial, renderer.sharedMaterial.mainTexture, tiles);
-        }
-
         internal static Shader UnlitShader()
         {
             return Shader.Find("Universal Render Pipeline/Unlit")
@@ -132,6 +153,72 @@ namespace RedHollow.Game.View
                 ?? Shader.Find("Unlit/Texture")
                 ?? Shader.Find("Sprites/Default")
                 ?? Shader.Find("Hidden/InternalErrorShader");
+        }
+
+        internal static Shader LitShader()
+        {
+            return Shader.Find("Universal Render Pipeline/Lit")
+                ?? Shader.Find("Standard")
+                ?? UnlitShader();
+        }
+
+        /// <summary>Matte URP Lit so lanterns and fog actually model the cavern.</summary>
+        internal static Material LitMaterial(Color color, float smoothness)
+        {
+            var shader = LitShader();
+            if (shader == null)
+            {
+                return null;
+            }
+
+            var material = new Material(shader);
+            ApplyColor(material, color);
+            if (material.HasProperty("_Smoothness"))
+            {
+                material.SetFloat("_Smoothness", smoothness);
+            }
+
+            if (material.HasProperty("_Metallic"))
+            {
+                material.SetFloat("_Metallic", 0f);
+            }
+
+            return material;
+        }
+
+        /// <summary>Window / shaft glow — does not consume the URP additional-light budget.</summary>
+        internal static Material EmissiveMaterial(Color color, float intensity)
+        {
+            var material = LitMaterial(color, 0.35f);
+            if (material == null)
+            {
+                return null;
+            }
+
+            var emission = color * intensity;
+            material.EnableKeyword("_EMISSION");
+            if (material.HasProperty("_EmissionColor"))
+            {
+                material.SetColor("_EmissionColor", emission);
+            }
+
+            material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+            return material;
+        }
+
+        internal static void PaintLit(GameObject go, Material material)
+        {
+            if (go == null || material == null)
+            {
+                return;
+            }
+
+            foreach (var renderer in go.GetComponentsInChildren<Renderer>(true))
+            {
+                renderer.sharedMaterial = material;
+                renderer.shadowCastingMode = ShadowCastingMode.On;
+                renderer.receiveShadows = true;
+            }
         }
 
         private static void ApplyColor(Material material, Color color)

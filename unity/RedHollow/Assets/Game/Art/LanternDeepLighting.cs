@@ -33,8 +33,13 @@ namespace RedHollow.Game.Art
         /// <summary>How far above the colony floor the central lantern cluster hangs.</summary>
         private const float LanternHeight = 6f;
 
-        /// <summary>Vertical size of the dome; sideways it spans whatever the scene renders.</summary>
-        private const float DomeHeight = 30f;
+        /// <summary>
+        /// Vertical size of the dome. The match camera sits at y=60; a 30-unit squash put the
+        /// camera OUTSIDE looking through the shell. 140 puts the camera inside the arch so
+        /// Play can call Apply without occluding the colony. T13 only pins max.y above ground
+        /// and XZ span — height is free.
+        /// </summary>
+        private const float DomeHeight = 140f;
 
         /// <summary>Breathing room past the rendered content, so no camera angle sees the rim.</summary>
         private const float DomeMargin = 8f;
@@ -75,7 +80,7 @@ namespace RedHollow.Game.Art
             RenderSettings.fog = true;
             RenderSettings.fogColor = FogDust;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
-            RenderSettings.fogDensity = 0.02f;
+            RenderSettings.fogDensity = 0.018f;
 
             RenderSettings.skybox = null;
             RenderSettings.sun = null;
@@ -121,8 +126,9 @@ namespace RedHollow.Game.Art
             var light = go.AddComponent<Light>();
             light.type = LightType.Point;
             light.color = LanternAmber;
-            light.intensity = 1.6f;
+            light.intensity = 2.4f;
             light.range = Mathf.Max(span.extents.x, span.extents.z) + LanternHeight + DomeMargin;
+            light.shadows = LightShadows.None;
         }
 
         /// <summary>
@@ -140,6 +146,23 @@ namespace RedHollow.Game.Art
                 span.size.x + DomeMargin * 2f,
                 DomeHeight,
                 span.size.z + DomeMargin * 2f);
+
+            var rock = TopDownArt.LitMaterial(new Color(0.12f, 0.07f, 0.04f), 0.05f);
+            if (rock != null)
+            {
+                TopDownArt.PaintLit(dome, rock);
+                foreach (var renderer in dome.GetComponentsInChildren<Renderer>(true))
+                {
+                    renderer.shadowCastingMode = ShadowCastingMode.Off;
+                    renderer.receiveShadows = false;
+                }
+            }
+
+            var collider = dome.GetComponent<Collider>();
+            if (collider != null)
+            {
+                Object.DestroyImmediate(collider);
+            }
 
             return dome;
         }

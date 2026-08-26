@@ -1,4 +1,5 @@
 using System;
+using RedHollow.Game.Art;
 using RedHollow.Game.Input;
 using RedHollow.Game.View;
 using RedHollow.Sim;
@@ -92,6 +93,14 @@ namespace RedHollow.Game.UI
             }
 
             _matchScene = MatchSceneBuilder.Build(ColonyMap.V1(), _shell.Visuals);
+            if (Application.isPlaying)
+            {
+                // Fog, warm ambient, no sun, cavern dome. Skipped in EditMode so T16/T22
+                // do not leak RenderSettings; the dome is taller than the camera so this
+                // no longer paints a shell over the colony.
+                LanternDeepLighting.Apply(_matchScene);
+            }
+
             _shell.AttachScene(_matchScene);
         }
 

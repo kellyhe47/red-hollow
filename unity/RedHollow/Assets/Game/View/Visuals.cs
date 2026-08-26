@@ -122,10 +122,10 @@ namespace RedHollow.Game.View
         }
 
         /// <summary>
-        /// A visible primitive for the class. Capsules read as a one-unit speck under a y-down
-        /// camera; heroes, monsters and shelters are squat discs with a real XZ footprint so
-        /// they stay readable at the match ortho size. Shape is presentation — T16 pins a
-        /// Renderer, not a mesh.
+        /// A visible primitive for the class. Heroes/monsters/lamps are short blocks with
+        /// height (readable under a y-down camera, standing in the 3D cavern). The cavern
+        /// floor itself is built by <see cref="CavernEnvironment"/>, so Ground here is only
+        /// the seam fallback. Shape is presentation — T16 pins a Renderer, not a mesh.
         /// </summary>
         private static GameObject CreatePlaceholder(VisualClass visualClass)
         {
@@ -135,19 +135,25 @@ namespace RedHollow.Game.View
             {
                 if (visualClass == VisualClass.Ground)
                 {
-                    var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
-                    ground.name = name;
-                    TopDownArt.Paint(ground, TopDownArt.Rust);
-                    return ground;
+                    return TopDownArt.BlockToken(name, 4f, 0.6f, TopDownArt.Rust);
                 }
 
-                var disc = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                disc.name = name;
-                var diameter = TopDownArt.FootprintFor(visualClass);
-                var height = visualClass == VisualClass.Hotspot ? 1.2f : 0.7f;
-                TopDownArt.FlattenCylinder(disc, diameter, height);
-                TopDownArt.Paint(disc, TopDownArt.ColorFor(visualClass));
-                return disc;
+                if (visualClass == VisualClass.Hotspot)
+                {
+                    return TopDownArt.BlockToken(name, 1.2f, 3.4f, TopDownArt.Amber);
+                }
+
+                if (visualClass == VisualClass.Hero)
+                {
+                    return TopDownArt.BlockToken(name, 2.4f, 3.2f, TopDownArt.Amber);
+                }
+
+                if (visualClass == VisualClass.Monster)
+                {
+                    return TopDownArt.BlockToken(name, 2.2f, 2.6f, TopDownArt.HostileGreen);
+                }
+
+                return TopDownArt.BlockToken(name, 1.8f, 1.6f, TopDownArt.Brass);
             }
             catch (Exception)
             {

@@ -1297,10 +1297,10 @@ namespace RedHollow.Game.UI
         // ---- plumbing -------------------------------------------------------------------------
 
         /// <summary>
-        /// One representative asset entry: load the Resources copy and stand it up as an unlit
-        /// XZ quad (not a SpriteRenderer). Sprite.Create on non-readable textures throws in Play
-        /// and the catalog treats that as absence — which is how heroes stayed tiny placeholders
-        /// while the rust plane still showed. A missing resource returns null (fallback).
+        /// One representative asset entry: load the Resources copy and stand it up. Heroes
+        /// and monsters are 2.5D cards in the 3D cavern; placeables stay XZ decals. The
+        /// cavern-ground tile is still registered (T21) but is not the match floor — the
+        /// floor is <c>CavernEnvironment</c> meshes.
         /// </summary>
         private static void RegisterResourceArt(ArtCatalog catalog, string artKey, string resourcePath)
         {
@@ -1320,21 +1320,34 @@ namespace RedHollow.Game.UI
                     return null;
                 }
 
-                var isGround = artKey == ShellArtKeys.GroundTile;
-                if (isGround)
+                var name = "art_" + artKey.Replace('/', '_');
+                if (artKey == ShellArtKeys.GroundTile)
                 {
                     var plane = GameObject.CreatePrimitive(PrimitiveType.Plane);
-                    plane.name = "art_" + artKey.Replace('/', '_');
+                    plane.name = name;
                     TopDownArt.Paint(plane, TopDownArt.Rust, texture, 1f);
                     return plane;
                 }
 
-                return TopDownArt.QuadOnXz(
-                    "art_" + artKey.Replace('/', '_'),
-                    FootprintForArtKey(artKey),
-                    texture,
-                    Color.white);
+                if (IsStandingSprite(artKey))
+                {
+                    return TopDownArt.StandingCard(name, FootprintForArtKey(artKey), texture, Color.white);
+                }
+
+                return TopDownArt.QuadOnXz(name, FootprintForArtKey(artKey), texture, Color.white);
             });
+        }
+
+        private static bool IsStandingSprite(string artKey)
+        {
+            return artKey == HeroClass.Gunslinger
+                || artKey == HeroClass.Rancher
+                || artKey == HeroClass.Sawbones
+                || artKey == MonsterType.Shambler
+                || artKey == MonsterType.Ravager
+                || artKey == MonsterType.Spitter
+                || artKey == MonsterType.Burrower
+                || artKey == MonsterType.BullBehemoth;
         }
 
         private static float FootprintForArtKey(string artKey)
