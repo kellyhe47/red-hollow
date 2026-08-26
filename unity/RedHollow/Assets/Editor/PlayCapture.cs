@@ -1,5 +1,6 @@
 #if UNITY_EDITOR
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using RedHollow.Game.Input;
@@ -10,6 +11,7 @@ using RedHollow.Sim;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 namespace RedHollow.EditorTools
 {
@@ -26,9 +28,14 @@ namespace RedHollow.EditorTools
         private const string StatusPath = "/workspace/unity/playtest.status";
         private const string ShotPath = "/workspace/unity/shots/game-view.png";
         private const string ProofPath = "/workspace/unity/shots/combat-proof.png";
+        private const string WaveClearPath = "/workspace/unity/shots/wave1-clear.png";
+        private const string Wave2Path = "/workspace/unity/shots/wave2.png";
 
         private static double _enteredAt;
         private static bool _driving;
+        private static bool _wave1Captured;
+        private static bool _readySent;
+        private static bool _wave2Captured;
         private static readonly StringBuilder Logs = new StringBuilder();
 
         static PlayCapture()
@@ -72,6 +79,9 @@ namespace RedHollow.EditorTools
                 Logs.Clear();
                 _enteredAt = 0;
                 _driving = false;
+                _wave1Captured = false;
+                _readySent = false;
+                _wave2Captured = false;
                 EditorApplication.isPlaying = true;
                 return;
             }
@@ -89,12 +99,12 @@ namespace RedHollow.EditorTools
 
             var elapsed = EditorApplication.timeSinceStartup - _enteredAt;
             DriveCombatInput();
+            DriveWaveProgression();
 
-            var proof = CombatProofReady();
-            var timedOut = elapsed >= 12.0;
-            // Hold the walk/fire long enough that the Game view shows the gunslinger
-            // clearly off spawn (4 u/s * 2.5s ≈ 10 units) rather than a 0.2s twitch.
-            if ((!proof || elapsed < 2.5) && !timedOut)
+            var timedOut = elapsed >= 22.0;
+            // Wave-loop proof: stay in Play until wave 1 is cleared AND wave 2 combat
+            // has spawned (or we time out). Combat-first opening is unchanged.
+            if (!_wave2Captured && !timedOut)
             {
                 return;
             }
@@ -113,42 +123,161 @@ namespace RedHollow.EditorTools
         }
 
         /// <summary>
-        /// Hold A+W (west + forward toward wave-1 shamblers), aim at a living shambler, and
-        /// fire SPACE plus a Q/E press so the live input map, not a sim cheat, drives combat.
+        /// Chase the nearest living monster with WASD, aim at it, and hold SPACE (plus Q/E)
+        /// so the live input map, not a sim cheat, drives combat. Stops walking inside 8u
+        /// so a long wave-clear does not walk the gunslinger off the cavern.
         /// </summary>
         private static void DriveCombatInput()
         {
             var match = LiveMatch();
             if (match == null || match.State == null || match.State.Phase != MatchPhase.Combat)
             {
+                OverlayInputSource.ExtraHeld.Clear();
                 return;
             }
 
-            if (!_driving)
-            {
-                _driving = true;
-                OverlayInputSource.ExtraHeld.Clear();
-                OverlayInputSource.ExtraHeld.Add(PlayerKey.A);
-                OverlayInputSource.ExtraHeld.Add(PlayerKey.W);
-                OverlayInputSource.ExtraHeld.Add(PlayerKey.Space);
-                OverlayInputSource.ExtraHeld.Add(PlayerKey.Q);
-                OverlayInputSource.ExtraHeld.Add(PlayerKey.E);
-            }
+            _driving = true;
+            OverlayInputSource.ExtraHeld.Clear();
+            OverlayInputSource.ExtraHeld.Add(PlayerKey.Space);
+            OverlayInputSource.ExtraHeld.Add(PlayerKey.Q);
+            OverlayInputSource.ExtraHeld.Add(PlayerKey.E);
 
-            OverlayInputSource.CursorOverride = AimAtLivingShambler(match.State);
-        }
-
-        private static Vector2 AimAtLivingShambler(MatchState state)
-        {
-            foreach (var monster in state.Monsters.Values)
+            Hero hero = null;
+            foreach (var h in match.State.Heroes.Values)
             {
-                if (monster != null && monster.Alive)
+                if (h != null && h.Alive)
                 {
-                    return new Vector2((float)monster.Pos.X, (float)monster.Pos.Y);
+                    hero = h;
+                    break;
                 }
             }
 
-            return new Vector2(-12f, 6f);
+            Monster target = NearestLiving(match.State, hero);
+            if (target == null)
+            {
+                OverlayInputSource.CursorOverride = new Vector2(-12f, 6f);
+                return;
+            }
+
+            OverlayInputSource.CursorOverride = new Vector2((float)target.Pos.X, (float)target.Pos.Y);
+            if (hero == null)
+            {
+                return;
+            }
+
+            var dx = target.Pos.X - hero.Pos.X;
+            var dy = target.Pos.Y - hero.Pos.Y;
+            var dist = Math.Sqrt((dx * dx) + (dy * dy));
+            if (dist > 8.0)
+            {
+                if (dx < -0.4)
+                {
+                    OverlayInputSource.ExtraHeld.Add(PlayerKey.A);
+                }
+                else if (dx > 0.4)
+                {
+                    OverlayInputSource.ExtraHeld.Add(PlayerKey.D);
+                }
+
+                if (dy > 0.4)
+                {
+                    OverlayInputSource.ExtraHeld.Add(PlayerKey.W);
+                }
+                else if (dy < -0.4)
+                {
+                    OverlayInputSource.ExtraHeld.Add(PlayerKey.S);
+                }
+            }
+        }
+
+        /// <summary>
+        /// After wave 1's last kill the sim is already in planning (R-02). Ready-up is the
+        /// R-03 early exit so the 60s planning timer does not block a wave-2 playtest — T21/T25/T12
+        /// still open matches in combat; this only fires once the campaign has advanced.
+        /// </summary>
+        private static void DriveWaveProgression()
+        {
+            var match = LiveMatch();
+            var shell = LiveShell();
+            if (match == null || match.State == null)
+            {
+                return;
+            }
+
+            if (!_wave1Captured && Wave1Cleared(match))
+            {
+                DumpCamera(Camera.main, WaveClearPath);
+                _wave1Captured = true;
+            }
+
+            if (!_readySent
+                && match.State.Phase == MatchPhase.Planning
+                && match.State.Wave.Number >= 2
+                && shell != null
+                && shell.Planning != null)
+            {
+                shell.Planning.ReadyUp();
+                _readySent = true;
+            }
+
+            if (!_wave2Captured && Wave2Live(match))
+            {
+                DumpCamera(Camera.main, Wave2Path);
+                _wave2Captured = true;
+            }
+        }
+
+        private static Monster NearestLiving(MatchState state, Hero hero)
+        {
+            Monster best = null;
+            var bestD = double.MaxValue;
+            foreach (var monster in state.Monsters.Values)
+            {
+                if (monster == null || !monster.Alive)
+                {
+                    continue;
+                }
+
+                if (hero == null)
+                {
+                    return monster;
+                }
+
+                var dx = monster.Pos.X - hero.Pos.X;
+                var dy = monster.Pos.Y - hero.Pos.Y;
+                var d = (dx * dx) + (dy * dy);
+                if (d < bestD)
+                {
+                    bestD = d;
+                    best = monster;
+                }
+            }
+
+            return best;
+        }
+
+        private static bool Wave1Cleared(HostedMatch match)
+        {
+            if (match.State.Wave == null || match.State.Monsters.Count == 0)
+            {
+                return false;
+            }
+
+            return match.State.Wave.LivingMonsterIds.Count == 0
+                && match.State.Wave.Number >= 1;
+        }
+
+        private static bool Wave2Live(HostedMatch match)
+        {
+            return match.State.Phase == MatchPhase.Combat
+                && match.State.Wave.Number >= 2
+                && match.State.Wave.LivingMonsterIds.Count > 0;
+        }
+
+        private static ShellBootstrap LiveShell()
+        {
+            var entry = UnityEngine.Object.FindFirstObjectByType<GameEntryBehaviour>();
+            return entry != null ? entry.Shell : null;
         }
 
         private static bool CombatProofReady()
@@ -228,6 +357,10 @@ namespace RedHollow.EditorTools
                 sb.Append("ortho=").Append(cam.orthographic).Append(" size=").Append(cam.orthographicSize).Append('\n');
                 DumpCamera(cam, ShotPath);
                 sb.Append("shot=").Append(ShotPath).Append('\n');
+                sb.Append("wave1ClearShot=").Append(WaveClearPath)
+                    .Append(" exists=").Append(File.Exists(WaveClearPath)).Append('\n');
+                sb.Append("wave2Shot=").Append(Wave2Path)
+                    .Append(" exists=").Append(File.Exists(Wave2Path)).Append('\n');
                 try
                 {
                     CropHeroProof(cam, ProofPath);
@@ -302,7 +435,25 @@ namespace RedHollow.EditorTools
                 .Append("/").Append(state.Wave.TotalWaves).Append('\n');
             sb.Append("civilians=").Append(state.TotalCivilians)
                 .Append(" livingMonsters=").Append(state.Wave.LivingMonsterIds.Count)
-                .Append(" placeables=").Append(state.PlaceableCount).Append('\n');
+                .Append(" placeables=").Append(state.PlaceableCount)
+                .Append(" scrip=").Append(state.Team.Scrip).Append('\n');
+            sb.Append("wave1Captured=").Append(_wave1Captured)
+                .Append(" readySent=").Append(_readySent)
+                .Append(" wave2Captured=").Append(_wave2Captured).Append('\n');
+            var shell = entry != null ? entry.Shell : null;
+            if (shell != null && shell.Router != null)
+            {
+                sb.Append("uiScreen=").Append(shell.Router.Screen).Append('\n');
+            }
+            if (shell != null && shell.Ui != null)
+            {
+                sb.Append("hudWave=").Append(shell.Ui.WaveLabel != null ? shell.Ui.WaveLabel.text : "")
+                    .Append('\n');
+                sb.Append("hudScrip=").Append(shell.Ui.ScripLabel != null ? shell.Ui.ScripLabel.text : "")
+                    .Append('\n');
+                sb.Append("hudLeft=").Append(shell.Ui.MonstersRemainingLabel != null
+                    ? shell.Ui.MonstersRemainingLabel.text : "").Append('\n');
+            }
 
             foreach (var hero in state.Heroes.Values)
             {
@@ -431,6 +582,8 @@ namespace RedHollow.EditorTools
             }
 
             sb.Append("proofReady=").Append(CombatProofReady()).Append('\n');
+            sb.Append("wave1Clear=").Append(_wave1Captured)
+                .Append(" wave2Live=").Append(_wave2Captured).Append('\n');
         }
 
         private static void CropHeroProof(Camera camera, string path)
@@ -494,11 +647,41 @@ namespace RedHollow.EditorTools
 
         private static void DumpCamera(Camera camera, string path)
         {
+            if (camera == null)
+            {
+                return;
+            }
+
             const int width = 1920;
             const int height = 1080;
             var rt = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32);
             var prev = camera.targetTexture;
             var prevActive = RenderTexture.active;
+
+            // ScreenSpaceOverlay is not drawn by Camera.Render. Park overlay canvases
+            // on this camera for the capture so wave/scrip/civ HUD lands in the PNG.
+            var restored = new List<Canvas>();
+            var modes = new List<RenderMode>();
+            var cams = new List<Camera>();
+            var distances = new List<float>();
+            var canvases = UnityEngine.Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None);
+            for (var i = 0; i < canvases.Length; i++)
+            {
+                var canvas = canvases[i];
+                if (canvas == null || canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+                {
+                    continue;
+                }
+
+                restored.Add(canvas);
+                modes.Add(canvas.renderMode);
+                cams.Add(canvas.worldCamera);
+                distances.Add(canvas.planeDistance);
+                canvas.renderMode = RenderMode.ScreenSpaceCamera;
+                canvas.worldCamera = camera;
+                canvas.planeDistance = 2f;
+            }
+
             camera.targetTexture = rt;
             camera.Render();
             RenderTexture.active = rt;
@@ -511,6 +694,13 @@ namespace RedHollow.EditorTools
             UnityEngine.Object.DestroyImmediate(tex);
             rt.Release();
             UnityEngine.Object.DestroyImmediate(rt);
+
+            for (var i = 0; i < restored.Count; i++)
+            {
+                restored[i].renderMode = modes[i];
+                restored[i].worldCamera = cams[i];
+                restored[i].planeDistance = distances[i];
+            }
         }
     }
 }

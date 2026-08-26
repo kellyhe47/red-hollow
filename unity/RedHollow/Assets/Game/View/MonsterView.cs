@@ -66,7 +66,41 @@ namespace RedHollow.Game.View
             WorldPosition = SimSpace.ToWorld(monster.Pos);
 
             transform.position = WorldPosition;
+            ScatterVisual();
             ViewRig.SetVisible(Visual, DisplayedAlive);
+        }
+
+        /// <summary>
+        /// View-only pack spread: several monsters can share a sim tile (tunnel 0) and still
+        /// read as a pack. <see cref="WorldPosition"/> stays the sim's answer so T16/T21 keep
+        /// mirroring replication; FeelRig still offsets the TRANSFORM from that. The scatter
+        /// rides on the visual child only.
+        /// </summary>
+        private void ScatterVisual()
+        {
+            if (Visual == null || Visual.Instance == null || string.IsNullOrEmpty(MonsterId))
+            {
+                return;
+            }
+
+            var n = 0;
+            for (var i = 0; i < MonsterId.Length; i++)
+            {
+                var c = MonsterId[i];
+                if (c >= '0' && c <= '9')
+                {
+                    n = (n * 10) + (c - '0');
+                }
+            }
+
+            // Golden-angle ring so wave-1's six shamblers (and later stacked spawns) fan out.
+            var angle = n * 2.399963229728653f;
+            var radius = 1.25f + ((n % 3) * 0.55f);
+            var local = Visual.Instance.transform.localPosition;
+            Visual.Instance.transform.localPosition = new Vector3(
+                Mathf.Cos(angle) * radius,
+                local.y,
+                Mathf.Sin(angle) * radius);
         }
     }
 }

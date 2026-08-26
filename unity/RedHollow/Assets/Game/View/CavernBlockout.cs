@@ -160,7 +160,7 @@ namespace RedHollow.Game.View
             HidePlaceholders(marker);
 
             var metal = HabitatMaterial();
-            var roof = ViewLook.Unlit(Roof);
+            var roof = RoofMaterial();
             var brass = ViewLook.Unlit(Brass);
             var glow = ViewLook.Unlit(AmberGlow);
 
@@ -237,7 +237,7 @@ namespace RedHollow.Game.View
             settlement.transform.SetParent(root, false);
 
             var metal = HabitatMaterial();
-            var roof = ViewLook.Unlit(Roof);
+            var roof = RoofMaterial();
             var dark = ViewLook.Unlit(MetalDark);
             var deck = DeckingMaterial();
             var brass = ViewLook.Unlit(Brass);
@@ -622,6 +622,10 @@ namespace RedHollow.Game.View
                     new Vector3(pos.x + size.x * 0.12f, size.y + 0.32f + 1.6f, pos.z),
                     new Vector3(size.x * 0.55f, 3.2f, size.z * 0.55f),
                     metal);
+                Box(hab.transform, "StackRoof",
+                    new Vector3(pos.x + size.x * 0.12f, size.y + 0.32f + 3.2f + 0.16f, pos.z),
+                    new Vector3(size.x * 0.62f, 0.28f, size.z * 0.62f),
+                    roof);
             }
         }
 
@@ -679,9 +683,25 @@ namespace RedHollow.Game.View
                 "RedHollowArt/cavern-ground");
         }
 
+        private static Material RoofMaterial()
+        {
+            // Hab cube TOPS: authored rusty roof plates, then decking, then cladding.
+            var tex = ViewLook.LoadTexture("RedHollowArt/hab-block-roof")
+                ?? ViewLook.LoadTexture("RedHollowArt/colony-decking")
+                ?? ViewLook.LoadTexture("RedHollowArt/hab-block-cladding");
+            var mat = ViewLook.Unlit(tex != null ? Color.white : Roof, tex);
+            if (mat != null && tex != null)
+            {
+                ViewLook.SetTiling(mat, new Vector2(2.4f, 2.4f));
+            }
+
+            return mat;
+        }
+
         private static Material HabitatMaterial()
         {
-            var tex = ViewLook.LoadTexture("RedHollowArt/hab-block-cladding")
+            var tex = ViewLook.LoadTexture("RedHollowArt/hab-block-wall")
+                ?? ViewLook.LoadTexture("RedHollowArt/hab-block-cladding")
                 ?? ViewLook.LoadTexture("RedHollowArt/colony-wall")
                 ?? ViewLook.LoadTexture("RedHollowArt/metal-floor-plate")
                 ?? ViewLook.LoadTexture("RedHollowArt/cavern-ground");

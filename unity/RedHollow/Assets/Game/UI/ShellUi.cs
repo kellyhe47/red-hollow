@@ -228,10 +228,16 @@ namespace RedHollow.Game.UI
             ui.HudPanel = new GameObject("HUD_TopBar", typeof(RectTransform));
             ui.HudPanel.transform.SetParent(canvasGo.transform, false);
             UiStyle.Anchor((RectTransform)ui.HudPanel.transform, 0f, 0.93f, 1f, 1f);
+            var hudFace = ui.HudPanel.AddComponent<Image>();
+            hudFace.color = UiStyle.PanelDark;
+            hudFace.raycastTarget = false;
 
             ui.SelfBar = new GameObject("HUD_SelfBar", typeof(RectTransform));
             ui.SelfBar.transform.SetParent(canvasGo.transform, false);
             UiStyle.Anchor((RectTransform)ui.SelfBar.transform, 0.01f, 0.17f, 0.2f, 0.25f);
+            var selfFace = ui.SelfBar.AddComponent<Image>();
+            selfFace.color = UiStyle.PanelDark;
+            selfFace.raycastTarget = false;
 
             ui.WaveLabel = NewLabel(ui.HudPanel, "WaveLabel", 18);
             ui.ScripLabel = NewLabel(ui.HudPanel, "ScripLabel", 18);

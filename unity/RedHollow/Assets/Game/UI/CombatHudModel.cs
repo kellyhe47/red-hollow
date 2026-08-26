@@ -128,6 +128,9 @@ namespace RedHollow.Game.UI
 
         public int Scrip => _match.State.Team.Scrip;
 
+        /// <summary>R-61 — civilians remaining, summed across every shelter.</summary>
+        public int Civilians => _match.State.TotalCivilians;
+
         public IReadOnlyList<HotspotReadout> Hotspots => _hotspots;
 
         // ---- self bar (R-61) ------------------------------------------------------------------

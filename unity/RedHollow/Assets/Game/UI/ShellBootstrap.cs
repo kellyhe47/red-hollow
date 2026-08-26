@@ -1257,10 +1257,13 @@ namespace RedHollow.Game.UI
             _ui.WaveLabel.text = "Wave "
                 + _hud.WaveNumber.ToString(CultureInfo.InvariantCulture)
                 + "/" + _hud.TotalWaves.ToString(CultureInfo.InvariantCulture);
-            _ui.ScripLabel.text = _hud.Scrip.ToString(CultureInfo.InvariantCulture);
-            _ui.HpLabel.text = ((int)_hud.Hp).ToString(CultureInfo.InvariantCulture);
-            _ui.MonstersRemainingLabel.text =
-                _hud.MonstersRemaining.ToString(CultureInfo.InvariantCulture);
+            _ui.ScripLabel.text = "Scrip "
+                + _hud.Scrip.ToString(CultureInfo.InvariantCulture)
+                + "  Civ "
+                + _hud.Civilians.ToString(CultureInfo.InvariantCulture);
+            _ui.HpLabel.text = "HP " + ((int)_hud.Hp).ToString(CultureInfo.InvariantCulture);
+            _ui.MonstersRemainingLabel.text = "Left "
+                + _hud.MonstersRemaining.ToString(CultureInfo.InvariantCulture);
 
             var hotspots = _hud.Hotspots;
             _ui.EnsureHotspotLabels(hotspots.Count);
