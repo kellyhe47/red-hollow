@@ -76,7 +76,11 @@ namespace RedHollow.Game.Net
             state.Status = MatchStatus.InProgress;
 
             var clock = new SimClock();
-            var sim = new MatchSim(state, _config, _profiles, clock, null) { ColonyMap = _map };
+            // Live barricades have to redirect the NEXT wave (R-16 / B-002). OpenPathOracle is a
+            // no-op, which is why a wall bought in planning used to be scenery: SelectTarget never
+            // heard it was in the way. Goldens keep DeclaredPathOracle via the fixture loader.
+            var pathOracle = new BarricadePathOracle(state);
+            var sim = new MatchSim(state, _config, _profiles, clock, pathOracle) { ColonyMap = _map };
 
             SeatTheParty(state, party);
 
