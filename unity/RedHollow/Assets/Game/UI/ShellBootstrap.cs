@@ -56,6 +56,12 @@ namespace RedHollow.Game.UI
         /// ticket 021 left null. Null means no local input (a headless shell / most tests).
         /// </summary>
         public IInputSource InputSource;
+
+        /// <summary>
+        /// Ticket 025 (T-25) — the combat action tunables (attack cadence, aim-line footprint).
+        /// Null means the shipped <see cref="CombatActionConfig"/> defaults.
+        /// </summary>
+        public CombatActionConfig CombatActions;
     }
 
     /// <summary>
@@ -263,6 +269,24 @@ namespace RedHollow.Game.UI
         /// is the one option with no offline default, because only a scene entry owns a device).
         /// </summary>
         public IInputSource Input => _input;
+
+        /// <summary>
+        /// Ticket 025 (T-25) — the combat action tunables this shell routes SPACE/Q/E with:
+        /// the <see cref="ShellBootstrapOptions.CombatActions"/> it was composed with, or the
+        /// shipped defaults when none was.
+        /// </summary>
+        public CombatActionConfig CombatActions =>
+            throw new NotImplementedException("T-25: combat action routing not implemented yet.");
+
+        /// <summary>
+        /// Ticket 025 (T-25) / R-31 / R-32 — the outcome of the most recent Q/E cast this shell's
+        /// pump issued for the local hero (null before the first press). The shell only issues the
+        /// command; cooldowns, locks and ranks stay sim-side, so an accepted cast and a rejection
+        /// (ability_locked, ability_cooling) both land here for the UI to surface — and a
+        /// rejection never breaks the pump.
+        /// </summary>
+        public AbilityCastOutcome LastAbilityOutcome =>
+            throw new NotImplementedException("T-25: combat action routing not implemented yet.");
 
         /// <summary>
         /// R-61 — the combat HUD model for the local account. Null until a match is live; rebuilt
