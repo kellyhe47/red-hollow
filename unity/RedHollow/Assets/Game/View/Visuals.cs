@@ -1,4 +1,5 @@
 using System;
+using RedHollow.Sim;
 using UnityEngine;
 
 namespace RedHollow.Game.View
@@ -110,7 +111,7 @@ namespace RedHollow.Game.View
         /// </summary>
         public VisualHandle Resolve(VisualClass visualClass, string artKey)
         {
-            var instance = CreatePlaceholder(visualClass);
+            var instance = CreatePlaceholder(visualClass, artKey);
 
             return new VisualHandle
             {
@@ -127,7 +128,7 @@ namespace RedHollow.Game.View
         /// permission to fail, so an engine that refuses a primitive still has to yield something
         /// with a <see cref="Renderer"/> on it.
         /// </summary>
-        private static GameObject CreatePlaceholder(VisualClass visualClass)
+        private static GameObject CreatePlaceholder(VisualClass visualClass, string artKey)
         {
             var name = "placeholder_" + visualClass.ToString().ToLowerInvariant();
 
@@ -140,9 +141,9 @@ namespace RedHollow.Game.View
 
                 var primitive = GameObject.CreatePrimitive(PrimitiveFor(visualClass));
                 primitive.name = name;
-                ScalePlaceholder(primitive, visualClass);
-                primitive.transform.localPosition = StandingOffsetFor(visualClass);
-                TintPlaceholder(primitive, visualClass);
+                ScalePlaceholder(primitive, visualClass, artKey);
+                primitive.transform.localPosition = StandingOffsetFor(visualClass, artKey);
+                TintPlaceholder(primitive, visualClass, artKey);
                 return primitive;
             }
             catch (Exception)
@@ -171,7 +172,7 @@ namespace RedHollow.Game.View
         /// Heroes/monsters are upright billboards (see <see cref="UnitBillboard"/>). Hotspot
         /// cubes are a fallback volume — MatchSceneBuilder dresses them as Mars habs.
         /// </summary>
-        private static void ScalePlaceholder(GameObject go, VisualClass visualClass)
+        private static void ScalePlaceholder(GameObject go, VisualClass visualClass, string artKey)
         {
             switch (visualClass)
             {
@@ -180,7 +181,18 @@ namespace RedHollow.Game.View
                     break;
 
                 case VisualClass.Placeable:
-                    go.transform.localScale = new Vector3(3.2f, 1.6f, 3.2f);
+                    if (artKey == PlaceableType.Barricade)
+                    {
+                        go.transform.localScale = new Vector3(4.6f, 2.4f, 1.4f);
+                    }
+                    else if (artKey == PlaceableType.Turret)
+                    {
+                        go.transform.localScale = new Vector3(1.8f, 3.4f, 1.8f);
+                    }
+                    else
+                    {
+                        go.transform.localScale = new Vector3(3.2f, 1.6f, 3.2f);
+                    }
                     break;
             }
         }
@@ -190,7 +202,7 @@ namespace RedHollow.Game.View
         /// Presentation only — every position assertion in this ticket is horizontal, and the
         /// vertical axis is the one <see cref="SimSpace"/> leaves free for exactly this.
         /// </summary>
-        private static Vector3 StandingOffsetFor(VisualClass visualClass)
+        private static Vector3 StandingOffsetFor(VisualClass visualClass, string artKey)
         {
             switch (visualClass)
             {
@@ -201,7 +213,14 @@ namespace RedHollow.Game.View
                     return new Vector3(0f, 4.25f, 0f);
 
                 case VisualClass.Placeable:
-                    // Cube height 1 * 1.6 scale.
+                    if (artKey == PlaceableType.Barricade)
+                    {
+                        return new Vector3(0f, 1.2f, 0f);
+                    }
+                    if (artKey == PlaceableType.Turret)
+                    {
+                        return new Vector3(0f, 1.7f, 0f);
+                    }
                     return new Vector3(0f, 0.8f, 0f);
 
                 default:
@@ -214,7 +233,7 @@ namespace RedHollow.Game.View
         /// the floor even with no lights. Default-Material is lit URP Lit — without a light it
         /// renders black, which is how a Play session became a void. T16 pins none of the colours.
         /// </summary>
-        private static void TintPlaceholder(GameObject go, VisualClass visualClass)
+        private static void TintPlaceholder(GameObject go, VisualClass visualClass, string artKey)
         {
             var renderer = go.GetComponent<Renderer>();
             if (renderer == null)
@@ -222,7 +241,7 @@ namespace RedHollow.Game.View
                 return;
             }
 
-            var color = ColorFor(visualClass);
+            var color = ColorFor(visualClass, artKey);
             var shader = Shader.Find("Universal Render Pipeline/Unlit");
             if (shader == null)
             {
@@ -260,7 +279,7 @@ namespace RedHollow.Game.View
             }
         }
 
-        private static Color ColorFor(VisualClass visualClass)
+        private static Color ColorFor(VisualClass visualClass, string artKey)
         {
             switch (visualClass)
             {
@@ -275,6 +294,29 @@ namespace RedHollow.Game.View
 
                 case VisualClass.Hotspot:
                     return new Color(0.72f, 0.42f, 0.18f);
+
+                case VisualClass.Placeable:
+                    if (artKey == PlaceableType.Barricade)
+                    {
+                        return new Color(0.62f, 0.38f, 0.16f);
+                    }
+                    if (artKey == PlaceableType.Turret)
+                    {
+                        return new Color(0.55f, 0.64f, 0.72f);
+                    }
+                    if (artKey == PlaceableType.SpikeTrap)
+                    {
+                        return new Color(0.72f, 0.28f, 0.14f);
+                    }
+                    if (artKey == PlaceableType.DynamiteTrap)
+                    {
+                        return new Color(0.80f, 0.22f, 0.14f);
+                    }
+                    if (artKey == PlaceableType.MedStation)
+                    {
+                        return new Color(0.42f, 0.72f, 0.40f);
+                    }
+                    return new Color(0.70f, 0.58f, 0.32f);
 
                 default:
                     return new Color(0.55f, 0.48f, 0.38f);
@@ -295,3 +337,4 @@ namespace RedHollow.Game.View
         }
     }
 }
+

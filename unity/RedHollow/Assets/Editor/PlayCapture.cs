@@ -30,12 +30,17 @@ namespace RedHollow.EditorTools
         private const string ProofPath = "/workspace/unity/shots/combat-proof.png";
         private const string WaveClearPath = "/workspace/unity/shots/wave1-clear.png";
         private const string Wave2Path = "/workspace/unity/shots/wave2.png";
+        private const string ShopPath = "/workspace/unity/shots/shop.png";
 
         private static double _enteredAt;
         private static bool _driving;
         private static bool _wave1Captured;
         private static bool _readySent;
         private static bool _wave2Captured;
+        private static bool _shopAttempted;
+        private static bool _shopShot;
+        private static double _planningSince;
+        private static readonly List<string> PurchaseLog = new List<string>();
         private static readonly StringBuilder Logs = new StringBuilder();
 
         static PlayCapture()
@@ -82,6 +87,10 @@ namespace RedHollow.EditorTools
                 _wave1Captured = false;
                 _readySent = false;
                 _wave2Captured = false;
+                _shopAttempted = false;
+                _shopShot = false;
+                _planningSince = 0;
+                PurchaseLog.Clear();
                 EditorApplication.isPlaying = true;
                 return;
             }
@@ -101,7 +110,7 @@ namespace RedHollow.EditorTools
             DriveCombatInput();
             DriveWaveProgression();
 
-            var timedOut = elapsed >= 22.0;
+            var timedOut = elapsed >= 32.0;
             // Wave-loop proof: stay in Play until wave 1 is cleared AND wave 2 combat
             // has spawned (or we time out). Combat-first opening is unchanged.
             if (!_wave2Captured && !timedOut)
@@ -191,9 +200,10 @@ namespace RedHollow.EditorTools
         }
 
         /// <summary>
-        /// After wave 1's last kill the sim is already in planning (R-02). Ready-up is the
-        /// R-03 early exit so the 60s planning timer does not block a wave-2 playtest — T21/T25/T12
-        /// still open matches in combat; this only fires once the campaign has advanced.
+        /// After wave 1's last kill the sim is already in planning (R-02). Buy from the
+        /// existing R-23 shop (planning-phase only, R-21) BEFORE Ready-up, so wave 2 opens
+        /// with standing defences. Ready-up remains the R-03 early exit so the 60s timer
+        /// does not block autoplay — T21/T25/T12 still open matches in combat.
         /// </summary>
         private static void DriveWaveProgression()
         {
@@ -210,14 +220,34 @@ namespace RedHollow.EditorTools
                 _wave1Captured = true;
             }
 
-            if (!_readySent
-                && match.State.Phase == MatchPhase.Planning
-                && match.State.Wave.Number >= 2
+            if (match.State.Phase == MatchPhase.Planning
+                && (_wave1Captured || match.State.Wave.Number >= 2)
                 && shell != null
                 && shell.Planning != null)
             {
-                shell.Planning.ReadyUp();
-                _readySent = true;
+                if (!_shopAttempted)
+                {
+                    DriveShopPurchases(shell, match);
+                    _planningSince = EditorApplication.timeSinceStartup;
+                }
+
+                var onPlanningUi = shell.Router != null
+                    && shell.Router.Screen == UiScreen.Planning;
+                if (!_shopShot && onPlanningUi)
+                {
+                    DumpCamera(Camera.main, ShopPath);
+                    _shopShot = true;
+                }
+
+                // Place-then-ready. Wait for the S3 shop bar (post-interstitial) when we can,
+                // but never hang autoplay if the router sticks on S5.
+                var waited = _planningSince > 0
+                    && (EditorApplication.timeSinceStartup - _planningSince) >= 5.0;
+                if (!_readySent && _shopAttempted && (_shopShot || waited))
+                {
+                    shell.Planning.ReadyUp();
+                    _readySent = true;
+                }
             }
 
             if (!_wave2Captured && Wave2Live(match))
@@ -226,6 +256,142 @@ namespace RedHollow.EditorTools
                 _wave2Captured = true;
             }
         }
+
+        /// <summary>
+        /// Drive the locked T-23 shop seam: one Barricade and one Turret (R-23 catalog rows)
+        /// on open colony ground. Falls back to a Spike if the turret is refused.
+        /// </summary>
+        private static void DriveShopPurchases(ShellBootstrap shell, HostedMatch match)
+        {
+            _shopAttempted = true;
+            shell.Planning.Refresh();
+
+            var oracle = ZoneOracleFor(match);
+            TryBuy(shell, match, oracle, PlaceableType.Barricade);
+            if (!TryBuy(shell, match, oracle, PlaceableType.Turret))
+            {
+                TryBuy(shell, match, oracle, PlaceableType.SpikeTrap);
+            }
+        }
+
+        private static PlacementZoneOracle ZoneOracleFor(HostedMatch match)
+        {
+            var map = match.Sim != null ? match.Sim.ColonyMap : ColonyMap.V1();
+            var oracle = new PlacementZoneOracle(map);
+            if (match.Sim != null)
+            {
+                oracle.HotspotBuildingRadius = match.Sim.HotspotBuildingRadius;
+                oracle.EntryTunnelMouthRadius = match.Sim.EntryTunnelMouthRadius;
+                oracle.PlaceableFootprintRadius = match.Sim.PlaceableFootprintRadius;
+            }
+
+            return oracle;
+        }
+
+        private static bool TryBuy(
+            ShellBootstrap shell,
+            HostedMatch match,
+            PlacementZoneOracle oracle,
+            string placeableType)
+        {
+            var planning = shell.Planning;
+            ShopItem item = null;
+            foreach (var candidate in planning.ShopItems)
+            {
+                if (candidate != null && candidate.Type == placeableType)
+                {
+                    item = candidate;
+                    break;
+                }
+            }
+
+            if (item == null)
+            {
+                PurchaseLog.Add("buy " + placeableType + " accepted=False reason=not_in_catalog");
+                return false;
+            }
+
+            if (!item.Affordable)
+            {
+                PurchaseLog.Add("buy " + placeableType + " accepted=False reason=insufficient_scrip cost="
+                    + item.Cost + " scrip=" + planning.Scrip);
+                return false;
+            }
+
+            var button = shell.Controls != null ? shell.Controls.ShopItemButton(placeableType) : null;
+            if (button != null)
+            {
+                button.onClick.Invoke();
+            }
+            else
+            {
+                planning.BeginPlacement(placeableType);
+            }
+
+            Vec2 pos;
+            if (!TryOpenGround(oracle, match.State, out pos))
+            {
+                planning.CancelPlacement();
+                PurchaseLog.Add("buy " + placeableType + " accepted=False reason=no_open_ground");
+                return false;
+            }
+
+            var zoneOk = oracle.WouldAccept(match.State, pos);
+            planning.MoveGhost(pos, zoneOk);
+            var result = planning.ConfirmPlacement();
+            var reason = result.RejectionReason ?? "";
+            PurchaseLog.Add("buy " + placeableType
+                + " accepted=" + result.Accepted
+                + " reason=" + reason
+                + " scripAfter=" + result.ScripAfter
+                + " pos=" + pos.X.ToString("0.00") + "," + pos.Y.ToString("0.00"));
+            return result.Accepted;
+        }
+
+        /// <summary>
+        /// West-choke first (wave 1 walked in from x=-30), then a coarse grid. Radii come from
+        /// the live sim via the T-24 oracle — never a second copy of R-24.
+        /// </summary>
+        private static bool TryOpenGround(PlacementZoneOracle oracle, MatchState state, out Vec2 pos)
+        {
+            var preferred = new[]
+            {
+                new Vec2(-20.0, 0.0),
+                new Vec2(-16.0, -4.0),
+                new Vec2(-18.0, 4.0),
+                new Vec2(-14.0, 2.0),
+                new Vec2(5.0, 0.0),
+                new Vec2(-8.0, -6.0),
+                new Vec2(8.0, -4.0),
+                new Vec2(0.0, 8.0),
+            };
+
+            for (var i = 0; i < preferred.Length; i++)
+            {
+                if (oracle.WouldAccept(state, preferred[i]))
+                {
+                    pos = preferred[i];
+                    return true;
+                }
+            }
+
+            for (var x = -24; x <= 24; x += 4)
+            {
+                for (var y = -24; y <= 24; y += 4)
+                {
+                    var candidate = new Vec2(x, y);
+                    if (oracle.WouldAccept(state, candidate))
+                    {
+                        pos = candidate;
+                        return true;
+                    }
+                }
+            }
+
+            pos = new Vec2(0.0, 0.0);
+            return false;
+        }
+
 
         private static Monster NearestLiving(MatchState state, Hero hero)
         {
@@ -361,6 +527,8 @@ namespace RedHollow.EditorTools
                     .Append(" exists=").Append(File.Exists(WaveClearPath)).Append('\n');
                 sb.Append("wave2Shot=").Append(Wave2Path)
                     .Append(" exists=").Append(File.Exists(Wave2Path)).Append('\n');
+                sb.Append("shopShot=").Append(ShopPath)
+                    .Append(" exists=").Append(File.Exists(ShopPath)).Append('\n');
                 try
                 {
                     CropHeroProof(cam, ProofPath);
@@ -439,7 +607,13 @@ namespace RedHollow.EditorTools
                 .Append(" scrip=").Append(state.Team.Scrip).Append('\n');
             sb.Append("wave1Captured=").Append(_wave1Captured)
                 .Append(" readySent=").Append(_readySent)
-                .Append(" wave2Captured=").Append(_wave2Captured).Append('\n');
+                .Append(" wave2Captured=").Append(_wave2Captured)
+                .Append(" shopAttempted=").Append(_shopAttempted)
+                .Append(" shopShot=").Append(_shopShot).Append('\n');
+            for (var i = 0; i < PurchaseLog.Count; i++)
+            {
+                sb.Append(PurchaseLog[i]).Append('\n');
+            }
             var shell = entry != null ? entry.Shell : null;
             if (shell != null && shell.Router != null)
             {
@@ -495,6 +669,39 @@ namespace RedHollow.EditorTools
 
                 sb.Append("hotspot ").Append(hotspot.Id)
                     .Append(" civ=").Append(hotspot.Civilians).Append('\n');
+            }
+
+            foreach (var placeable in state.Placeables.Values)
+            {
+                if (placeable == null)
+                {
+                    continue;
+                }
+
+                sb.Append("placeable ").Append(placeable.Id)
+                    .Append(" type=").Append(placeable.Type)
+                    .Append(" pos=").Append(placeable.Pos.X.ToString("0.00")).Append(",")
+                    .Append(placeable.Pos.Y.ToString("0.00"))
+                    .Append(" hp=").Append(placeable.Hp.ToString("0.0"))
+                    .Append(" exists=").Append(placeable.Exists).Append('\n');
+            }
+
+            var shellViews = entry != null && entry.Shell != null ? entry.Shell.Views : null;
+            if (shellViews != null)
+            {
+                sb.Append("boundPlaceables=").Append(shellViews.BoundPlaceableIds.Count).Append('\n');
+                foreach (var id in shellViews.BoundPlaceableIds)
+                {
+                    var pv = shellViews.PlaceableViewFor(id);
+                    sb.Append("placeableView ").Append(id);
+                    if (pv != null)
+                    {
+                        sb.Append(" world=").Append(pv.WorldPosition)
+                            .Append(" type=").Append(pv.Visual != null ? pv.Visual.ArtKey : "");
+                    }
+
+                    sb.Append('\n');
+                }
             }
 
             var markers = UnityEngine.Object.FindObjectsByType<HotspotMarkerView>(FindObjectsSortMode.None);
@@ -583,7 +790,8 @@ namespace RedHollow.EditorTools
 
             sb.Append("proofReady=").Append(CombatProofReady()).Append('\n');
             sb.Append("wave1Clear=").Append(_wave1Captured)
-                .Append(" wave2Live=").Append(_wave2Captured).Append('\n');
+                .Append(" wave2Live=").Append(_wave2Captured)
+                .Append(" shopPlaced=").Append(_shopAttempted).Append('\n');
         }
 
         private static void CropHeroProof(Camera camera, string path)
@@ -705,3 +913,4 @@ namespace RedHollow.EditorTools
     }
 }
 #endif
+
