@@ -70,6 +70,11 @@ namespace RedHollow.Game.View
             }
 
             visual.Instance.transform.SetParent(owner, false);
+            if (visual.Class == VisualClass.Hero || visual.Class == VisualClass.Monster)
+            {
+                visual.Instance.transform.localPosition = new Vector3(
+                    0f, CavernBlockout.DeckSurface, 0f);
+            }
         }
 
         /// <summary>

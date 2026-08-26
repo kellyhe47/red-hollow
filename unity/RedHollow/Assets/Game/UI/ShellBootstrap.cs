@@ -1476,8 +1476,8 @@ namespace RedHollow.Game.UI
             }
 
             cam.rotation = Quaternion.Euler(MatchSceneBuilder.CameraPitchDown, 0f, 0f);
-            _scene.Camera.orthographic = true;
-            _scene.Camera.orthographicSize = MatchSceneBuilder.StreetOrthoSize;
+            _scene.Camera.orthographic = false;
+            _scene.Camera.fieldOfView = MatchSceneBuilder.StreetFov;
         }
 
         /// <summary>
@@ -1526,12 +1526,12 @@ namespace RedHollow.Game.UI
                     var plane = GameObject.CreatePrimitive(PrimitiveType.Plane);
                     plane.name = name;
                     ViewLook.StripCollider(plane);
-                    var groundMat = ViewLook.Lit(new Color(0.82f, 0.58f, 0.38f), texture,
+                    var groundMat = ViewLook.Lit(new Color(0.40f, 0.24f, 0.14f), texture,
                         ViewLook.LoadTexture(resourcePath + "_normal"),
-                        smoothness: 0.12f);
+                        smoothness: 0.10f);
                     if (groundMat != null)
                     {
-                        ViewLook.SetTiling(groundMat, new Vector2(8f, 8f));
+                        ViewLook.SetTiling(groundMat, new Vector2(14f, 14f));
                         ViewLook.Paint(plane, groundMat);
                     }
 

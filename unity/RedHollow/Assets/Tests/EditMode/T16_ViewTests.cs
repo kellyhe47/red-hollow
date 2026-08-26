@@ -411,9 +411,10 @@ namespace RedHollow.Tests.EditMode
         }
 
         /// <summary>
-        /// R-30. The camera is a 3D top-down look: pitched ~60-70° down (isometric-ish) from
-        /// above the colony so habitat roofs and wall sides read. Straight-down hides every
-        /// vertical face, which is the failure this pins.
+        /// R-30. The camera is a 3D street-scale follow look: pitched ~58-62° down from
+        /// above the colony so habitat walls, roof slabs and deck thickness read.
+        /// Perspective, not ortho — an orthographic map-view made every hab a roof stamp.
+        /// Straight-down hides every vertical face, which is the failure this pins.
         /// </summary>
         [Test]
         public void The_built_scene_looks_straight_down_at_the_play_area()
@@ -423,12 +424,16 @@ namespace RedHollow.Tests.EditMode
 
             Assert.That(scene, Is.Not.Null, "the builder must hand back the scene it composed");
             Assert.That(scene.Camera, Is.Not.Null, "R-30: a top-down game needs a camera");
+            Assert.That(scene.Camera.orthographic, Is.False,
+                "R-30: the play camera is perspective so hab sides and deck thickness foreshorten");
+            Assert.That(scene.Camera.fieldOfView, Is.InRange(32f, 45f),
+                "street-scale FOV, not a whole-map lens; got " + scene.Camera.fieldOfView);
 
             var forward = scene.Camera.transform.forward.normalized;
             var downDot = Vector3.Dot(forward, Vector3.down);
-            // sin(60°)≈0.866, sin(70°)≈0.940 — isometric pitch, not 1.0 (straight down).
-            Assert.That(downDot, Is.InRange(0.85f, 0.95f),
-                "R-30: the camera pitches ~60-70 degrees down so building sides and roof edges "
+            // sin(58°)≈0.848, sin(62°)≈0.883 — isometric pitch, not 1.0 (straight down).
+            Assert.That(downDot, Is.InRange(0.82f, 0.92f),
+                "R-30: the camera pitches ~58-62 degrees down so building sides and roof edges "
                 + "read; got down-dot " + downDot);
             Assert.That(forward.z, Is.GreaterThan(0.2f),
                 "the camera looks into the cavern (+Z), not back at the near wall");

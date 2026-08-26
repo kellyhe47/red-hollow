@@ -32,6 +32,7 @@ namespace RedHollow.Game.View
             quad.transform.localScale = new Vector3(width, height, 1f);
             ViewLook.StripCollider(quad);
             ViewLook.Paint(quad, ViewLook.Unlit(tint));
+            PromoteReadOrder(quad.GetComponent<Renderer>());
             quad.AddComponent<BillboardFacing>();
 
             AttachBlobShadow(root.transform, width * 0.72f);
@@ -49,6 +50,7 @@ namespace RedHollow.Game.View
             spriteGo.transform.SetParent(root.transform, false);
             spriteGo.transform.localRotation = Quaternion.identity;
             spriteGo.transform.localPosition = new Vector3(0f, across * 0.5f, 0f);
+            PromoteReadOrder(spriteGo.GetComponent<Renderer>());
             if (spriteGo.GetComponent<BillboardFacing>() == null)
             {
                 spriteGo.AddComponent<BillboardFacing>();
@@ -56,6 +58,25 @@ namespace RedHollow.Game.View
 
             AttachBlobShadow(root.transform, Mathf.Max(1.6f, across * 0.55f));
             return root;
+        }
+
+        /// <summary>
+        /// Draw units after opaque habs so a 2.5D card wins nearby depth fights
+        /// without changing the camera. Sorting order is presentation only.
+        /// </summary>
+        public static void PromoteReadOrder(Renderer renderer)
+        {
+            if (renderer == null)
+            {
+                return;
+            }
+
+            renderer.sortingOrder = 40;
+            var sprite = renderer as SpriteRenderer;
+            if (sprite != null)
+            {
+                sprite.sortingOrder = 40;
+            }
         }
 
         public static void AttachBlobShadow(Transform owner, float radius)

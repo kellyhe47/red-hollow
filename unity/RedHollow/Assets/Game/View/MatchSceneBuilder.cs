@@ -48,16 +48,22 @@ namespace RedHollow.Game.View
     /// </summary>
     public static class MatchSceneBuilder
     {
-        /// <summary>How far above the colony floor the camera sits. Not a PRD number; see below.</summary>
-        public const float CameraHeight = 40f;
+        /// <summary>
+        /// How far above the colony floor the camera sits. Low enough that hab south
+        /// walls fill the frame under a 60° perspective look; 40 made every hab a roof stamp.
+        /// </summary>
+        public const float CameraHeight = 22f;
 
         /// <summary>
-        /// Pitch down from the horizon, degrees. ~60-70 is isometric-ish so roof edges and
-        /// building sides read; 90 would hide every vertical face.
+        /// Pitch down from the horizon, degrees. ~58-62 so roof edges AND wall sides read;
+        /// 90 would hide every vertical face.
         /// </summary>
-        public const float CameraPitchDown = 62f;
+        public const float CameraPitchDown = 60f;
 
-        /// <summary>World units of breathing room around the colony, so nothing sits on the frame edge.</summary>
+        /// <summary>Vertical FOV for the street-scale follow cam. Ortho is retired.</summary>
+        public const float StreetFov = 38f;
+
+        /// <summary>Legacy name kept so older callers compile; no longer drives the view.</summary>
         public const float StreetOrthoSize = 10f;
 
         /// <summary>World offset from the followed ground point to the camera eye.</summary>
@@ -77,8 +83,8 @@ namespace RedHollow.Game.View
                 return;
             }
 
-            camera.orthographic = true;
-            camera.orthographicSize = StreetOrthoSize;
+            camera.orthographic = false;
+            camera.fieldOfView = StreetFov;
             camera.transform.position = lookAt + FollowOffset;
             camera.transform.rotation = Quaternion.Euler(CameraPitchDown, 0f, 0f);
         }
@@ -97,8 +103,12 @@ namespace RedHollow.Game.View
         /// <summary>Warm brown haze — dust under lamplight, never a blue night mist.</summary>
         private static readonly Color FogDust = new Color(0.46f, 0.26f, 0.12f);
 
-        /// <summary>Near-black umber ambient: dark, warm, and a color — never daylight.</summary>
-        private static readonly Color AmbientUmber = new Color(0.24f, 0.16f, 0.08f);
+        /// <summary>
+        /// Warm umber fill. Street-mast lanterns sit below the roof plane so Lambert on a
+        /// +Y face is zero; ambient is the floor that keeps roofs and alley gaps readable
+        /// umber instead of void-black. Still far under daylight.
+        /// </summary>
+        private static readonly Color AmbientUmber = new Color(0.40f, 0.27f, 0.14f);
 
         /// <summary>
         /// Compose the scene the session is played in: a tilted top-down camera, the colony floor,
@@ -187,13 +197,10 @@ namespace RedHollow.Game.View
         }
 
         /// <summary>
-        /// R-30 — a 3D top-down look: the camera sits at <see cref="CameraHeight"/> over the
-        /// play area and pitches ~60-70° down (isometric-ish) so habitat roofs, wall thickness
-        /// and gantries read. Straight-down hides every vertical face.
-        ///
-        /// Orthographic, sized from the map, because a colony-defence read is about relative
-        /// distance — which shelter a wave is closer to — and perspective makes the same gap
-        /// read differently at the frame edge than at the centre.
+        /// R-30 — a 3D street-scale follow look: the camera sits at <see cref="CameraHeight"/>
+        /// over the followed ground point and pitches ~60° down so habitat walls, roof slabs
+        /// and deck thickness read. Perspective (not ortho) is the depth cue; a map-sized
+        /// ortho made every hab a roof stamp. Straight-down hides every vertical face.
         /// </summary>
         private static Camera BuildCamera(Transform root, Bounds playArea)
         {
@@ -201,10 +208,10 @@ namespace RedHollow.Game.View
             go.transform.SetParent(root, false);
 
             var camera = go.AddComponent<Camera>();
-            camera.orthographic = true;
-            camera.orthographicSize = StreetOrthoSize;
+            camera.orthographic = false;
+            camera.fieldOfView = StreetFov;
             camera.nearClipPlane = 0.3f;
-            camera.farClipPlane = 400f;
+            camera.farClipPlane = 280f;
 
             // Play-mode Game view: tag + solid cavern clear makes this the Game camera.
             go.tag = "MainCamera";
@@ -222,7 +229,7 @@ namespace RedHollow.Game.View
 
             urp.renderType = CameraRenderType.Base;
 
-            // Street-scale follow cam: a neighborhood, not the whole board.
+            // Street-scale perspective follow cam: a neighborhood, not the whole board.
             PlaceOver(camera, new Vector3(playArea.center.x, SimSpace.GroundHeight, playArea.center.z));
 
             return camera;
@@ -312,14 +319,23 @@ namespace RedHollow.Game.View
 
         /// <summary>
         /// Street-mast height. High lamps (y=16+) left umber holes between habs because
-        /// inverse-square died before the floor; keep the pool on the pavement.
+        /// inverse-square died before the floor; keep this layer's pool on the pavement.
         /// </summary>
         private const float ClusterLanternHeight = 8f;
 
         /// <summary>Sphere radius from the cluster lamp; must clear height plus a street radius.</summary>
-        private const float ClusterLanternRange = 24f;
+        private const float ClusterLanternRange = 26f;
 
-        /// <summary>Spawn / shelter keys hang over open courtyards, below the 4-story peak.</summary>
+        /// <summary>
+        /// Roof-graze height. 4-story stacks peak ~y=25; sit above that so N·L on the roof
+        /// plane is positive, with enough range to still kiss the street.
+        /// </summary>
+        private const float RoofLanternHeight = 28f;
+
+        /// <summary>Sphere radius from a roof lamp: 28 down to the floor plus a street pool.</summary>
+        private const float RoofLanternRange = 46f;
+
+        /// <summary>Spawn / shelter keys hang over open courtyards, just above 4-story peak.</summary>
         private const float KeyLanternHeight = 28f;
 
         /// <summary>
@@ -362,6 +378,24 @@ namespace RedHollow.Game.View
                     AddLantern(root, "Lantern_Fill_" + n, new Vec2(x, z), ClusterLanternHeight,
                         amber, ClusterLanternRange, 220f, LightShadows.None);
                     n++;
+                }
+            }
+
+            // Sparse high cluster: a few lamps above the roof plane so hab tops and
+            // alley gaps get amber, not only the pavement immediately under a mast.
+            var r = 0;
+            for (var x = -32; x <= 32; x += 32)
+            {
+                for (var z = -32; z <= 32; z += 32)
+                {
+                    if (x == 0 && z == 0)
+                    {
+                        continue;
+                    }
+
+                    AddLantern(root, "Lantern_Roof_" + r, new Vec2(x, z), RoofLanternHeight,
+                        amber, RoofLanternRange, 180f, LightShadows.None);
+                    r++;
                 }
             }
         }
