@@ -215,10 +215,39 @@ namespace RedHollow.Game.View
                 new Vector3(1.6f, 1.1f, 0.08f),
                 glow);
 
+            PinFacade(hab.transform, hotspotId, rot);
+
             if (civilians > 0)
             {
                 RaiseCivilianHuddle(hab.transform, civilians, 2.4f);
             }
+        }
+
+        /// <summary>
+        /// Authored hab front on the camera-facing (south) rim. Missing art is a no-op so the
+        /// placeholder build stays shippable (R-15).
+        /// </summary>
+        private static void PinFacade(Transform hab, string hotspotId, Quaternion rot)
+        {
+            var resource = hotspotId == "hs_chapel" ? "RedHollowArt/chapel-hab-facade"
+                : hotspotId == "hs_homestead" ? "RedHollowArt/homestead-hab-facade"
+                : "RedHollowArt/saloon-hab-facade";
+            var tex = ViewLook.LoadTexture(resource);
+            if (tex == null)
+            {
+                return;
+            }
+
+            var mat = ViewLook.Unlit(Color.white, tex);
+            var front = rot * new Vector3(0.2f, 0f, -6.9f);
+            var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            quad.name = "Facade";
+            quad.transform.SetParent(hab, false);
+            quad.transform.localPosition = new Vector3(front.x, 4.6f, front.z);
+            quad.transform.localRotation = rot * Quaternion.Euler(0f, 180f, 0f);
+            quad.transform.localScale = new Vector3(10f, 9f, 1f);
+            ViewLook.StripCollider(quad);
+            ViewLook.Paint(quad, mat);
         }
 
         /// <summary>

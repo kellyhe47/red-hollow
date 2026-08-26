@@ -34,6 +34,8 @@ namespace RedHollow.EditorTools
         private const string ShopPath = "/workspace/unity/shots/shop.png";
         private const string TurretShotPath = "/workspace/unity/shots/turret-shot.png";
         private const string TurretLastHitPath = "/workspace/unity/shots/turret-lasthit.png";
+        private const string EndShotPath = "/workspace/unity/shots/wave10-end.png";
+        private const double MatchTimeoutSeconds = 240.0;
 
         private static double _enteredAt;
         private static bool _driving;
@@ -48,6 +50,8 @@ namespace RedHollow.EditorTools
         private static bool _proofPhaseDone;
         private static bool _wave3Captured;
         private static int _readiedWave;
+        private static int _shoppedWave;
+        private static int _furthestWave;
         private static double _wave2CombatSince;
         private static readonly Dictionary<string, double> Wave2HpAtHold = new Dictionary<string, double>();
         private static string _turretProofLine = "";
@@ -111,6 +115,8 @@ namespace RedHollow.EditorTools
                 _proofPhaseDone = false;
                 _wave3Captured = false;
                 _readiedWave = 0;
+                _shoppedWave = 0;
+                _furthestWave = 0;
                 _wave2CombatSince = 0;
                 Wave2HpAtHold.Clear();
                 _turretProofLine = "";
@@ -145,16 +151,16 @@ namespace RedHollow.EditorTools
             DriveCombatInput();
             DriveWaveProgression();
 
-            var timedOut = elapsed >= 95.0;
+            var timedOut = elapsed >= MatchTimeoutSeconds;
+            var matchOver = MatchIsOver();
             // Stay in Play until a turret LAST-HIT is reaped (HP to 0 + roster/bounty)
-            // with SPACE released, or we time out. Linger after that so autoplay can
-            // keep Ready-up / SPACE through later waves.
+            // with SPACE released. After that, keep driving until victory, defeat, or timeout.
             if (!timedOut && !_proofPhaseDone)
             {
                 return;
             }
 
-            if (!timedOut && elapsed < 80.0)
+            if (!timedOut && !matchOver)
             {
                 return;
             }
@@ -263,6 +269,11 @@ namespace RedHollow.EditorTools
                 return;
             }
 
+            if (match.State.Wave != null && match.State.Wave.Number > _furthestWave)
+            {
+                _furthestWave = match.State.Wave.Number;
+            }
+
             if (!_wave1Captured && Wave1Cleared(match))
             {
                 DumpCamera(Camera.main, WaveClearPath);
@@ -274,10 +285,14 @@ namespace RedHollow.EditorTools
                 && shell != null
                 && shell.Planning != null)
             {
-                if (!_shopAttempted)
+                if (_shoppedWave != match.State.Wave.Number)
                 {
                     DriveShopPurchases(shell, match);
+                    _shoppedWave = match.State.Wave.Number;
                     _planningSince = EditorApplication.timeSinceStartup;
+                    PurchaseLog.Add("shopped planning-wave=" + match.State.Wave.Number
+                        + " scrip=" + match.State.Team.Scrip
+                        + " placeables=" + match.State.PlaceableCount);
                 }
 
                 var onPlanningUi = shell.Router != null
@@ -288,16 +303,23 @@ namespace RedHollow.EditorTools
                     _shopShot = true;
                 }
 
-                // Place-then-ready. Wait for the S3 shop bar (post-interstitial) when we can,
-                // but never hang autoplay if the router sticks on S5.
+                // Place-then-ready. Short settle so the S3 shop bar can paint; never hang
+                // autoplay if the router sticks on S5.
                 var waited = _planningSince > 0
-                    && (EditorApplication.timeSinceStartup - _planningSince) >= 5.0;
-                if (!_readySent && _shopAttempted && (_shopShot || waited))
+                    && (EditorApplication.timeSinceStartup - _planningSince) >= 1.5;
+                if (_shoppedWave == match.State.Wave.Number
+                    && _readiedWave != match.State.Wave.Number
+                    && (_shopShot || waited))
                 {
                     shell.Planning.ReadyUp();
                     _readySent = true;
+                    if (match.State.Wave.Number <= 2)
+                    {
+                        _holdFire = true;
+                    }
+
                     _readiedWave = match.State.Wave.Number;
-                    _holdFire = true;
+                    PurchaseLog.Add("ready-up wave=" + match.State.Wave.Number);
                 }
             }
 
@@ -346,18 +368,6 @@ namespace RedHollow.EditorTools
                     _holdFire = false;
                     _proofPhaseDone = true;
                 }
-            }
-
-            if (_wave2Captured
-                && match.State.Phase == MatchPhase.Planning
-                && match.State.Wave.Number >= 3
-                && shell != null
-                && shell.Planning != null
-                && _readiedWave != match.State.Wave.Number)
-            {
-                shell.Planning.ReadyUp();
-                _readiedWave = match.State.Wave.Number;
-                PurchaseLog.Add("ready-up wave=" + match.State.Wave.Number);
             }
 
             if (!_wave3Captured
@@ -494,19 +504,38 @@ namespace RedHollow.EditorTools
         }
 
         /// <summary>
-        /// Drive the locked T-23 shop seam: one Barricade and one Turret (R-23 catalog rows)
-        /// on open colony ground. Falls back to a Spike if the turret is refused.
+        /// Drive the locked T-23 shop seam every planning phase. Spend leftover scrip on more
+        /// than one barricade and turret (spikes/dynamite too) so later waves cannot walk every
+        /// civilian down. Catalog rows only — never an invented placeable.
         /// </summary>
         private static void DriveShopPurchases(ShellBootstrap shell, HostedMatch match)
         {
             _shopAttempted = true;
-            shell.Planning.Refresh();
-
             var oracle = ZoneOracleFor(match);
-            TryBuy(shell, match, oracle, PlaceableType.Barricade);
-            if (!TryBuy(shell, match, oracle, PlaceableType.Turret))
+            var cart = new[]
             {
-                TryBuy(shell, match, oracle, PlaceableType.SpikeTrap);
+                PlaceableType.Barricade, PlaceableType.Barricade,
+                PlaceableType.Barricade, PlaceableType.Barricade,
+                PlaceableType.Turret, PlaceableType.Turret,
+                PlaceableType.SpikeTrap, PlaceableType.SpikeTrap,
+                PlaceableType.SpikeTrap, PlaceableType.SpikeTrap,
+                PlaceableType.DynamiteTrap, PlaceableType.DynamiteTrap,
+                PlaceableType.Barricade, PlaceableType.Barricade,
+                PlaceableType.Turret,
+                PlaceableType.MedStation,
+            };
+
+            for (var i = 0; i < cart.Length; i++)
+            {
+                shell.Planning.Refresh();
+                var type = cart[i];
+                var stats = match.Sim != null ? match.Sim.Config.Placeables.TryGet(type) : null;
+                if (stats != null && match.State.Team.Scrip < stats.Cost)
+                {
+                    continue;
+                }
+
+                TryBuy(shell, match, oracle, type);
             }
         }
 
@@ -565,7 +594,7 @@ namespace RedHollow.EditorTools
             }
 
             Vec2 pos;
-            if (!TryOpenGround(oracle, match.State, out pos))
+            if (!TryOpenGround(oracle, match.State, placeableType, out pos))
             {
                 planning.CancelPlacement();
                 PurchaseLog.Add("buy " + placeableType + " accepted=False reason=no_open_ground");
@@ -585,23 +614,14 @@ namespace RedHollow.EditorTools
         }
 
         /// <summary>
-        /// West-choke first (wave 1 walked in from x=-30), then a coarse grid. Radii come from
-        /// the live sim via the T-24 oracle — never a second copy of R-24.
+        /// Lane-on-path first so a wall actually crosses the next wave's walk (west/east/north/
+        /// south tunnels → nearest shelter). Radii come from the live sim via the T-24 oracle —
+        /// never a second copy of R-24.
         /// </summary>
-        private static bool TryOpenGround(PlacementZoneOracle oracle, MatchState state, out Vec2 pos)
+        private static bool TryOpenGround(
+            PlacementZoneOracle oracle, MatchState state, string placeableType, out Vec2 pos)
         {
-            var preferred = new[]
-            {
-                new Vec2(-20.0, 0.0),
-                new Vec2(-16.0, 0.0),
-                new Vec2(-18.0, 4.0),
-                new Vec2(-14.0, 2.0),
-                new Vec2(5.0, 0.0),
-                new Vec2(-8.0, -6.0),
-                new Vec2(8.0, -4.0),
-                new Vec2(0.0, 8.0),
-            };
-
+            var preferred = PreferredGround(placeableType);
             for (var i = 0; i < preferred.Length; i++)
             {
                 if (oracle.WouldAccept(state, preferred[i]))
@@ -626,6 +646,69 @@ namespace RedHollow.EditorTools
 
             pos = new Vec2(0.0, 0.0);
             return false;
+        }
+
+        /// <summary>
+        /// Points sit on (or cover) the four v1 tunnel→shelter walks. Computed from ColonyMap.V1
+        /// tunnels and hotspot positions: west (-30,0)→saloon, east (30,0)→chapel,
+        /// north (0,30)→chapel, south (0,-30)→homestead.
+        /// </summary>
+        private static Vec2[] PreferredGround(string placeableType)
+        {
+            if (placeableType == PlaceableType.Barricade)
+            {
+                return new[]
+                {
+                    new Vec2(-22.8, 2.4),
+                    new Vec2(22.4, 3.6),
+                    new Vec2(4.4, 21.6),
+                    new Vec2(0.8, -23.2),
+                    new Vec2(-19.56, 3.48),
+                    new Vec2(18.98, 5.22),
+                    new Vec2(6.38, 17.82),
+                    new Vec2(1.16, -20.14),
+                    new Vec2(-16.5, 4.5),
+                    new Vec2(15.75, 6.75),
+                };
+            }
+
+            if (placeableType == PlaceableType.Turret)
+            {
+                return new[]
+                {
+                    new Vec2(-18.0, 0.5),
+                    new Vec2(18.0, 0.5),
+                    new Vec2(0.0, 16.0),
+                    new Vec2(4.5, -18.0),
+                    new Vec2(-12.0, 0.0),
+                    new Vec2(12.0, 2.0),
+                    new Vec2(8.0, 12.0),
+                };
+            }
+
+            if (placeableType == PlaceableType.SpikeTrap
+                || placeableType == PlaceableType.DynamiteTrap)
+            {
+                return new[]
+                {
+                    new Vec2(-26.04, 1.32),
+                    new Vec2(25.82, 1.98),
+                    new Vec2(2.42, 25.38),
+                    new Vec2(0.44, -26.26),
+                    new Vec2(-16.5, 4.5),
+                    new Vec2(15.75, 6.75),
+                    new Vec2(8.25, 14.25),
+                    new Vec2(1.5, -17.25),
+                };
+            }
+
+            return new[]
+            {
+                new Vec2(6.0, 0.0),
+                new Vec2(-6.0, -5.0),
+                new Vec2(8.0, -4.0),
+                new Vec2(0.0, 8.0),
+            };
         }
 
 
@@ -674,6 +757,12 @@ namespace RedHollow.EditorTools
             return match.State.Phase == MatchPhase.Combat
                 && match.State.Wave.Number >= 2
                 && match.State.Wave.LivingMonsterIds.Count > 0;
+        }
+
+        private static bool MatchIsOver()
+        {
+            var match = LiveMatch();
+            return match != null && match.State != null && match.State.IsOver;
         }
 
         private static ShellBootstrap LiveShell()
@@ -769,6 +858,8 @@ namespace RedHollow.EditorTools
                     .Append(" exists=").Append(File.Exists(TurretShotPath)).Append('\n');
                 sb.Append("turretLastHitShot=").Append(TurretLastHitPath)
                     .Append(" exists=").Append(File.Exists(TurretLastHitPath)).Append('\n');
+                DumpCamera(cam, EndShotPath);
+                sb.Append("endShot=").Append(EndShotPath).Append('\n');
                 try
                 {
                     CropHeroProof(cam, ProofPath);
@@ -845,11 +936,33 @@ namespace RedHollow.EditorTools
                 .Append(" livingMonsters=").Append(state.Wave.LivingMonsterIds.Count)
                 .Append(" placeables=").Append(state.PlaceableCount)
                 .Append(" scrip=").Append(state.Team.Scrip).Append('\n');
+            var chewing = 0;
+            foreach (var monster in state.Monsters.Values)
+            {
+                if (monster == null || !monster.Alive || string.IsNullOrEmpty(monster.TargetId))
+                {
+                    continue;
+                }
+
+                Placeable wall;
+                if (state.Placeables.TryGetValue(monster.TargetId, out wall)
+                    && wall != null
+                    && wall.Exists
+                    && wall.IsBarricade)
+                {
+                    chewing++;
+                }
+            }
+
+            sb.Append("chewingBarricades=").Append(chewing)
+                .Append(" pathOracle=BarricadePathOracle").Append('\n');
             sb.Append("wave1Captured=").Append(_wave1Captured)
                 .Append(" readySent=").Append(_readySent)
                 .Append(" wave2Captured=").Append(_wave2Captured)
                 .Append(" shopAttempted=").Append(_shopAttempted)
-                .Append(" shopShot=").Append(_shopShot).Append('\n');
+                .Append(" shopShot=").Append(_shopShot)
+                .Append(" furthestWave=").Append(_furthestWave)
+                .Append(" shoppedWave=").Append(_shoppedWave).Append('\n');
             var deadInSim = 0;
             foreach (var m in state.Monsters.Values)
             {
