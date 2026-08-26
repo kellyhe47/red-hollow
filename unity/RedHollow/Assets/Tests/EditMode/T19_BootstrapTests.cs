@@ -535,8 +535,30 @@ namespace RedHollow.Tests.EditMode
 
             session.Step(Step60Hz);
 
-            Assert.That(victim.Hp, Is.EqualTo(hpBefore - match.Config.Placeables.StatsFor(PlaceableType.Turret).Damage).Within(SimTolerance),
+            var turretDamage = match.Config.Placeables.StatsFor(PlaceableType.Turret).Damage;
+            Assert.That(victim.Hp, Is.EqualTo(hpBefore - turretDamage).Within(SimTolerance),
                 "R-23: the first combat step fires every standing turret at the nearest monster in range");
+
+            // 1 Hz, not 60 Hz: half a second more must not be a second volley, or 20 DPS becomes
+            // 1200 and the catalog row is fiction.
+            var afterFirst = victim.Hp;
+            var halfSecond = (int)Math.Round(0.5 / Step60Hz);
+            for (var i = 0; i < halfSecond; i++)
+            {
+                session.Step(Step60Hz);
+            }
+
+            Assert.That(victim.Hp, Is.EqualTo(afterFirst).Within(SimTolerance),
+                "R-23: turrets fire at 1 Hz (20 DPS); a second shot inside 0.5s is a per-frame melt");
+
+            var untilSecond = (int)Math.Round(0.6 / Step60Hz);
+            for (var i = 0; i < untilSecond; i++)
+            {
+                session.Step(Step60Hz);
+            }
+
+            Assert.That(victim.Hp, Is.EqualTo(afterFirst - turretDamage).Within(SimTolerance),
+                "R-23: the next volley lands about one sim-second after the first");
         }
 
         /// <summary>
