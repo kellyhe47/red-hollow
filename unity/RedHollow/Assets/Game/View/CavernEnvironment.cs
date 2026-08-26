@@ -42,6 +42,11 @@ namespace RedHollow.Game.View
             var roof = TopDownArt.LitMaterial(Roof, 0.14f);
             var glow = TopDownArt.EmissiveMaterial(AmberGlow, 3.5f);
 
+            // Cavern-ground tile wraps the rock meshes (UVs), never as a floor quad.
+            var cavernAlbedo = Resources.Load<Texture2D>("RedHollowArt/cavern-ground");
+            TopDownArt.BindAlbedo(rock, cavernAlbedo, 5f);
+            TopDownArt.BindAlbedo(rockDeep, cavernAlbedo, 7f);
+
             var half = coverSpan * 0.5f;
             LayRockFloor(ground.transform, half, rock, rockDeep);
             RaiseCliffs(ground.transform, half, rockDeep);

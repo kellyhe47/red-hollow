@@ -85,7 +85,7 @@ config.
 | 010 | R-50, R-52 | `HostLoop`, `ISimHost`/`MatchSimHost`, `PartyRoster`, R-52 seams, **the Cecil invariant** |
 | 011 | R-07, R-53, R-55 | `NetSession`, loopback transport, 10-wave match, rematch, disconnect, non-pausing ESC |
 | 015 | R-18 | **Monster attack cadence** (`TryMonsterAttack`) |
-| 016 | R-30 | Scene, top-down camera, WASD + mouse-aim input, placeholder visuals |
+| 016 | R-30 | Scene, tilted isometric camera (~60–70° down), WASD + mouse-aim input, placeholder visuals |
 | 017 | — | **Wave spawning** (`SpawnWave`) |
 | 018 | — | **Hero and monster movement** (`TickMonsterMovement`, `MoveHero`) |
 | 019 | — | The playable bootstrap — spawn → target → move → gate → damage → defeat |
@@ -207,10 +207,14 @@ probe** for an asset before falling back — a probe is a code path that can ans
 is where blocking-on-art creeps in. **Chain a real resolver in FRONT of it**; do not teach it to
 look.
 
-R-15 "Lantern Deep" is carried primarily by **Unity scene lighting** — dark warm ambient, amber
-point lights, volumetric fog, rock-dome mesh as sky — over painterly-matte albedo. **URP 17.5.0 is
-the active pipeline** (adopted deliberately for exactly this; see the git log for 010). Read
-`docs/comfy-prompts/00-shared-style.md` before touching visuals.
+**R-15 / DEC-026 presentation:** art-to-scene means a **3D Lykos cavern** (stacked colony meshes,
+rock walls, lift shaft), a **tilted isometric camera (~60–70° down)**, and **2D standing-card**
+heroes/monsters — not a 2D tilemap, not a western main street, not sculpted character models.
+Lantern Deep lighting still holds: dark warm ambient, amber **point** lights, volumetric fog,
+rock-dome mesh as sky; **no sun / directional golden-hour**. **URP 17.5.0 is the active pipeline**
+(adopted deliberately for exactly this; see the git log for 010). Read
+`docs/comfy-prompts/00-shared-style.md` before touching visuals. Environment Comfy tiles are
+albedo/normal/AO for those 3D meshes.
 
 R-64 feel targets hang off these sim events: `monster_damaged`, `hero_damaged`, `hero_died`,
 `hero_respawned`, `civilians_killed`, `hotspot_emptied`, `placeable_created`,

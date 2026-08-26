@@ -150,6 +150,8 @@ namespace RedHollow.Game.Art
             var rock = TopDownArt.LitMaterial(new Color(0.12f, 0.07f, 0.04f), 0.05f);
             if (rock != null)
             {
+                TopDownArt.BindAlbedo(
+                    rock, Resources.Load<Texture2D>("RedHollowArt/cavern-ground"), 8f);
                 TopDownArt.PaintLit(dome, rock);
                 foreach (var renderer in dome.GetComponentsInChildren<Renderer>(true))
                 {

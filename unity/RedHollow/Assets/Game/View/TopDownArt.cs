@@ -184,6 +184,20 @@ namespace RedHollow.Game.View
             return material;
         }
 
+        /// <summary>
+        /// Wrap a Comfy tile as albedo on a Lit mesh material (DEC-026: tiles are UV maps,
+        /// not a 2D tilemap). Safe no-op when the texture is missing.
+        /// </summary>
+        internal static void BindAlbedo(Material material, Texture texture, float tiles)
+        {
+            if (material == null || texture == null)
+            {
+                return;
+            }
+
+            ApplyTexture(material, texture, tiles);
+        }
+
         /// <summary>Window / shaft glow — does not consume the URP additional-light budget.</summary>
         internal static Material EmissiveMaterial(Color color, float intensity)
         {
