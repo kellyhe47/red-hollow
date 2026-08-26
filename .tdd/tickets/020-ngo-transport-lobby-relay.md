@@ -1,7 +1,7 @@
 ---
 id: 020
 title: Real networking — NGO transport, Unity Lobby and Relay
-status: pending
+status: awaiting-owner-handcheck (code green; two-machine verification is the owner's)
 depends_on: [011]
 touches: [unity/RedHollow/Assets/Game/Net/]
 iterations: 0
@@ -21,8 +21,8 @@ with no UGS id configured.
 
 ## Acceptance criteria
 
-- [ ] `INetTransport` implemented over NGO 2.13.2 + Lobby + Relay behind the existing seam
-- [ ] loopback transport still works with no UGS id configured
+- [x] `INetTransport` implemented over NGO 2.13.2 + Lobby + Relay behind the existing seam
+- [x] loopback transport still works with no UGS id configured (pinned: zero service calls)
 - [ ] a 2-player co-op session across two real machines completes a 10-wave match — victory,
       defeat and rematch exercised (hand-verified; DoD item 3's real-transport half)
 
@@ -95,8 +95,15 @@ demanded anywhere.
 
 ## Attempt log
 
-_(created 2026-08-25 by the handoff-2 orchestrator; the two-machine hand-verification
-needs the owner — flag before starting.)_
+_(created 2026-08-25 by the handoff-2 orchestrator.)_
+
+- 2026-08-25 orchestration + real adapters green: EditMode 165/165, dotnet 371/371
+  (orchestrator-verified). Red was 11/11 NotImplementedException.
+- OWNER HAND-CHECK REQUIRED (third criterion): two machines, 10-wave match, victory/defeat/
+  rematch. Before testing: the shell must call NgoWire.SetLocalPeerId on both machines before
+  starting the wire, and pump NgoNetTransport.Tick for lobby heartbeats. Known caveats:
+  UGS calls block the main thread for their latency (desktop-acceptable, WebGL would deadlock —
+  not a v1 target); relay adapter prefers the dtls endpoint.
 
 ## Handoff notes
 
