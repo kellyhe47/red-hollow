@@ -194,6 +194,19 @@ namespace RedHollow.Game.UI
         public Button PlanningReadyButton { get; }
 
         /// <summary>
+        /// Ticket 027 (T-27) — the placement ghost's on-screen visual: a <see cref="Graphic"/>
+        /// under the Planning screen root, active exactly while
+        /// <see cref="PlanningScreenModel.GhostActive"/>, and tinted differently while
+        /// <see cref="PlanningScreenModel.GhostInvalid"/> (the wireframe's "invalid zones tint
+        /// red") than while the hovered zone is valid. The ghost was model-state only until the
+        /// owner's Play test showed nothing on screen.
+        /// </summary>
+        public Graphic GhostVisual
+        {
+            get { throw new System.NotImplementedException("T27: ghost visual"); }
+        }
+
+        /// <summary>
         /// The cursor moved over the ground: while a ghost is up this is
         /// <see cref="PlanningScreenModel.MoveGhost"/>. Zone validity is the caller's answer —
         /// resolving it from geometry is the play-mode raycaster's job.
