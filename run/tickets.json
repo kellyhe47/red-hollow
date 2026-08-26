@@ -543,6 +543,22 @@
         "sold, broken and destroyed placeables disappear; distinct events remain distinct for feel",
         "a damaged barricade shows a damage readout driven by sim state; Cecil invariant holds"
       ]
+    },
+    {
+      "id": "T-27",
+      "title": "Visible, clickable UI \u2014 fonts, graphics and layout for the real player",
+      "owns_requirements": [],
+      "grades_fixtures": [],
+      "depends_on": [
+        "T-26"
+      ],
+      "scope": "Owner pressed Play: shell boots (hierarchy correct) but the screen shows only the cavern \u2014 the UI is invisible. Root cause: ShellUi/ShellControls create Text with no Font (Unity 6 has no implicit default; renders nothing) and Buttons with no Graphic (invisible AND unclickable \u2014 uGUI raycasts need a Graphic). EditMode tests graded text values and invoked onClick directly, so pixels were never pinned. Adds the visible-presentation contract: every Text has a font, size and color; every Button a raycastable background Image; screen roots and labels non-degenerate rects laid out per wireframe regions; CanvasScaler configured.",
+      "acceptance": [
+        "every uGUI Text in the shell has a non-null font, a readable size and a non-degenerate rect",
+        "every Button has an enabled raycastable Graphic; the ghost/invalid tint and greyed shop states are visually distinct",
+        "canvas has a CanvasScaler; screens lay out per the wireframe regions (top bar, bottom bars, centered banners)",
+        "a Play session visually shows S1 title text and buttons on boot (pinned via font/rect/graphic checks, not screenshots)"
+      ]
     }
   ]
 }
