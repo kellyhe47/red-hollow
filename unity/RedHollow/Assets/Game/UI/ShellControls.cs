@@ -97,6 +97,10 @@ namespace RedHollow.Game.UI
             lobbyBanner.color = UiStyle.Ember;
             UiStyle.Anchor(lobbyBanner.rectTransform, 0.2f, 0.78f, 0.8f, 0.9f);
 
+            LobbyJoinCodeLabel = NewLabel(lobby, "LobbyJoinCodeLabel", 18);
+            LobbyJoinCodeLabel.color = UiStyle.Ember;
+            UiStyle.Anchor(LobbyJoinCodeLabel.rectTransform, 0.2f, 0.68f, 0.8f, 0.77f);
+
             var classes = new[] { HeroClass.Gunslinger, HeroClass.Rancher, HeroClass.Sawbones };
             for (var i = 0; i < classes.Length; i++)
             {
@@ -267,6 +271,12 @@ namespace RedHollow.Game.UI
         /// <summary>S2 — READY (LobbyScreenModel.SetReady; all-ready auto-starts the match).</summary>
         public Button LobbyReadyButton { get; }
 
+        /// <summary>
+        /// S2 — the join code to share (wireframe: HOST GAME shows it; waiting-alone hints
+        /// "share code"). Mirrored from <see cref="LobbyScreenModel.JoinCode"/> each refresh.
+        /// </summary>
+        public Text LobbyJoinCodeLabel { get; }
+
         // ---- S3 · Planning --------------------------------------------------------------------
 
         /// <summary>
@@ -396,6 +406,7 @@ namespace RedHollow.Game.UI
         {
             JoinErrorLabel.text = _shell.Title.JoinError ?? string.Empty;
 
+            RefreshLobbyJoinCode();
             RefreshGhostVisual();
             RefreshShopBar();
             RefreshBadgeAndPicker();
@@ -415,6 +426,31 @@ namespace RedHollow.Game.UI
                     pair.Value.interactable = canRematch;
                 }
             }
+        }
+
+        /// <summary>
+        /// S2 — the code on screen is the session's (T-12's model already held it; this is the
+        /// label the wireframe's "share code" state needs). Empty while there is no lobby.
+        /// </summary>
+        private void RefreshLobbyJoinCode()
+        {
+            var lobby = _shell.Lobby;
+            if (lobby == null)
+            {
+                LobbyJoinCodeLabel.text = string.Empty;
+                return;
+            }
+
+            var code = lobby.JoinCode;
+            if (string.IsNullOrEmpty(code))
+            {
+                LobbyJoinCodeLabel.text = string.Empty;
+                return;
+            }
+
+            LobbyJoinCodeLabel.text = lobby.WaitingAlone
+                ? "SHARE CODE  " + code
+                : "JOIN CODE  " + code;
         }
 
         /// <summary>

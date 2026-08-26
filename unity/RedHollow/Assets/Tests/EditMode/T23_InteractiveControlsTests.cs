@@ -215,6 +215,26 @@ namespace RedHollow.Tests.EditMode
             AssertControlUnder(shell.Controls.ClassPickButton(HeroClass.Sawbones), root,
                 "the sawbones PICK");
             AssertControlUnder(shell.Controls.LobbyReadyButton, root, "READY");
+            AssertControlUnder(shell.Controls.LobbyJoinCodeLabel, root, "the join code to share");
+        }
+
+        /// <summary>
+        /// Wireframe S2: HOST GAME shows a join code, and waiting alone hints "share code". The
+        /// label must carry the session's live code so a second player can type it on S1.
+        /// </summary>
+        [Test]
+        public void S2_shows_the_session_join_code_to_share()
+        {
+            var shell = NewHostedShell();
+            shell.Pump(0.0);
+
+            var code = shell.Session.JoinCode;
+            Assert.That(code, Is.Not.Null.And.Not.Empty, "sanity (R-50): a hosted lobby has a code");
+            Assert.That(shell.Lobby.WaitingAlone, Is.True, "solo host is the share-code state");
+            Assert.That(shell.Controls.LobbyJoinCodeLabel.text, Does.Contain(code),
+                "S2: the code on screen is the session's, so the one that works");
+            Assert.That(shell.Controls.LobbyJoinCodeLabel.text.ToUpperInvariant(), Does.Contain("SHARE"),
+                "S2: waiting alone shows the share-code hint");
         }
 
         /// <summary>
