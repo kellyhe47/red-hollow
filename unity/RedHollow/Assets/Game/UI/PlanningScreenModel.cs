@@ -152,6 +152,22 @@ namespace RedHollow.Game.UI
         /// </summary>
         public PurchaseResult ConfirmPlacement()
         {
+            // R-24 (T-23) — the shell's zone answer is already "no": don't issue a command whose
+            // outcome is known. The refusal mirrors the sim's own invalid-zone shape (reason
+            // surfaced, ghost stays up), and the sim STILL reaches its own verdict on everything
+            // actually sent — request.ZoneValid is deliberately never read there (R-51).
+            if (!_ghostZoneValid)
+            {
+                _lastPurchaseRejection = "invalid_zone";
+                return new PurchaseResult
+                {
+                    Accepted = false,
+                    PlaceableType = _ghostType,
+                    ScripAfter = _match.State.Team.Scrip,
+                    RejectionReason = _lastPurchaseRejection,
+                };
+            }
+
             var catalogCost = _match.Sim.Config.Placeables.StatsFor(_ghostType).Cost;
             var result = _match.Sim.PurchasePlacement(new PurchaseRequest
             {

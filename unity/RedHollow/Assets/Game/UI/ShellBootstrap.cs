@@ -131,8 +131,6 @@ namespace RedHollow.Game.UI
     /// </summary>
     public sealed class ShellBootstrap
     {
-        private readonly NetSession _session;
-        private readonly UiRouter _router;
         private readonly ShellUi _ui;
         private readonly FeelRouter _feel = new FeelRouter();
         private readonly MatchViewBinder _views;
@@ -140,9 +138,31 @@ namespace RedHollow.Game.UI
         private readonly ArtCatalog _catalog;
         private readonly IProfileStore _profiles;
         private readonly INetTransport _transport;
-        private readonly string _accountId;
         private readonly IInputSource _input;
         private readonly LocalHeroIntentSource _heroIntents;
+        private readonly string _localPeerId;
+        private readonly NetSessionConfig _netConfig;
+        private readonly IHostedMatchFactory _matchFactory;
+        private readonly TitleScreenModel _title;
+        private readonly ShellControls _controls;
+
+        /// <summary>
+        /// T-23 — NOT readonly: <see cref="RequestHost"/> builds a FRESH session when hosting is
+        /// requested over a dead one (see that method), and the router follows its session.
+        /// </summary>
+        private NetSession _session;
+
+        private UiRouter _router;
+
+        private LobbyScreenModel _lobby;
+
+        /// <summary>
+        /// R-43/R-44 — the account the HUD and the local-input path key off. Seeded from
+        /// <see cref="ShellBootstrapOptions.LocalAccountId"/>; <see cref="RequestHost"/> re-seats
+        /// it as the TYPED callsign (R-44: the callsign IS the account), so the hosted hero and
+        /// the HUD agree on whose progression is on screen.
+        /// </summary>
+        private string _accountId;
 
         /// <summary>The event tap each match this shell created carries (see the factory).</summary>
         private readonly Dictionary<HostedMatch, SimEventTap> _taps =
@@ -154,6 +174,9 @@ namespace RedHollow.Game.UI
         private HostedMatch _boundMatch;
         private SimEventTap _tap;
         private CombatHudModel _hud;
+        private PlanningScreenModel _planning;
+        private PostMatchModel _postMatch;
+        private MatchStatsTracker _stats;
         private int _noticesDelivered;
         private bool _tornDown;
 
@@ -179,11 +202,19 @@ namespace RedHollow.Game.UI
             _views = new MatchViewBinder(_visuals);
 
             var factory = new ColonyMatchFactory(options.Map, options.SimConfig, _profiles);
-            _session = new NetSession(
-                options.NetConfig, _transport, new ViewBoundMatchFactory(this, factory));
+            _matchFactory = new ViewBoundMatchFactory(this, factory);
+            _netConfig = options.NetConfig;
+            _localPeerId = options.LocalPeerId;
+            _session = new NetSession(_netConfig, _transport, _matchFactory);
 
             _router = new UiRouter(_session);
             _ui = ShellUi.Build();
+
+            // T-23 — S1's model exists from birth (the title screen does), S2's follows the
+            // session, and the controls hang under the screen roots the UI just built.
+            _title = new TitleScreenModel(_profiles);
+            _lobby = new LobbyScreenModel(_session, _localPeerId);
+            _controls = new ShellControls(this, _ui);
 
             // The shell shows a screen from birth (S1 before anything is hosted).
             RefreshPresentation();
@@ -240,34 +271,128 @@ namespace RedHollow.Game.UI
         /// Ticket 023 (T-23) — S1's model: the callsign→profile load and the join-code inline
         /// error. Alive from birth (the title screen exists before anything is hosted).
         /// </summary>
-        public TitleScreenModel Title =>
-            throw new NotImplementedException("ticket 023 — the shell does not own S1's model yet");
+        public TitleScreenModel Title => _title;
 
         /// <summary>
         /// Ticket 023 (T-23) — S2's model for the local peer: class picks, ready, and the
         /// all-ready auto-start its Update performs. Refreshed by the pump while a lobby is open.
+        /// Rebuilt when the match changes hands (a rematch's lobby starts with nobody ready) and
+        /// when a re-host builds a fresh session.
         /// </summary>
-        public LobbyScreenModel Lobby =>
-            throw new NotImplementedException("ticket 023 — the shell does not own S2's model yet");
+        public LobbyScreenModel Lobby => _lobby;
 
         /// <summary>
         /// Ticket 023 (T-23) — S3's model for the live match (null without one, like
         /// <see cref="Hud"/>): shop, ghost placement, sell, ready-up. Refreshed by the pump.
         /// </summary>
-        public PlanningScreenModel Planning =>
-            throw new NotImplementedException("ticket 023 — the shell does not own S3's model yet");
+        public PlanningScreenModel Planning
+        {
+            get
+            {
+                BindToCurrentMatch();
+                return _planning;
+            }
+        }
 
         /// <summary>
         /// Ticket 023 (T-23) — the interactive controls (buttons, input fields, the pointer
         /// wiring seam), built beside the labels under the same screen roots.
         /// </summary>
-        public ShellControls Controls =>
-            throw new NotImplementedException("ticket 023 — the shell has no interactive controls yet");
+        public ShellControls Controls => _controls;
+
+        /// <summary>
+        /// T-23 — S6/S7's model (rematch enablement/stats), following the live match like
+        /// <see cref="Hud"/>. Internal: the tests pin the CONTROLS; the model rides underneath.
+        /// </summary>
+        internal PostMatchModel PostMatch
+        {
+            get
+            {
+                BindToCurrentMatch();
+                return _postMatch;
+            }
+        }
+
+        /// <summary>
+        /// T-23 / R-50 — HOST GAME: seat the local peer as host, carrying the TYPED callsign as
+        /// its account (R-44). Ignored while a lobby/match is already up (those screens carry no
+        /// HOST button anyway).
+        ///
+        /// <b>The re-host gap (orchestrator decision at 023):</b> after MAIN MENU / LEAVE the old
+        /// session is <see cref="NetSessionPhase.Ended"/> — DEC-RUN-10 leaves it there forever and
+        /// <see cref="NetSession.StartHost"/> throws for it (R-50's one-lobby guard). The dead
+        /// session is not re-driven: hosting over one builds a FRESH <see cref="NetSession"/> on
+        /// the same transport/factory at this composition root, so the player can always host
+        /// again. The ended session object itself stays Ended, exactly as DEC-RUN-10 pins.
+        /// </summary>
+        public void RequestHost()
+        {
+            if (string.IsNullOrEmpty(_localPeerId))
+            {
+                // A shell with no local identity fronts nobody; there is no peer to seat.
+                return;
+            }
+
+            if (_session.Phase == NetSessionPhase.Ended)
+            {
+                RebuildSessionForRehost();
+            }
+
+            if (_session.Phase != NetSessionPhase.Offline)
+            {
+                return;
+            }
+
+            // R-44 — the callsign IS the account: the seat, the HUD and the input path must all
+            // key off what was typed, or the hosted hero belongs to somebody else's profile.
+            if (!string.IsNullOrEmpty(_title.Callsign))
+            {
+                _accountId = _title.Callsign;
+            }
+
+            _session.StartHost(new NetPeer
+            {
+                PeerId = _localPeerId,
+                AccountId = _title.Callsign,
+                IsHost = true,
+            });
+        }
+
+        /// <summary>
+        /// T-23 — JOIN: this loopback shell fronts its own session, so there is no remote lobby a
+        /// code could land in — the join fails and the model raises S1's inline error. Join
+        /// SUCCESS is transport territory (a second endpoint) and lands here when it exists.
+        /// </summary>
+        public void RequestJoin()
+        {
+            _title.NoteJoinFailed();
+        }
+
+        /// <summary>
+        /// T-23 / R-53 — LEAVE MATCH and MAIN MENU: the local peer leaves its own session — the
+        /// only leave the session surface offers. For a host that ends the session (DEC-RUN-10)
+        /// and the router lands on S1. The overlay never follows the player out of the match.
+        /// </summary>
+        public void LeaveToTitle()
+        {
+            _session.SetOverlayOpen(false);
+
+            if (!string.IsNullOrEmpty(_localPeerId))
+            {
+                _session.Disconnect(_localPeerId);
+            }
+        }
 
         /// <summary>One presentation frame. See the class doc for the six-step contract.</summary>
         public void Pump(double deltaSeconds)
         {
             BindToCurrentMatch();
+
+            // T-23 / R-62 / R-55 — the UI keys, through the same input seam as the hero keys:
+            // held L opens the picker, held ESC raises the overlay. Open-only on purpose (release
+            // closes nothing — the overlay's own close control does), and neither produces any
+            // gameplay intent (DefaultHeroInputMap never reads them).
+            HandleUiKeys();
 
             // 1 — collect BEFORE stepping: events of commands issued directly between pumps are
             // still sitting in LastObservation until the step's first command overwrites it.
@@ -294,6 +419,11 @@ namespace RedHollow.Game.UI
                 if (_hud != null)
                 {
                     _hud.OnSimEvent(evt);
+                }
+
+                if (_stats != null)
+                {
+                    _stats.OnSimEvent(evt);
                 }
 
                 _feel.Route(evt);
@@ -387,21 +517,118 @@ namespace RedHollow.Game.UI
 
             _boundMatch = match;
 
+            // T-23 / DEC-RUN-11 — the lobby model is rebuilt whenever the match changes hands: a
+            // rematch returns the party to S2 with the picks retained (they live on the seats)
+            // but with NOBODY ready — a stale ready flag would start the next match on arrival.
+            _lobby = new LobbyScreenModel(_session, _localPeerId);
+
             if (match == null)
             {
                 _tap = null;
                 _hud = null;
+                _planning = null;
+                _postMatch = null;
+                _stats = null;
                 return;
             }
 
             _taps.TryGetValue(match, out _tap);
             _hud = new CombatHudModel(match, _accountId, _profiles);
+            _planning = new PlanningScreenModel(match, PlayerSlotIdFor(match, _accountId));
+            _stats = new MatchStatsTracker(match.Sim.Config.Placeables);
+            _postMatch = new PostMatchModel(
+                _session, _localPeerId, _stats, match.State.TotalCivilians);
+        }
+
+        /// <summary>
+        /// The sim addresses planning commands by PLAYER SLOT id, not by account — resolved off
+        /// the seated party the factory just built. Null when this shell's account holds no slot
+        /// (a headless observer), which the sim answers with a rejection, never a crash.
+        /// </summary>
+        private static string PlayerSlotIdFor(HostedMatch match, string accountId)
+        {
+            if (string.IsNullOrEmpty(accountId))
+            {
+                return null;
+            }
+
+            var players = match.State.Players;
+            for (var i = 0; i < players.Count; i++)
+            {
+                var player = players[i];
+                if (player != null
+                    && string.Equals(player.AccountId, accountId, StringComparison.Ordinal))
+                {
+                    return player.Id;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>See <see cref="RequestHost"/> — the fresh-session-per-hosting-attempt rule.</summary>
+        private void RebuildSessionForRehost()
+        {
+            // Same transport (loopback's Shutdown left it restartable; it mints a fresh join
+            // code), same factory, same profiles — only the SESSION is new. The old one is
+            // dropped where it stands: Ended, exactly as DEC-RUN-10 leaves it.
+            _session = new NetSession(_netConfig, _transport, _matchFactory);
+            _router = new UiRouter(_session);
+            _lobby = new LobbyScreenModel(_session, _localPeerId);
+
+            _noticesDelivered = 0;
+            _boundMatch = null;
+            _tap = null;
+            _hud = null;
+            _planning = null;
+            _postMatch = null;
+            _stats = null;
+            _taps.Clear();
+        }
+
+        /// <summary>
+        /// T-23 — the UI keys' input path (see <see cref="Pump"/>). In-match only: outside one
+        /// there is no picker to open and the ESC overlay is a match overlay.
+        /// </summary>
+        private void HandleUiKeys()
+        {
+            if (_input == null || _session.Phase != NetSessionPhase.InMatch)
+            {
+                return;
+            }
+
+            var snapshot = _input.Sample();
+            if (snapshot == null)
+            {
+                return;
+            }
+
+            if (snapshot.Pressed.Contains(PlayerKey.L) && _hud != null)
+            {
+                _hud.OpenPicker();
+            }
+
+            if (snapshot.Pressed.Contains(PlayerKey.Escape))
+            {
+                _session.SetOverlayOpen(true);
+            }
         }
 
         // ---- presentation refresh -------------------------------------------------------------
 
         private void RefreshPresentation()
         {
+            // T-23 — the lobby model's own Update carries the R-50 all-ready auto-start (on the
+            // host's model only), so it runs before the router derives the screen: READY on a
+            // solo lobby lands S3/S4 on this same pump's refresh.
+            if (_lobby != null)
+            {
+                _lobby.Update();
+            }
+
+            // The lobby's Update may just have started a match — bind before deriving anything.
+            BindToCurrentMatch();
+
             _router.Update();
 
             if (_hud != null)
@@ -409,7 +636,18 @@ namespace RedHollow.Game.UI
                 _hud.Refresh();
             }
 
+            if (_planning != null)
+            {
+                _planning.Refresh();
+            }
+
             RefreshLabels();
+
+            if (_controls != null)
+            {
+                _controls.Refresh();
+            }
+
             _ui.SetActiveScreen(_router.Screen);
         }
 
