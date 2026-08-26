@@ -1308,6 +1308,24 @@ namespace RedHollow.Game.UI
                 var go = new GameObject("art_" + artKey.Replace('/', '_'));
                 var renderer = go.AddComponent<SpriteRenderer>();
                 renderer.sprite = sprite;
+                // SpriteRenderer faces +Z (XY plane). The match camera looks down -Y at XZ,
+                // so an unrotated sprite is edge-on and invisible. Lay it on the colony floor.
+                go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+
+                // Ground is sized by MatchSceneBuilder to cover the play area. Characters and
+                // props that come in smaller than a body from y-down get enlarged so they read
+                // at camera height 60 (~2-3 world units across).
+                if (artKey != ShellArtKeys.GroundTile)
+                {
+                    var across = Mathf.Max(sprite.bounds.size.x, sprite.bounds.size.y);
+                    const float minCharacterSpan = 2.5f;
+                    if (across > 0.0001f && across < minCharacterSpan)
+                    {
+                        var s = minCharacterSpan / across;
+                        go.transform.localScale = new Vector3(s, s, 1f);
+                    }
+                }
+
                 return go;
             });
         }

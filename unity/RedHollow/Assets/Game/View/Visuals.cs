@@ -135,7 +135,9 @@ namespace RedHollow.Game.View
             {
                 var primitive = GameObject.CreatePrimitive(PrimitiveFor(visualClass));
                 primitive.name = name;
+                ScalePlaceholder(primitive, visualClass);
                 primitive.transform.localPosition = StandingOffsetFor(visualClass);
+                TintPlaceholder(primitive, visualClass);
                 return primitive;
             }
             catch (Exception)
@@ -156,10 +158,32 @@ namespace RedHollow.Game.View
                     return PrimitiveType.Capsule;
 
                 case VisualClass.Hotspot:
-                    return PrimitiveType.Cylinder;
+                    // Cube, not a cylinder: from y-down a cylinder is the same gray disc as a
+                    // capsule. A cube is a square footprint that reads as a building.
+                    return PrimitiveType.Cube;
 
                 default:
                     return PrimitiveType.Cube;
+            }
+        }
+
+        /// <summary>
+        /// Footprint from a y-down camera. Default primitives are ~1 unit across — a gray disc
+        /// at camera height 60. Hotspots get a wide cube so they read as buildings, not capsules.
+        /// </summary>
+        private static void ScalePlaceholder(GameObject go, VisualClass visualClass)
+        {
+            switch (visualClass)
+            {
+                case VisualClass.Hero:
+                case VisualClass.Monster:
+                    go.transform.localScale = new Vector3(2.2f, 1.2f, 2.2f);
+                    break;
+
+                case VisualClass.Hotspot:
+                    // Wide square from above, short enough not to poke the camera.
+                    go.transform.localScale = new Vector3(2.8f, 1.4f, 2.8f);
+                    break;
             }
         }
 
@@ -177,11 +201,87 @@ namespace RedHollow.Game.View
 
                 case VisualClass.Hero:
                 case VisualClass.Monster:
+                    // Capsule height 2 * 1.2 scale.
+                    return new Vector3(0f, 1.2f, 0f);
+
                 case VisualClass.Hotspot:
-                    return new Vector3(0f, 1f, 0f);
+                    // Cube height 1 * 1.4 scale.
+                    return new Vector3(0f, 0.7f, 0f);
 
                 default:
                     return new Vector3(0f, 0.5f, 0f);
+            }
+        }
+
+        /// <summary>
+        /// Distinct UNLIT albedo per class so a y-down camera can tell a hero from a monster from
+        /// the floor even with no lights. Default-Material is lit URP Lit — without a light it
+        /// renders black, which is how a Play session became a void. T16 pins none of the colours.
+        /// </summary>
+        private static void TintPlaceholder(GameObject go, VisualClass visualClass)
+        {
+            var renderer = go.GetComponent<Renderer>();
+            if (renderer == null)
+            {
+                return;
+            }
+
+            var color = ColorFor(visualClass);
+            var shader = Shader.Find("Universal Render Pipeline/Unlit");
+            if (shader == null)
+            {
+                shader = Shader.Find("Unlit/Color");
+            }
+
+            if (shader != null)
+            {
+                var material = new Material(shader);
+                ApplyColor(material, color);
+                renderer.sharedMaterial = material;
+                return;
+            }
+
+            // Last resort: tint whatever CreatePrimitive assigned so the seam still renders.
+            ApplyColor(renderer.material, color);
+        }
+
+        private static void ApplyColor(Material material, Color color)
+        {
+            if (material == null)
+            {
+                return;
+            }
+
+            material.color = color;
+            if (material.HasProperty("_BaseColor"))
+            {
+                material.SetColor("_BaseColor", color);
+            }
+
+            if (material.HasProperty("_Color"))
+            {
+                material.SetColor("_Color", color);
+            }
+        }
+
+        private static Color ColorFor(VisualClass visualClass)
+        {
+            switch (visualClass)
+            {
+                case VisualClass.Ground:
+                    return new Color(0.55f, 0.28f, 0.14f);
+
+                case VisualClass.Hero:
+                    return new Color(0.95f, 0.70f, 0.25f);
+
+                case VisualClass.Monster:
+                    return new Color(0.42f, 0.70f, 0.28f);
+
+                case VisualClass.Hotspot:
+                    return new Color(0.72f, 0.42f, 0.18f);
+
+                default:
+                    return new Color(0.55f, 0.48f, 0.38f);
             }
         }
 

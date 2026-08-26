@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using RedHollow.Game.UI;
 using RedHollow.Sim;
 using UnityEngine;
+using UnityEngine.Rendering.Universal;
 
 namespace RedHollow.Game.View
 {
@@ -83,6 +85,10 @@ namespace RedHollow.Game.View
 
             scene.Ground = BuildGround(scene.Root.transform, resolver, playArea);
 
+            // Modest sourced lanterns for leftover lit mats. Do NOT call LanternDeepLighting.Apply
+            // here: that raises the cavern dome (top ~y=15) which covers this camera at y=60.
+            RaiseLanterns(scene.Root.transform, map);
+
             // R-33 — one team spawn, where heroes enter at wave 1 and come back after a death.
             scene.TeamSpawn = Marker(
                 scene.Root.transform, resolver, VisualClass.Placeable, "TeamSpawn", map.TeamSpawn);
@@ -143,6 +149,26 @@ namespace RedHollow.Game.View
             camera.nearClipPlane = 0.1f;
             camera.farClipPlane = CameraHeight * 2f;
 
+            // Play-mode Game view: an untagged Skybox-clear camera over a square ground plane
+            // in a wide Game window letterboxes into a slate column (Unity's default clear
+            // 0.19/0.30/0.47) and every placeholder shares Default-Material gray, so a
+            // y-down look cannot tell a capsule from the floor. Tag + solid cavern clear
+            // makes this the Game camera and kills the skybox bars; tint is in the resolver.
+            go.tag = "MainCamera";
+            camera.depth = 10f;
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = new Color(0.12f, 0.07f, 0.04f, 1f);
+
+            // URP ignores a Camera that has no UniversalAdditionalCameraData; without it the
+            // Game view falls through to a second Base camera (or nothing) and letterboxes black.
+            var urp = go.GetComponent<UniversalAdditionalCameraData>();
+            if (urp == null)
+            {
+                urp = go.AddComponent<UniversalAdditionalCameraData>();
+            }
+
+            urp.renderType = CameraRenderType.Base;
+
             go.transform.position = new Vector3(
                 playArea.center.x, SimSpace.GroundHeight + CameraHeight, playArea.center.z);
 
@@ -154,10 +180,12 @@ namespace RedHollow.Game.View
         }
 
         // The pre-013 placeholder KeyLight (a directional light) is retired: R-15 forbids any
-        // sun-like light, and RedHollow.Game.Art.LanternDeepLighting now lights the scene.
+        // sun-like light. LanternDeepLighting.Apply is the full look (dome + fog) but must not
+        // run at Play until the camera sits inside the dome; Build raises point lanterns only.
 
         /// <summary>
-        /// The colony floor: one placeholder plane, stretched to cover the whole play area so no
+        /// The colony floor: resolved through the art seam (cavern-ground when the catalog has
+        /// it, otherwise the unlit rust plane) and sized to cover the whole play area so no
         /// part of the map a monster can walk to is over a hole.
         /// </summary>
         private static GameObject BuildGround(Transform root, IVisualResolver visuals, Bounds playArea)
@@ -166,17 +194,80 @@ namespace RedHollow.Game.View
             ground.transform.SetParent(root, false);
             ground.transform.position = new Vector3(playArea.center.x, SimSpace.GroundHeight, playArea.center.z);
 
-            var visual = visuals.Resolve(VisualClass.Ground, null);
+            var visual = visuals.Resolve(VisualClass.Ground, ShellArtKeys.GroundTile);
             ViewRig.Attach(ground.transform, visual);
 
             if (visual != null && visual.Instance != null)
             {
                 var span = Mathf.Max(playArea.size.x, playArea.size.z) + (ViewMargin * 2f);
-                var scale = span / PlanePrimitiveSize;
-                visual.Instance.transform.localScale = new Vector3(scale, 1f, scale);
+                SizeGroundToCover(visual.Instance, span);
             }
 
             return ground;
+        }
+
+        /// <summary>
+        /// Cover the play area without assuming Unity's Plane primitive. A sprite laid on XZ
+        /// (Euler 90,0,0) has its size on local XY; applying (span/10, 1, span/10) scales the
+        /// thin axis and leaves the sprite a sliver — the "ground shrunk to nothing" bug.
+        /// </summary>
+        private static void SizeGroundToCover(GameObject instance, float span)
+        {
+            var sprite = instance.GetComponentInChildren<SpriteRenderer>();
+            if (sprite != null && sprite.sprite != null)
+            {
+                var size = sprite.sprite.bounds.size;
+                var current = Mathf.Max(size.x, size.y);
+                if (current > 0.0001f)
+                {
+                    var s = span / current;
+                    instance.transform.localScale = new Vector3(s, s, 1f);
+                }
+
+                return;
+            }
+
+            var scale = span / PlanePrimitiveSize;
+            instance.transform.localScale = new Vector3(scale, 1f, scale);
+        }
+
+        /// <summary>
+        /// R-15 — sourced amber point lights over spawn and each shelter. Named and typed as
+        /// lanterns (never Directional) so the no-sun tests still pass. Range covers the
+        /// hotspot cluster; intensity is for any leftover lit materials (placeholders are unlit).
+        /// </summary>
+        private static void RaiseLanterns(Transform root, ColonyMap map)
+        {
+            const float height = 6f;
+            var amber = new Color(1.0f, 0.62f, 0.28f);
+
+            AddLantern(root, "Lantern_Spawn", map.TeamSpawn, height, amber, 32f, 18f);
+
+            foreach (var spec in map.Hotspots)
+            {
+                if (spec == null || string.IsNullOrEmpty(spec.Id))
+                {
+                    continue;
+                }
+
+                AddLantern(root, "Lantern_" + spec.Id, spec.Pos, height, amber, 28f, 14f);
+            }
+        }
+
+        private static void AddLantern(
+            Transform root, string name, Vec2 pos, float height, Color color, float range, float intensity)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(root, false);
+            go.transform.position = new Vector3(
+                (float)pos.X, SimSpace.GroundHeight + height, (float)pos.Y);
+
+            var light = go.AddComponent<Light>();
+            light.type = LightType.Point;
+            light.color = color;
+            light.intensity = intensity;
+            light.range = range;
+            light.shadows = LightShadows.None;
         }
 
         /// <summary>

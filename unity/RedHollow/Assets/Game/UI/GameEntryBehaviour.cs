@@ -79,6 +79,15 @@ namespace RedHollow.Game.UI
             var baked = GameObject.Find("RedHollow_Match");
             if (baked != null)
             {
+                // Destroy() is deferred until end of frame: leave the baked TopDownCamera
+                // enabled and URP has two Base cameras for a frame, which is the
+                // letterboxed-slate Game view. Disable every camera on the baked colony
+                // NOW so the replacement is the only one the Game view draws.
+                foreach (var cam in baked.GetComponentsInChildren<Camera>(true))
+                {
+                    cam.enabled = false;
+                }
+
                 DestroyGameObjectCompat(baked);
             }
 
