@@ -39,6 +39,12 @@ namespace RedHollow.EditorTools
 
             var built = MatchSceneBuilder.Build(ColonyMap.V1(), new PlaceholderVisualResolver());
 
+            // Ticket 022 (T-22) — the entry point that makes pressing Play boot the shell: without
+            // it the saved scene contains zero MonoBehaviours and Play shows nothing (the bug the
+            // owner found 2026-08-26). Exactly one, enabled; AddComponent in the editor runs no
+            // lifecycle, so the serialized scene stays inert until Play calls Awake.
+            new GameObject("RedHollow_Entry", typeof(RedHollow.Game.UI.GameEntryBehaviour));
+
             var directory = Path.GetDirectoryName(ScenePath);
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
             {

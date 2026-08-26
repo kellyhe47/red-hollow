@@ -141,6 +141,8 @@ namespace RedHollow.Game.UI
         private readonly IProfileStore _profiles;
         private readonly INetTransport _transport;
         private readonly string _accountId;
+        private readonly IInputSource _input;
+        private readonly LocalHeroIntentSource _heroIntents;
 
         /// <summary>The event tap each match this shell created carries (see the factory).</summary>
         private readonly Dictionary<HostedMatch, SimEventTap> _taps =
@@ -162,6 +164,12 @@ namespace RedHollow.Game.UI
             _transport = options.Transport ?? new LoopbackNetTransport();
             _profiles = options.Profiles ?? new InMemoryProfileStore();
             _accountId = options.LocalAccountId;
+
+            // T-22 / R-30 — the device seam, exactly as supplied (null = headless, no local input).
+            // One intent source for the shell's lifetime: it reads whatever match is stepped, so a
+            // rematch needs no rewiring.
+            _input = options.InputSource;
+            _heroIntents = new LocalHeroIntentSource(this);
 
             // R-15 — real art by default; the placeholder answers for everything unregistered.
             _catalog = options.ArtCatalog ?? LoadRepresentativeArt();
@@ -213,8 +221,7 @@ namespace RedHollow.Game.UI
         /// supplied via <see cref="ShellBootstrapOptions.InputSource"/> (null when none was: input
         /// is the one option with no offline default, because only a scene entry owns a device).
         /// </summary>
-        public IInputSource Input =>
-            throw new NotImplementedException("T-22: expose and wire ShellBootstrapOptions.InputSource");
+        public IInputSource Input => _input;
 
         /// <summary>
         /// R-61 — the combat HUD model for the local account. Null until a match is live; rebuilt
@@ -502,10 +509,77 @@ namespace RedHollow.Game.UI
 
                 var tap = new SimEventTap(match.Host);
                 match.Host = tap;
-                match.Session = new MatchSession(tap, null, _shell._views);
+                match.Session = new MatchSession(tap, _shell._heroIntents, _shell._views);
 
                 _shell._taps[match] = tap;
                 return match;
+            }
+        }
+
+        /// <summary>
+        /// Ticket 022 (T-22) / R-30 — the hole ticket 021 left null: each host step, sample the
+        /// shell's <see cref="IInputSource"/> once, resolve it through the shipped
+        /// <see cref="DefaultHeroInputMap"/>, and address the result to the LOCAL hero — the one
+        /// whose <c>AccountId</c> is the shell's <see cref="ShellBootstrapOptions.LocalAccountId"/>.
+        ///
+        /// Candidates only: the sim still decides what the intent is worth (R-33 — a dead hero does
+        /// not walk), and <see cref="HostLoop"/> already skips a zero direction. No source, no
+        /// local hero, or a headless shell simply contributes nothing — never throws mid-frame.
+        /// </summary>
+        private sealed class LocalHeroIntentSource : IHeroIntentSource
+        {
+            private readonly ShellBootstrap _shell;
+            private readonly DefaultHeroInputMap _map = new DefaultHeroInputMap();
+
+            /// <summary>Reused per step so a held key does not allocate sixty times a second.</summary>
+            private readonly HeroIntentCommand _command = new HeroIntentCommand();
+
+            private readonly List<HeroIntentCommand> _commands = new List<HeroIntentCommand>(1);
+
+            public LocalHeroIntentSource(ShellBootstrap shell)
+            {
+                _shell = shell;
+            }
+
+            public IReadOnlyList<HeroIntentCommand> IntentsThisStep(ISimHost sim, double deltaSeconds)
+            {
+                var source = _shell._input;
+                if (source == null || sim == null)
+                {
+                    return null;
+                }
+
+                var hero = LocalHero(sim.State);
+                if (hero == null)
+                {
+                    return null;
+                }
+
+                _command.HeroId = hero.Id;
+                _command.Intent = _map.Resolve(source.Sample());
+
+                _commands.Clear();
+                _commands.Add(_command);
+                return _commands;
+            }
+
+            private Hero LocalHero(MatchState state)
+            {
+                var accountId = _shell._accountId;
+                if (state == null || string.IsNullOrEmpty(accountId))
+                {
+                    return null;
+                }
+
+                foreach (var hero in state.Heroes.Values)
+                {
+                    if (hero != null && string.Equals(hero.AccountId, accountId, StringComparison.Ordinal))
+                    {
+                        return hero;
+                    }
+                }
+
+                return null;
             }
         }
     }
