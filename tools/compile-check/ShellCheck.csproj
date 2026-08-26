@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Headless compile check for the shell's UNITY-FREE layers (Host, Net-minus-NGO, SimEventTap),
+    for agents working without a Unity editor: `dotnet build tools/compile-check/ShellCheck.csproj`.
+
+    Stubs.cs stands in for the handful of Unity-side types those layers name (Vector2, HeroIntent,
+    MatchViewBinder, INetWire). This catches syntax and type errors in host/session/net edits that
+    would otherwise first surface in the owner's editor; it does NOT cover the uGUI-facing files
+    (ShellBootstrap, ShellControls, views) or the EditMode tests — those still need Unity.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Stubs.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/GameSim/**/*.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Host/HeroIntents.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Host/HostLoop.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Host/IMatchSimHost.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Host/ISimHost.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Host/MatchSession.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Host/MatchSimHost.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Host/MonsterAttack.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Host/PartyRoster.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Host/ClientPrediction.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/UI/SimEventTap.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Net/ColonyMatchFactory.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Net/HostedMatch.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Net/INetTransport.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Net/LoopbackNetTransport.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Net/NetSession.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Net/NetSessionConfig.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Net/NetTransportFactory.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Net/NgoNetTransport.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Net/UgsServices.cs" />
+  </ItemGroup>
+
+</Project>
