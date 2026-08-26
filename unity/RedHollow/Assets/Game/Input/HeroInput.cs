@@ -237,6 +237,17 @@ namespace RedHollow.Game.Input
             AddIfHeld(snapshot, KeyCode.Q, PlayerKey.Q);
             AddIfHeld(snapshot, KeyCode.E, PlayerKey.E);
 
+            // T-23/T-24 — the UI keys and the UI mouse button, REPORTED here but consumed only by
+            // the shell's UI paths: DefaultHeroInputMap never reads any of them, so R-30's "no
+            // gameplay intent from the mouse" stays enforced by the map's shape, exactly as the
+            // T16 tests lock. MouseLeft drives planning placement/sell (placement IS UI).
+            AddIfHeld(snapshot, KeyCode.L, PlayerKey.L);
+            AddIfHeld(snapshot, KeyCode.Escape, PlayerKey.Escape);
+            if (UnityEngine.Input.GetMouseButton(0))
+            {
+                snapshot.Pressed.Add(PlayerKey.MouseLeft);
+            }
+
             return snapshot;
         }
 
@@ -256,26 +267,17 @@ namespace RedHollow.Game.Input
         private Vector2 CursorOnGround()
         {
             var camera = _camera != null ? _camera : Camera.main;
-            if (camera == null)
+            var mouse = UnityEngine.Input.mousePosition;
+
+            // T-24 — one plane-projection for aim AND the planning pointer: both resolve a cursor
+            // through PointerProjection, so they can never disagree about where the cursor is.
+            if (PointerProjection.TryScreenToGround(
+                    camera, new Vector2(mouse.x, mouse.y), out var ground))
             {
-                return Vector2.zero;
+                return new Vector2((float)ground.X, (float)ground.Y);
             }
 
-            var ray = camera.ScreenPointToRay(UnityEngine.Input.mousePosition);
-
-            // Parallel to the floor: the cursor is on the horizon and has no ground point at all.
-            if (Mathf.Approximately(ray.direction.y, 0f))
-            {
-                return Vector2.zero;
-            }
-
-            var distance = (SimSpace.GroundHeight - ray.origin.y) / ray.direction.y;
-            if (distance < 0f)
-            {
-                return Vector2.zero;
-            }
-
-            return SimSpace.ToGroundVector(ray.GetPoint(distance));
+            return Vector2.zero;
         }
     }
 #endif

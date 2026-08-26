@@ -26,12 +26,26 @@ namespace RedHollow.Game.UI
     /// </summary>
     public sealed class PlacementZoneOracle
     {
+        private readonly ColonyMap _map;
+
         /// <param name="map">
         /// The colony layout the match is played on — the tunnel mouths exist nowhere else.
         /// </param>
         public PlacementZoneOracle(ColonyMap map)
         {
-            throw new NotImplementedException("T-24: placement zone oracle not implemented yet.");
+            if (map == null)
+            {
+                throw new ArgumentNullException("map");
+            }
+
+            _map = map;
+
+            // The shipped defaults are READ off a fresh sim, never spelled as literals here, so a
+            // retuned sim default can never silently leave the oracle behind (the T24 pin).
+            var shipped = new MatchSim(new MatchState());
+            HotspotBuildingRadius = shipped.HotspotBuildingRadius;
+            EntryTunnelMouthRadius = shipped.EntryTunnelMouthRadius;
+            PlaceableFootprintRadius = shipped.PlaceableFootprintRadius;
         }
 
         /// <summary>Mirror of <c>MatchSim.HotspotBuildingRadius</c> (same shipped default).</summary>
@@ -47,10 +61,46 @@ namespace RedHollow.Game.UI
         /// Would the sim's R-24 zone gate accept a placement at <paramref name="pos"/> given the
         /// live <paramref name="state"/>? Zone geometry ONLY — phase, catalog and scrip are the
         /// sim's other gates and not this question.
+        ///
+        /// Mirrors <c>MatchSim.IsPlaceableGround</c> exactly, strict-less-than edges included:
+        /// standing exactly ON a radius edge is placeable ground, exactly as it is sim-side.
         /// </summary>
         public bool WouldAccept(MatchState state, Vec2 pos)
         {
-            throw new NotImplementedException("T-24: placement zone oracle not implemented yet.");
+            if (state == null)
+            {
+                return false;
+            }
+
+            // Hotspot buildings come from LIVE state (an emptied shelter is still a building).
+            foreach (var hotspot in state.Hotspots.Values)
+            {
+                if (pos.DistanceTo(hotspot.Pos) < HotspotBuildingRadius)
+                {
+                    return false;
+                }
+            }
+
+            // Tunnel mouths exist only on the map.
+            foreach (var tunnel in _map.EntryTunnels)
+            {
+                if (pos.DistanceTo(tunnel) < EntryTunnelMouthRadius)
+                {
+                    return false;
+                }
+            }
+
+            // Only placeables that are *there* block ground (R-22 — a sold tile is ground again).
+            var clearance = PlaceableFootprintRadius * 2.0;
+            foreach (var placeable in state.Placeables.Values)
+            {
+                if (placeable.Exists && pos.DistanceTo(placeable.Pos) < clearance)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
     }
 }

@@ -180,6 +180,16 @@ namespace RedHollow.Game.UI
         private int _noticesDelivered;
         private bool _tornDown;
 
+        /// <summary>T-24 — the client-side R-24 mirror for the bound match (null without one).</summary>
+        private PlacementZoneOracle _zoneOracle;
+
+        /// <summary>
+        /// T-24 — was MouseLeft held on the PREVIOUS pump? <see cref="InputSnapshot.Pressed"/> is
+        /// held-this-frame, so a press EDGE (one click per press, never one per pump) needs the
+        /// last frame remembered here.
+        /// </summary>
+        private bool _pointerMouseWasDown;
+
         public ShellBootstrap(ShellBootstrapOptions options = null)
         {
             options = options ?? new ShellBootstrapOptions();
@@ -394,6 +404,11 @@ namespace RedHollow.Game.UI
             // gameplay intent (DefaultHeroInputMap never reads them).
             HandleUiKeys();
 
+            // T-24 / R-24 / R-30 — the planning pointer path: cursor → PointerAt with the oracle's
+            // zone answer, a fresh MouseLeft press → one ground/placeable click through the T23
+            // seam. Planning-only; combat never routes a mouse button anywhere (R-30).
+            HandlePlanningPointer();
+
             // 1 — collect BEFORE stepping: events of commands issued directly between pumps are
             // still sitting in LastObservation until the step's first command overwrites it.
             if (_tap != null)
@@ -529,10 +544,14 @@ namespace RedHollow.Game.UI
                 _planning = null;
                 _postMatch = null;
                 _stats = null;
+                _zoneOracle = null;
                 return;
             }
 
             _taps.TryGetValue(match, out _tap);
+            // T-24 — one oracle per match, over the match's own map; its radii are re-copied off
+            // the live sim every pump (see HandlePlanningPointer) so retunes move both sides.
+            _zoneOracle = new PlacementZoneOracle(match.Sim.ColonyMap);
             _hud = new CombatHudModel(match, _accountId, _profiles);
             _planning = new PlanningScreenModel(match, PlayerSlotIdFor(match, _accountId));
             _stats = new MatchStatsTracker(match.Sim.Config.Placeables);
@@ -583,6 +602,8 @@ namespace RedHollow.Game.UI
             _planning = null;
             _postMatch = null;
             _stats = null;
+            _zoneOracle = null;
+            _pointerMouseWasDown = false;
             _taps.Clear();
         }
 
@@ -611,6 +632,80 @@ namespace RedHollow.Game.UI
             if (snapshot.Pressed.Contains(PlayerKey.Escape))
             {
                 _session.SetOverlayOpen(true);
+            }
+        }
+
+        /// <summary>
+        /// T-24 — the planning pointer path (see <see cref="Pump"/>). Each in-match pump samples
+        /// the cursor's ground point and, in the sim's PLANNING phase only:
+        ///
+        ///  * routes it to <see cref="ShellControls.PointerAt"/> with the oracle's R-24 answer
+        ///    (the ghost follows the pointer and tints by zone);
+        ///  * on a FRESH MouseLeft press (edge, not level — one click per press): a ghost up is a
+        ///    ground click at the cursor, no ghost with a standing placeable under the cursor is a
+        ///    placeable click (the R-22 sell), and a ghostless click on clear ground is NOTHING.
+        ///
+        /// The held-last-pump flag is updated in every phase, so a button pressed during combat
+        /// does not read as a fresh press the moment planning returns. Combat routes no click
+        /// anywhere: mouse buttons stay UI, and the planning UI is not on screen (R-30).
+        /// </summary>
+        private void HandlePlanningPointer()
+        {
+            if (_input == null || _session.Phase != NetSessionPhase.InMatch
+                || _boundMatch == null || _planning == null || _zoneOracle == null)
+            {
+                return;
+            }
+
+            var snapshot = _input.Sample();
+            if (snapshot == null)
+            {
+                return;
+            }
+
+            var mouseDown = snapshot.Pressed.Contains(PlayerKey.MouseLeft);
+            var freshPress = mouseDown && !_pointerMouseWasDown;
+            _pointerMouseWasDown = mouseDown;
+
+            if (_boundMatch.State.Phase != MatchPhase.Planning)
+            {
+                return;
+            }
+
+            var cursor = new Vec2(snapshot.CursorGroundPoint.x, snapshot.CursorGroundPoint.y);
+
+            // Mirror the LIVE sim's radii every pump — the oracle's defaults are only defaults,
+            // and a retuned sim must move the tint with it or the tint lies (T-24's pin).
+            var sim = _boundMatch.Sim;
+            _zoneOracle.HotspotBuildingRadius = sim.HotspotBuildingRadius;
+            _zoneOracle.EntryTunnelMouthRadius = sim.EntryTunnelMouthRadius;
+            _zoneOracle.PlaceableFootprintRadius = sim.PlaceableFootprintRadius;
+
+            var zoneValid = _zoneOracle.WouldAccept(_boundMatch.State, cursor);
+            _controls.PointerAt(cursor, zoneValid);
+
+            if (!freshPress)
+            {
+                return;
+            }
+
+            if (_planning.GhostActive)
+            {
+                // The click belongs to placement — even over a standing placeable (T23's
+                // precedence: ClickPlaceable is ignored while a ghost is up; the overlap rule
+                // rejects the attempt and the ghost stays for the retry).
+                _controls.ClickGround(cursor, zoneValid);
+                return;
+            }
+
+            // No ghost: the click is a sell exactly when a standing placeable is under the
+            // cursor. The pick radius is unpinned by the tests except at distance zero; the
+            // footprint radius is the natural "on it" extent.
+            var picked = PlaceablePicker.Pick(
+                _boundMatch.State, cursor, sim.PlaceableFootprintRadius);
+            if (picked != null)
+            {
+                _controls.ClickPlaceable(picked);
             }
         }
 

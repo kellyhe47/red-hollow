@@ -1,4 +1,4 @@
-using System;
+using RedHollow.Game.View;
 using RedHollow.Sim;
 using UnityEngine;
 
@@ -23,7 +23,32 @@ namespace RedHollow.Game.Input
         /// </summary>
         public static bool TryScreenToGround(Camera camera, Vector2 screenPoint, out Vec2 groundPos)
         {
-            throw new NotImplementedException("T-24: pointer-to-ground projection not implemented yet.");
+            groundPos = default(Vec2);
+
+            if (camera == null)
+            {
+                // An unwired camera fails soft — the combat aim path's own tolerance.
+                return false;
+            }
+
+            var ray = camera.ScreenPointToRay(new Vector3(screenPoint.x, screenPoint.y, 0f));
+
+            // Parallel to the floor: the cursor is on the horizon and has no ground point at all.
+            if (Mathf.Approximately(ray.direction.y, 0f))
+            {
+                return false;
+            }
+
+            // The signed ray distance to the ground plane. Negative means the intersection is
+            // BEHIND the camera — not a place a cursor can point at, so no extrapolation.
+            var distance = (SimSpace.GroundHeight - ray.origin.y) / ray.direction.y;
+            if (distance < 0f)
+            {
+                return false;
+            }
+
+            groundPos = SimSpace.ToGround(ray.GetPoint(distance));
+            return true;
         }
     }
 }

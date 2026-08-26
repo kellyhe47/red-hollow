@@ -1,4 +1,3 @@
-using System;
 using RedHollow.Sim;
 
 namespace RedHollow.Game.Input
@@ -19,7 +18,32 @@ namespace RedHollow.Game.Input
         /// </summary>
         public static string Pick(MatchState state, Vec2 groundPoint, double pickRadius)
         {
-            throw new NotImplementedException("T-24: placeable picking not implemented yet.");
+            if (state == null)
+            {
+                return null;
+            }
+
+            string nearestId = null;
+            var nearestDistance = double.MaxValue;
+
+            foreach (var pair in state.Placeables)
+            {
+                var placeable = pair.Value;
+                if (placeable == null || !placeable.Exists)
+                {
+                    // R-22 — a sold or destroyed placeable is ground again; it never takes a click.
+                    continue;
+                }
+
+                var distance = groundPoint.DistanceTo(placeable.Pos);
+                if (distance <= pickRadius && distance < nearestDistance)
+                {
+                    nearestDistance = distance;
+                    nearestId = pair.Key;
+                }
+            }
+
+            return nearestId;
         }
     }
 }
