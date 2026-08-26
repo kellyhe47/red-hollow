@@ -7,8 +7,8 @@ namespace RedHollow.Game.View
 {
     /// <summary>
     /// Shared materials and primitive hygiene for the runtime colony blockout.
-    /// Habs / ground / cavern walls use URP Lit so sourced amber lanterns shade them.
-    /// Characters stay Unlit billboards. Presentation only — no sim types.
+    /// Habs / ground / cavern walls / unit volumes use URP Lit so sourced amber
+    /// lanterns shade them. Presentation only — no sim types.
     /// </summary>
     public static class ViewLook
     {
@@ -169,6 +169,45 @@ namespace RedHollow.Game.View
             material.EnableKeyword("_ALPHATEST_ON");
             material.SetOverrideTag("RenderType", "TransparentCutout");
             material.renderQueue = 2450;
+            return material;
+        }
+
+        /// <summary>
+        /// URP Lit + alpha clip so a painted silhouette shades under lanterns instead
+        /// of sitting as an Unlit postcard. Two-sided so a world-facing card is not
+        /// invisible from behind.
+        /// </summary>
+        public static Material LitCutout(Color color, Texture texture)
+        {
+            var material = Lit(color, texture, smoothness: 0.12f);
+            if (material == null)
+            {
+                return UnlitCutout(color, texture);
+            }
+
+            if (texture != null)
+            {
+                texture.wrapMode = TextureWrapMode.Clamp;
+            }
+
+            if (material.HasProperty("_Cutoff"))
+            {
+                material.SetFloat("_Cutoff", 0.35f);
+            }
+
+            if (material.HasProperty("_AlphaClip"))
+            {
+                material.SetFloat("_AlphaClip", 1f);
+            }
+
+            material.EnableKeyword("_ALPHATEST_ON");
+            material.SetOverrideTag("RenderType", "TransparentCutout");
+            material.renderQueue = 2450;
+            if (material.HasProperty("_Cull"))
+            {
+                material.SetFloat("_Cull", 0f);
+            }
+
             return material;
         }
 

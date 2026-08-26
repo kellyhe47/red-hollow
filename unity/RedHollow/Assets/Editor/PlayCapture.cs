@@ -235,6 +235,14 @@ namespace RedHollow.EditorTools
             OverlayInputSource.ExtraHeld.Add(PlayerKey.Q);
             OverlayInputSource.ExtraHeld.Add(PlayerKey.E);
 
+            // Units recapture: keep the gunslinger in the spawn courtyard so the
+            // follow cam sits in open street, not inside a west-lane GridHab.
+            if (_playMode == "units")
+            {
+                OverlayInputSource.CursorOverride = new Vector2(6f, 10f);
+                return;
+            }
+
             Hero hero = null;
             foreach (var h in match.State.Heroes.Values)
             {
@@ -1320,27 +1328,10 @@ namespace RedHollow.EditorTools
                     return;
                 }
 
-                var nearest = 1e9;
-                foreach (var id in match.State.Wave.LivingMonsterIds)
-                {
-                    Monster monster;
-                    if (!match.State.Monsters.TryGetValue(id, out monster) || monster == null)
-                    {
-                        continue;
-                    }
-
-                    var d = hero.Pos.DistanceTo(monster.Pos);
-                    if (d < nearest)
-                    {
-                        nearest = d;
-                    }
-                }
-
-                // Tight street cam (~20u tall). Wait until a painted monster is in the neighborhood.
-                if (nearest > 12.0 && elapsed < 14.0)
-                {
-                    return;
-                }
+                // Courtyard recapture: pin the Game camera on the hero (held at
+                // spawn) so hab sides + deck read, never a kit-wall clipping plane.
+                var cam = Camera.main;
+                MatchSceneBuilder.PlaceOver(cam, SimSpace.ToWorld(hero.Pos));
             }
 
             var lookPath = _playMode == "units" ? UnitsPath
@@ -1349,12 +1340,18 @@ namespace RedHollow.EditorTools
                 : _playMode == "lit" ? LitPath
                 : LookPath;
             DumpCamera(Camera.main, lookPath);
+            if (_playMode == "units" && File.Exists(lookPath))
+            {
+                var clean = "/workspace/unity/shots/units-visible-clean.png";
+                File.Copy(lookPath, clean, true);
+            }
             _lookCaptured = true;
             PurchaseLog.Add("lykos-look shot path=" + lookPath
                 + " elapsed=" + elapsed.ToString("0.00")
                 + " phase=" + match.State.Phase
                 + " wave=" + match.State.Wave.Number
                 + " living=" + match.State.Wave.LivingMonsterIds.Count
+                + " camPos=" + (Camera.main != null ? Camera.main.transform.position.ToString() : "null")
                 + " litShader=" + ViewLook.LitShaderName);
         }
 

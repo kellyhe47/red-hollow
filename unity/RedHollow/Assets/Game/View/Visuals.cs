@@ -70,6 +70,11 @@ namespace RedHollow.Game.View
             }
 
             visual.Instance.transform.SetParent(owner, false);
+            if (visual.Class == VisualClass.Hero || visual.Class == VisualClass.Monster)
+            {
+                visual.Instance.transform.localPosition = new Vector3(
+                    0f, CavernBlockout.DeckSurface, 0f);
+            }
         }
 
         /// <summary>
@@ -230,7 +235,7 @@ namespace RedHollow.Game.View
 
         /// <summary>
         /// Ground / hotspot / placeable placeholders are URP Lit so sourced lanterns shade them.
-        /// Heroes and monsters never reach here (UnitBillboard is Unlit). T16 pins none of the
+        /// Heroes and monsters never reach here (UnitBillboard builds Lit volumes). T16 pins none of the
         /// colours. Default-Material-with-zero-lights was the first-playtest black; we Lit only
         /// now that sourced point lights actually exist.
         /// </summary>

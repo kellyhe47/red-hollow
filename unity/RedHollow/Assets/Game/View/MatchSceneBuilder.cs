@@ -48,16 +48,23 @@ namespace RedHollow.Game.View
     /// </summary>
     public static class MatchSceneBuilder
     {
-        /// <summary>How far above the colony floor the camera sits. Not a PRD number; see below.</summary>
-        public const float CameraHeight = 40f;
+        /// <summary>
+        /// How far above the colony floor the camera sits. Street-scale: hab SIDES and
+        /// the gunslinger body fill the frame under a ~56° look. Height 22 still read
+        /// as a roof-stamp; 28 clipped habs. Keep the south follow corridor empty.
+        /// </summary>
+        public const float CameraHeight = 16f;
 
         /// <summary>
-        /// Pitch down from the horizon, degrees. ~60-70 is isometric-ish so roof edges and
-        /// building sides read; 90 would hide every vertical face.
+        /// Pitch down from the horizon, degrees. ~55-58 so roof edges AND wall sides
+        /// and the unit body read; 90 would hide every vertical face.
         /// </summary>
-        public const float CameraPitchDown = 62f;
+        public const float CameraPitchDown = 55f;
 
-        /// <summary>World units of breathing room around the colony, so nothing sits on the frame edge.</summary>
+        /// <summary>Vertical FOV for the street-scale follow cam. Ortho is retired.</summary>
+        public const float StreetFov = 38f;
+
+        /// <summary>Legacy name kept so older callers compile; no longer drives the view.</summary>
         public const float StreetOrthoSize = 10f;
 
         /// <summary>World offset from the followed ground point to the camera eye.</summary>
@@ -77,8 +84,8 @@ namespace RedHollow.Game.View
                 return;
             }
 
-            camera.orthographic = true;
-            camera.orthographicSize = StreetOrthoSize;
+            camera.orthographic = false;
+            camera.fieldOfView = StreetFov;
             camera.transform.position = lookAt + FollowOffset;
             camera.transform.rotation = Quaternion.Euler(CameraPitchDown, 0f, 0f);
         }
@@ -95,10 +102,14 @@ namespace RedHollow.Game.View
         private const float TypicalViewAspect = 16f / 9f;
 
         /// <summary>Warm brown haze — dust under lamplight, never a blue night mist.</summary>
-        private static readonly Color FogDust = new Color(0.46f, 0.26f, 0.12f);
+        private static readonly Color FogDust = new Color(0.12f, 0.075f, 0.04f);
 
-        /// <summary>Near-black umber ambient: dark, warm, and a color — never daylight.</summary>
-        private static readonly Color AmbientUmber = new Color(0.24f, 0.16f, 0.08f);
+        /// <summary>
+        /// Low warm umber fill. Keys pool on the deck; ambient keeps unlit sides
+        /// dark-umber instead of void-black. High values plus a fill grid were the
+        /// orange flood.
+        /// </summary>
+        private static readonly Color AmbientUmber = new Color(0.07f, 0.045f, 0.022f);
 
         /// <summary>
         /// Compose the scene the session is played in: a tilted top-down camera, the colony floor,
@@ -187,13 +198,10 @@ namespace RedHollow.Game.View
         }
 
         /// <summary>
-        /// R-30 — a 3D top-down look: the camera sits at <see cref="CameraHeight"/> over the
-        /// play area and pitches ~60-70° down (isometric-ish) so habitat roofs, wall thickness
-        /// and gantries read. Straight-down hides every vertical face.
-        ///
-        /// Orthographic, sized from the map, because a colony-defence read is about relative
-        /// distance — which shelter a wave is closer to — and perspective makes the same gap
-        /// read differently at the frame edge than at the centre.
+        /// R-30 — a 3D street-scale follow look: the camera sits at <see cref="CameraHeight"/>
+        /// over the followed ground point and pitches ~60° down so habitat walls, roof slabs
+        /// and deck thickness read. Perspective (not ortho) is the depth cue; a map-sized
+        /// ortho made every hab a roof stamp. Straight-down hides every vertical face.
         /// </summary>
         private static Camera BuildCamera(Transform root, Bounds playArea)
         {
@@ -201,10 +209,10 @@ namespace RedHollow.Game.View
             go.transform.SetParent(root, false);
 
             var camera = go.AddComponent<Camera>();
-            camera.orthographic = true;
-            camera.orthographicSize = StreetOrthoSize;
+            camera.orthographic = false;
+            camera.fieldOfView = StreetFov;
             camera.nearClipPlane = 0.3f;
-            camera.farClipPlane = 400f;
+            camera.farClipPlane = 280f;
 
             // Play-mode Game view: tag + solid cavern clear makes this the Game camera.
             go.tag = "MainCamera";
@@ -222,7 +230,7 @@ namespace RedHollow.Game.View
 
             urp.renderType = CameraRenderType.Base;
 
-            // Street-scale follow cam: a neighborhood, not the whole board.
+            // Street-scale perspective follow cam: a neighborhood, not the whole board.
             PlaceOver(camera, new Vector3(playArea.center.x, SimSpace.GroundHeight, playArea.center.z));
 
             return camera;
@@ -241,7 +249,7 @@ namespace RedHollow.Game.View
             RenderSettings.fogColor = FogDust;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
             // Dense enough to haze the far wall / lift shaft; the playable square stays readable.
-            RenderSettings.fogDensity = 0.008f;
+            RenderSettings.fogDensity = 0.016f;
 
             RenderSettings.skybox = null;
             RenderSettings.sun = null;
@@ -305,35 +313,27 @@ namespace RedHollow.Game.View
         }
 
         /// <summary>
-        /// Soft shadows on sourced lanterns. llvmpipe may hitch or go black with cubemap
-        /// point shadows; flip this off and keep the extra lights if PlayCapture dies.
+        /// Soft shadows on the courtyard keys (spawn + two flank masts). Far lanterns
+        /// stay unshadowed so the URP atlas can actually draw those three. Blob
+        /// shadows remain as a fallback if cubemap point shadows hitch.
         /// </summary>
-        private const bool LanternSoftShadows = false;
+        private const bool LanternSoftShadows = true;
 
         /// <summary>
-        /// Hung above 4-story stacks (peak ~y=32) so the lamp is not inside a cube.
-        /// Range must exceed height or the pool never reaches the street
-        /// (range 26 at y=36 missed the floor last time).
-        /// </summary>
-        private const float ClusterLanternHeight = 16f;
-
-        /// <summary>Sphere radius from the cluster lamp; 48 clears y=0 with a street pool.</summary>
-        private const float ClusterLanternRange = 34f;
-
-        /// <summary>Spawn / shelter keys hang over open courtyards, below the 4-story peak.</summary>
-        private const float KeyLanternHeight = 28f;
-
-        /// <summary>
-        /// R-15 — sourced amber point lights over spawn, each shelter, each tunnel mouth,
-        /// and a fill grid so walking a street is not an umber hole. Named and typed as
-        /// lanterns (never Directional) so the no-sun tests still pass.
+        /// R-15 — 8 sourced amber keys (spawn + 3 shelters + 4 street masts). No fill
+        /// grid, no roof flood. Only the courtyard keys carry Soft shadows — 8
+        /// shadowed points overflow the URP atlas and become an unshadowed orange
+        /// wash. Named and typed as lanterns (never Directional).
         /// </summary>
         private static void RaiseLanterns(Transform root, ColonyMap map)
         {
-            var amber = new Color(1.0f, 0.62f, 0.28f);
-            var keyShadows = LanternSoftShadows ? LightShadows.Soft : LightShadows.None;
+            var amber = new Color(1.0f, 0.70f, 0.36f);
+            var soft = LanternSoftShadows ? LightShadows.Soft : LightShadows.None;
 
-            AddLantern(root, "Lantern_Spawn", map.TeamSpawn, KeyLanternHeight, amber, 56f, 110f, keyShadows);
+            // Offset off the hero's head so the body is side-lit and the deck
+            // pools instead of flooding. Matches the spawn-pad lamp mesh.
+            var spawn = new Vec2(map.TeamSpawn.X + 2.8, map.TeamSpawn.Y + 2.8);
+            AddLantern(root, "Lantern_Spawn", spawn, 5.2f, amber, 9f, 48f, soft);
 
             foreach (var spec in map.Hotspots)
             {
@@ -342,28 +342,23 @@ namespace RedHollow.Game.View
                     continue;
                 }
 
-                AddLantern(root, "Lantern_" + spec.Id, spec.Pos, KeyLanternHeight, amber, 48f, 90f, keyShadows);
+                AddLantern(root, "Lantern_" + spec.Id, spec.Pos, 6.2f, amber, 11f, 32f, LightShadows.None);
             }
 
-            for (var i = 0; i < map.EntryTunnels.Count; i++)
+            // Street masts at hab rims. Two courtyard-facing masts keep Soft
+            // shadows so habs and the gunslinger blob the deck.
+            var masts = new[]
             {
-                AddLantern(root, "Lantern_Tunnel_" + i, map.EntryTunnels[i], 14f, amber, 40f, 60f, LightShadows.None);
-            }
-
-            var n = 0;
-            for (var x = -40; x <= 40; x += 20)
+                new Vec2(8.2, -3.2),
+                new Vec2(-8.2, -3.2),
+                new Vec2(3.0, 8.5),
+                new Vec2(-9.0, 6.0),
+            };
+            var mastShadows = new[] { soft, soft, LightShadows.None, LightShadows.None };
+            var mastCd = new[] { 42f, 42f, 30f, 30f };
+            for (var i = 0; i < masts.Length; i++)
             {
-                for (var z = -40; z <= 40; z += 20)
-                {
-                    if (x == 0 && z == 0)
-                    {
-                        continue;
-                    }
-
-                    AddLantern(root, "Lantern_Fill_" + n, new Vec2(x, z), ClusterLanternHeight,
-                        amber, ClusterLanternRange, 140f, LightShadows.None);
-                    n++;
-                }
+                AddLantern(root, "Lantern_Mast_" + i, masts[i], 5.6f, amber, 10f, mastCd[i], mastShadows[i]);
             }
         }
 
