@@ -349,6 +349,94 @@ namespace RedHollow.Tests.EditMode
         }
 
         /// <summary>
+        /// The wave-stall bug, pinned dead (owner playtest, 2026-08-26): <c>MatchSim.TurretTick</c>
+        /// flips <c>Alive</c> at 0 HP but deliberately leaves R-40's accounting to its caller —
+        /// so a session that never reaps a turret LAST-HIT leaves the corpse on
+        /// <see cref="WaveState.LivingMonsterIds"/> and the campaign stalls forever: no
+        /// wave_complete, no planning, no wave 2. The fix is <see cref="MatchSession"/>'s
+        /// placeable reap; this is its end-to-end pin through <see cref="NetSession.Step"/> —
+        /// roster cleared, bounty paid (R-20), the PLACER's account credited (R-40), and the
+        /// campaign actually moving on (R-03), which is the symptom the playtest saw.
+        /// </summary>
+        [Test]
+        public void A_turret_last_hit_clears_the_wave_and_the_campaign_moves_on()
+        {
+            var lobby = NewTwoPlayerLoopbackLobby();
+            Assert.That(lobby.Session.TryStartMatch(HostPeerId), Is.True, "the host starts the match");
+            var match = lobby.Session.Match;
+
+            // Whittle wave 1 to one survivor, standing at exactly one turret tick of HP.
+            var roster = match.State.Wave.LivingMonsterIds.ToList();
+            foreach (var id in roster.Take(roster.Count - 1))
+            {
+                match.Sim.RecordMonsterKill(new MonsterKillRequest
+                {
+                    MonsterId = id,
+                    MonsterType = match.State.Monsters[id].Type,
+                    Bounty = 0,
+                });
+            }
+
+            var survivorId = roster[roster.Count - 1];
+            var survivor = match.State.Monsters[survivorId];
+            var turretStats = match.Sim.Config.Placeables.StatsFor(PlaceableType.Turret);
+            survivor.Hp = turretStats.Damage;
+
+            var ownerSlot = match.State.Players[0].Id;
+            match.State.Placeables["turret_pin"] = new Placeable
+            {
+                Id = "turret_pin",
+                Type = PlaceableType.Turret,
+                Pos = survivor.Pos,
+                OwnerPlayerId = ownerSlot,
+                Exists = true,
+                Damage = turretStats.Damage,
+                Range = turretStats.Range,
+            };
+
+            var scripBefore = match.State.Team.Scrip;
+            var ownerAccount = match.State.Players[0].AccountId;
+            var xpBefore = lobby.Profiles.Load(ownerAccount).LifetimeXp;
+            var bounty = match.Sim.Config.Monsters.StatsFor(survivor.Type).Bounty;
+
+            lobby.Session.Step(Step60Hz);
+
+            Assert.That(survivor.Alive, Is.False,
+                "sanity (R-23/G-028): the tick emptied the survivor's HP and flagged the corpse");
+            Assert.That(match.State.Wave.LivingMonsterIds, Does.Not.Contain(survivorId),
+                "THE BUG: a turret last-hit must be reaped through RecordMonsterKill — a corpse "
+                + "left on the roster is a wave that never completes and a match that stalls");
+            Assert.That(match.State.Team.Scrip, Is.EqualTo(scripBefore + bounty),
+                "R-20: the kill pays its catalog bounty into the shared pool");
+            Assert.That(lobby.Profiles.Load(ownerAccount).LifetimeXp,
+                Is.EqualTo(xpBefore + bounty).Within(SimTolerance),
+                "R-40: a turret kill credits the PLACER's account");
+
+            // The symptom the playtest saw was the campaign freezing — so the pin is the campaign
+            // MOVING: planning opens for wave 2, both players ready, and wave 2's monsters arrive.
+            var partyReady = new Action(() =>
+            {
+                if (match.State.Phase == MatchPhase.Planning)
+                {
+                    foreach (var player in match.State.Players)
+                    {
+                        match.Sim.SetPlayerReady(player.Id);
+                    }
+                }
+            });
+
+            var arrived = DriveUntil(
+                lobby.Session, match.Clock,
+                () => match.State.Wave.Number == 2 && match.State.Wave.LivingMonsterIds.Count > 0,
+                budgetSeconds: 10.0,
+                beforeEachStep: partyReady);
+
+            Assert.That(arrived, Is.True,
+                "R-03/R-19: the turret-cleared wave must be followed by wave 2 — the stalled "
+                + "campaign is exactly the bug this test exists to keep dead");
+        }
+
+        /// <summary>
         /// R-17's "ranged acid, range 10" through the REAL driven session (ticket 029): a Spitter
         /// walks to its line, holds there, and drains the shelter from range — movement's
         /// hold-at-reach, the contact source's widened reach, the R-18 gate and R-11's civilian
