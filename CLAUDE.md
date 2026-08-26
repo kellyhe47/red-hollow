@@ -1,6 +1,6 @@
 # The Red Hollow — agent operating guide
 
-Week-8 game project. Spec: `docs/PRD.md` (v1.2, approved). Fixtures: `eval/golden/` (acceptance contract). Art contracts: `docs/comfy-prompts/`.
+Week-8 game project. Spec: `docs/PRD.md` (v1.3, approved). Fixtures: `eval/golden/` (acceptance contract). Art contracts: `docs/comfy-prompts/`.
 
 ## ⚠️ Multiple agents are working this repo concurrently
 
@@ -21,9 +21,9 @@ Several Claude (Desktop/Code) agents run in parallel, one per Comfy Cloud art pi
 - When creating your pipeline, **build or duplicate then immediately retitle** it (e.g. "Characters Pipeline") and change all SaveImage `filename_prefix` values to your class prefix (`characters/…`, `icons/…`, `ui/…`) BEFORE the first run — output prefixes are how everyone attributes assets in the shared feed.
 
 ### 3. Shared contracts — docs are the source of truth
-- Art direction is **"Lantern Deep" (DEC-025)** — read `docs/comfy-prompts/00-shared-style.md` before generating anything. The Comfy prompt nodes are deployed *copies* of that doc; if style must change, change the doc first (and tell the owner — style is an owner-level decision), then mirror to nodes.
+- Art direction is **"Lantern Deep" palette/lighting (DEC-025)** plus the **DEC-026 presentation override** (3D Lykos cavern ~70% colony forms / ~30% western wood/brass/lantern wear; tilted isometric camera; 2D standing-card characters; not a cowboy main street, not western-only-on-characters) — read `docs/comfy-prompts/00-shared-style.md` before generating anything. The Comfy prompt nodes are deployed *copies* of that doc; if style must change, change the doc first (and tell the owner — style is an owner-level decision), then mirror to nodes.
 - Environment pipeline uses the **texture-core tail** documented in `01-environment-agent.md`, not the full scene tail (scene terms break tileability — verified).
-- Never mix pre- and post-DEC-025 assets in a delivered set; regenerate old-style assets.
+- Never mix pre- and post-DEC-025 assets in a delivered set; regenerate old-style assets. DEC-026 does not require a palette regen; first/second-gen env art that leaned too western (saloon porch, hitching post, chapel steeple, ranch porch) is superseded for the map look — do not delete committed files.
 
 ### 4. Comfy pipeline discipline (all pipelines)
 - Seed stays pinned (20260824, `control_after_generate: fixed`). Steps 28 for keepers, 12–15 for drafts. cfg 7, dpmpp_2m/karras.

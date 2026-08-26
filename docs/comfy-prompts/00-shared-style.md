@@ -1,6 +1,6 @@
 # Shared style contract — all four Comfy Cloud pipelines
 
-**Art direction: "Lantern Deep" — cinematic subterranean colonial Mars** (owner-approved 2026-08-24, DEC-025; supersedes the original "stylized low-poly orange-and-teal flat shading" direction).
+**Art direction: "Lantern Deep" palette/lighting (DEC-025) + 3D Lykos presentation (DEC-026, owner 2026-08-26).** DEC-025 still owns palette, sourced light, volumetric haze, and matte painterly semi-realism (owner-approved 2026-08-24; supersedes the original "stylized low-poly orange-and-teal flat shading" direction). DEC-026 overrides *what we ship in-engine*: fully 3D cavern colony (~70% Lykos habitat forms / ~30% western wood/brass/lantern wear on those forms; not a cowboy main street, not a flat 2D tilemap), tilted isometric camera, 2D painted characters as standing cards. Not western-only-on-characters.
 
 ## Design language (the words; use these when describing, prompting, or reviewing any asset)
 
@@ -19,13 +19,22 @@
 
 **Forms & materials**
 - Immense scale contrast: cathedral-height rock walls and dome dwarf dense low blocky architecture; human figures as tiny silhouettes for scale.
-- Architecture: stacked, flat-roofed, cubic vernacular masses — utilitarian, accreted, no ornament; industrial gantries, cables, scaffold masts threading through.
+- Architecture (~70%): stacked, flat-roofed, cubic **Lykos utilitarian colony blocks** — habitat masses, metal decking, carved rock, lantern masts, industrial gantries/cables. Western (~30%) is **wood/brass/lantern wear on those Mars forms**, not cowboy-main-street architecture. First/second-gen saloon-porch / hitching-post / chapel-steeple / ranch-porch LOOK is superseded (DEC-026).
 - Rock: rough-hewn, massive, softly modeled by bounce light, not textured detail.
 - Surfaces read matte and dusty; **no specular sparkle, no clean metal**.
 
 **Rendering character**
 - Semi-realistic painterly-matte (concept-art matte painting, not PBR-photoreal): soft edges in haze, crisp silhouette edges in foreground, detail suggested rather than drawn.
 - Cinematic framing sensibility, deep Z-depth layering (foreground ridge → mid city → glowing far wall).
+
+**In-engine presentation (DEC-026 — what we ship)**
+- Environment = **fully 3D** Martian terraformed underground colony inspired by Lykos (Red Rising) / `seed-env.webp`. Mix **~70% colony / ~30% western frontier accents**. Stacked blocky settlement, real building height, volumetric haze, amber lanterns.
+- Buildings are **Mars-type**: stacked habitat blocks, metal decking, carved rock, lantern masts, industrial colony architecture. Western is wood/brass/lantern wear on those forms — **not** western-only-on-characters, **not** a cowboy main street.
+- **Zero natural light** (DEC-025, still in force): no sun, no sky, no directional golden-hour. Lanterns, not sun.
+- Camera: **tilted 3D top-down/isometric ~60–70° down** so side walls and roof edges read. Not `Quaternion.LookRotation(Vector3.down)` bird's-eye. Reference language: r/DestroyMyGame 1hijaq4 trailer camera, but lanterns not sun.
+- Heroes and monsters stay **2D painted western sheets** as standing cards/billboards in 3D space (2.5D). **v1 explicitly defers 3D sculpted/rigged characters** (hard lift).
+- Comfy environment tiles = albedo/normal/AO for **3D mesh UVs**, not a flat 2D tilemap.
+- Hotspot **names** Saloon, Chapel, Homestead remain sim/fixture IDs (R-10); their 3D meshes are Lykos colony blocks with western wear.
 
 ## Prompt contract
 
@@ -46,8 +55,9 @@ Pipeline-specific modifiers still apply on top and **override scene terms where 
 Most of Lantern Deep is a **scene-lighting** achievement, deliberately kept out of the albedo textures:
 - Dark warm ambient (near-black umber), fog/volumetrics for the dust haze.
 - All light sourced: amber point lights at lanterns/string lights/windows; one bright landmark (lift shaft / arc towers) as the "glowing distance".
-- Cavern dome mesh textured with the sandstone wall tile; no skybox — the dome IS the sky.
-- Semi-realistic depth comes from URP lighting + derived normal/AO maps over painterly albedo (see per-pipeline deliverables) — NOT from photoreal source textures.
+- Cavern dome mesh textured with the sandstone/carved-rock wall tile; no skybox — the dome IS the sky.
+- Semi-realistic depth comes from URP lighting + derived normal/AO maps over painterly albedo on **3D meshes** (see per-pipeline deliverables) — NOT from photoreal source textures, and **not from a flat 2D tilemap**.
+- Camera is tilted isometric (~60–70° down). Heroes/monsters are 2D standing-card billboards in that 3D volume (DEC-026).
 
 **Process rules (all agents):**
 1. Start from a Comfy Cloud text-to-image template; get one image out before building anything.
@@ -56,7 +66,7 @@ Most of Lantern Deep is a **scene-lighting** achievement, deliberately kept out 
 4. Log model + seed + steps + cfg + both prompts per delivered asset in `art/asset-log.csv`.
 5. Draft at low steps and small sizes; spend credits only on keepers.
 5b. **"Deliver" means committed to the repo.** Comfy Cloud storage is scratch space, not delivery. Every keeper gets downloaded (asset "..." menu → Download) and committed under `art/<class>/` (textures / characters / icons / ui) named `<subject-slug>_v<N>_<size|variant>.png` — e.g. `art/textures/street-dirt_v1_512.png`. Bump `_v<N+1>` on regeneration; never overwrite a committed version; never re-run a pipeline just to rename. An asset that exists only in Comfy Cloud is not done.
-6. **Style-change rule:** any asset generated under the pre-DEC-025 tail must be regenerated before ship; never mix the two styles in one delivered set.
+6. **Style-change rule:** any asset generated under the pre-DEC-025 tail must be regenerated before ship; never mix the two styles in one delivered set. DEC-026 is a *presentation* override (3D Lykos ~70/30 + 2.5D + tilted camera), not a palette regen. First/second-gen env art that leaned too western (saloon porch, hitching posts, chapel steeple, ranch porch) is superseded for the map look even if those files remain committed.
 7. **Save hygiene (owner directive, 2026-08-25):** Comfy Cloud does not autosave, and console widget edits, queueing, and run progress all dirty the tab. **Never end a turn, report back, or go idle with a `*` (unsaved-changes dot) in your workflow tab title** — Cmd+S and verify the dot cleared (if it persists, click empty canvas to focus, Cmd+S again). Before that final save, restore the graph's contract nodes (framing/negative/prefixes) to match your committed `art/workflows/<pipeline>.json`, so the next run doesn't silently pick up a stale per-item experiment. The owner should never have to ping an agent to save its Comfy work. (Also in repo `CLAUDE.md` §1.)
 
-Game: **The Red Hollow** — 1–4 player co-op wave defense, top-down Unity. Full spec in `docs/PRD.md`; wireframes in `docs/ui-wireframes.html`.
+Game: **The Red Hollow** — 1–4 player co-op wave defense, tilted isometric 3D Unity (DEC-026). Full spec in `docs/PRD.md`; wireframes in `docs/ui-wireframes.html`.

@@ -1,7 +1,9 @@
 # Agent 2 — Characters pipeline (Comfy Cloud)
 
 ## Mission
-Build and commit a ComfyUI (cloud.comfy.org) pipeline producing **character art for The Red Hollow**: the 3 hero classes and 5 monster types — lobby/HUD portraits and full-body turnaround reference sheets (used for 3D modeling reference and marketing). Read `docs/comfy-prompts/00-shared-style.md` first; obey its style tail ("Lantern Deep", DEC-025), sampler locks, and process rules. Characters render as lantern-lit figures in the burnt-sienna monochrome: color keys below are *value/material* distinctions within that palette (charcoal, brass, oxblood, bone all sit inside it); the Spitter's acid-green is the sanctioned gameplay-alarm accent. Full character specs: `docs/PRD.md` §7 (heroes) and §5 (monsters).
+Build and commit a ComfyUI (cloud.comfy.org) pipeline producing **character art for The Red Hollow**: the 3 hero classes and 5 monster types — lobby/HUD portraits and full-body turnaround sheets. Read `docs/comfy-prompts/00-shared-style.md` first; obey its style tail ("Lantern Deep" palette/lighting, DEC-025; presentation override DEC-026), sampler locks, and process rules. Characters render as lantern-lit figures in the burnt-sienna monochrome: color keys below are *value/material* distinctions within that palette (charcoal, brass, oxblood, bone all sit inside it); the Spitter's acid-green is the sanctioned gameplay-alarm accent. Full character specs: `docs/PRD.md` §7 (heroes) and §5 (monsters).
+
+**In-engine use (DEC-026):** these are **2D painted sheets** used as standing cards/billboards in 3D space (2.5D). v1 is **not** 3D sculpted/rigged character meshes — that is explicitly deferred (hard lift). Western silhouettes stay on these 2.5D standing cards. Environment western is **wear on Lykos forms** (~30%), not a cowboy main street — see `00-shared-style.md`.
 
 ## Failure mode you own (from the art plan)
 **Same face in every image.** Identity drift across poses/angles is your defect class — measured on the walk-cycle demo as 13.9% scale drift and 11px baseline wander from prompt-only generation. Prompt-only is NOT acceptable here; you must climb the control ladder.
@@ -13,12 +15,12 @@ Build and commit a ComfyUI (cloud.comfy.org) pipeline producing **character art 
 4. **LoRA only if the 3 heroes still drift after IP-Adapter + ControlNet** (half-day cost; heroes only, never monsters).
 
 ## Cast (items list)
-Heroes (human, western silhouettes, distinct color keys):
+Heroes (human, **western silhouettes** — keep; these sheets become 2D standing cards, DEC-026 — distinct color keys):
 1. **Gunslinger** — lean duster coat, twin revolvers, low hat; color key: charcoal + brass
 2. **Rancher** — stocky, shotgun, coiled lasso on hip; color key: oxblood + rope-tan
 3. **Sawbones** — broad tank build, heavy apron-armor, bone-saw sword; color key: bone-white + rust
 
-Monsters (virus-mutated colonists/livestock, zombie-western horror, readable at top-down distance):
+Monsters (virus-mutated colonists/livestock, zombie-western horror, readable as standing cards at tilted-isometric distance):
 4. **Shambler** — mutated colonist, tattered settler clothes
 5. **Ravager** — mutated cattle-dog, fast quadruped
 6. **Spitter** — bloated colonist, acid-green throat sacs
@@ -26,7 +28,7 @@ Monsters (virus-mutated colonists/livestock, zombie-western horror, readable at 
 8. **Bull Behemoth** — massive mutated bull, exposed ribs, broken horns
 
 ## Deliverables
-Per character: 1 canon full-body (1024², front 3/4, neutral pose, plain dark background), 1 turnaround sheet (front/side/back, matched scale), 1 head-and-shoulders portrait 512² (heroes also get a greyed "dead/respawning" variant). Verify each set: consistent silhouette, colors, and gear across all frames — measure, don't eyeball (overlay frames; feet baseline within a few px, scale within ~3%).
+Per character: 1 canon full-body (1024², front 3/4, neutral pose, plain dark background) — this is the **standing-card / billboard** sheet in the 3D cavern — 1 turnaround sheet (front/side/back, matched scale; extra card angles + marketing, not v1 3D modeling reference), 1 head-and-shoulders portrait 512² (heroes also get a greyed "dead/respawning" variant). Verify each set: consistent silhouette, colors, and gear across all frames — measure, don't eyeball (overlay frames; feet baseline within a few px, scale within ~3%).
 
 Export Save (API Format) → `art/workflows/character.json` (+ `character_ipadapter.json`); commit; log model/seed/prompts per asset.
 
