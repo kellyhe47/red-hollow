@@ -62,6 +62,13 @@ namespace RedHollow.Game.UI
         /// Null means the shipped <see cref="CombatActionConfig"/> defaults.
         /// </summary>
         public CombatActionConfig CombatActions;
+
+        /// <summary>
+        /// Ticket 030 — the replication channel a HOSTING shell broadcasts snapshots on and
+        /// receives remote commands from (an <see cref="NgoMatchChannel"/> in a LAN/Relay party).
+        /// Null means no remote party — the offline default, and every EditMode harness.
+        /// </summary>
+        public IHostMatchChannel HostChannel;
     }
 
     /// <summary>
@@ -189,6 +196,13 @@ namespace RedHollow.Game.UI
         private readonly INetTransport _transport;
         private readonly IInputSource _input;
         private readonly LocalHeroIntentSource _heroIntents;
+
+        /// <summary>Ticket 030 — remote peers' held input, applied through the same seams as local play.</summary>
+        private readonly RemotePartyDriver _remoteParty;
+
+        /// <summary>Ticket 030 — where snapshots go out, or null for an offline shell.</summary>
+        private IHostMatchChannel _hostChannel;
+
         private readonly string _localPeerId;
         private readonly NetSessionConfig _netConfig;
         private readonly IHostedMatchFactory _matchFactory;
@@ -285,6 +299,16 @@ namespace RedHollow.Game.UI
             // T-25 — combat tunables are shell policy: composed, never constants in the routing.
             _combatActions = options.CombatActions ?? new CombatActionConfig();
 
+            // Ticket 030 — the remote party's half of the pump: wire commands become the same sim
+            // commands the local paths issue. One driver for the shell's lifetime (its per-peer
+            // held state survives rematches the way the local intent source does); the channel is
+            // optional and null for every offline shell.
+            _remoteParty = new RemotePartyDriver(_combatActions) { AfterCommand = DrainTap };
+            if (options.HostChannel != null)
+            {
+                AttachHostChannel(options.HostChannel);
+            }
+
             // R-15 — real art by default; the placeholder answers for everything unregistered.
             _catalog = options.ArtCatalog ?? LoadRepresentativeArt();
             _visuals = new ArtVisualResolver(_catalog, new PlaceholderVisualResolver());
@@ -313,6 +337,33 @@ namespace RedHollow.Game.UI
 
         /// <summary>The session this shell fronts. Hosting/joining goes through it directly.</summary>
         public NetSession Session => _session;
+
+        /// <summary>
+        /// Ticket 030 — attach the replication channel once the wire is listening (NGO's
+        /// messaging manager exists only from that moment, so a LAN/Relay host attaches after
+        /// HOST GAME brought the transport up). Idempotent per channel; the offline shell never
+        /// calls it.
+        /// </summary>
+        public void AttachHostChannel(IHostMatchChannel channel)
+        {
+            if (channel == null || ReferenceEquals(channel, _hostChannel))
+            {
+                return;
+            }
+
+            _hostChannel = channel;
+            channel.CommandReceived += _remoteParty.HandleCommand;
+        }
+
+        /// <summary>
+        /// Ticket 030 / R-53 — a remote peer's wire dropped: its held input must stop steering
+        /// its hero. The session-level despawn is <see cref="NetSession.Disconnect"/>'s business;
+        /// the composition root calls both.
+        /// </summary>
+        public void DropRemotePeer(string peerId)
+        {
+            _remoteParty.DropPeer(peerId);
+        }
 
         /// <summary>T-26 — the colony scene this shell refreshes marker state on (null until attached).</summary>
         public MatchScene Scene => _scene;
@@ -543,6 +594,14 @@ namespace RedHollow.Game.UI
             // commands' events ride this same pump's routing.
             HandleCombatActions(deltaSeconds);
 
+            // Ticket 030 — the remote party's combat/planning input, applied through the same sim
+            // seams in the same pump slot. Its AfterCommand drain keeps every remote-caused event
+            // in this pump's feed, exactly as the local paths drain per command.
+            if (_boundMatch != null)
+            {
+                _remoteParty.Step(_boundMatch, deltaSeconds);
+            }
+
             // 1 — collect BEFORE stepping: events of commands issued directly between pumps are
             // still sitting in LastObservation until the step's first command overwrites it.
             if (_tap != null)
@@ -553,6 +612,13 @@ namespace RedHollow.Game.UI
             // 2 — the step. Every command the session drives passes through the tap, so its
             // events land in the pending list as they happen.
             _session.Step(deltaSeconds);
+
+            // Ticket 030 — the world goes out to the remote party after it moved (R-51: clients
+            // render the host's answer, never their own prediction of it).
+            if (_hostChannel != null && _boundMatch != null)
+            {
+                _remoteParty.BroadcastSnapshot(_boundMatch, _hostChannel);
+            }
 
             // 3 — route, exactly once, in emission order.
             _routing.Clear();
@@ -705,6 +771,18 @@ namespace RedHollow.Game.UI
             }
 
             _taps.TryGetValue(match, out _tap);
+
+            // Ticket 030 — every seated peer that is not this machine plays through the remote
+            // driver. Seating is idempotent, and a shell with no channel simply holds seats whose
+            // input never arrives.
+            foreach (var seat in _session.Seats)
+            {
+                if (seat != null && !string.Equals(seat.PeerId, _localPeerId, StringComparison.Ordinal))
+                {
+                    _remoteParty.SeatPeer(seat.PeerId, seat.AccountId);
+                }
+            }
+
             // T-24 — one oracle per match, over the match's own map; its radii are re-copied off
             // the live sim every pump (see HandlePlanningPointer) so retunes move both sides.
             _zoneOracle = new PlacementZoneOracle(match.Sim.ColonyMap);
@@ -1473,7 +1551,13 @@ namespace RedHollow.Game.UI
 
                 var tap = new SimEventTap(match.Host);
                 match.Host = tap;
-                match.Session = new MatchSession(tap, _shell._heroIntents, _shell._views);
+
+                // Ticket 030 — one session, two hands on it: the local device and the remote
+                // party feed the same intent seam, so HostLoop paces every hero identically.
+                match.Session = new MatchSession(
+                    tap,
+                    new CompositeHeroIntentSource(_shell._heroIntents, _shell._remoteParty),
+                    _shell._views);
 
                 _shell._taps[match] = tap;
                 return match;

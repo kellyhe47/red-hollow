@@ -51,6 +51,7 @@
     <Compile Include="../../unity/RedHollow/Assets/Game/Net/NetTransportFactory.cs" />
     <Compile Include="../../unity/RedHollow/Assets/Game/Net/NgoNetTransport.cs" />
     <Compile Include="../../unity/RedHollow/Assets/Game/Net/UgsServices.cs" />
+    <Compile Include="../../unity/RedHollow/Assets/Game/Net/LanServices.cs" />
     <Compile Include="../../unity/RedHollow/Assets/Game/Net/MatchSnapshot.cs" />
     <Compile Include="../../unity/RedHollow/Assets/Game/Net/MatchChannel.cs" />
     <Compile Include="../../unity/RedHollow/Assets/Game/Net/RemotePartyDriver.cs" />

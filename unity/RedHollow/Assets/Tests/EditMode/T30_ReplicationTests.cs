@@ -340,6 +340,79 @@ namespace RedHollow.Tests.EditMode
         }
 
         // ==========================================================================================
+        //  LAN services — the cloudless NGO bring-up (ticket 030's "NGO on loopback")
+        // ==========================================================================================
+
+        /// <summary>
+        /// R-50 one layer further down: <see cref="NgoNetTransport"/>'s WHOLE pinned bring-up —
+        /// order, join refusal, teardown — runs over <see cref="LanServices"/> with no cloud
+        /// anywhere: the "allocation" is a <see cref="LocalEndpoint"/>, the join code is the dial
+        /// string, and a code the parser cannot read refuses exactly like an expired lobby (T-20's
+        /// shape, so S1's inline error works unchanged).
+        /// </summary>
+        [Test]
+        public void The_ngo_transport_hosts_and_joins_over_lan_services_with_no_cloud()
+        {
+            var hostWire = new RecordingWire();
+            var host = new NgoNetTransport(new LanServices(), hostWire);
+
+            host.StartHost(new NetSessionConfig());
+
+            Assert.That(host.IsRunning, Is.True, "the LAN host came up");
+            Assert.That(host.JoinCode, Is.EqualTo(LanServices.CodePrefix),
+                "the default dial string IS the join code the S2 screen shows");
+            var endpoint = hostWire.LastEndpoint as LocalEndpoint;
+            Assert.That(endpoint, Is.Not.Null, "the wire was handed a direct endpoint, not Relay");
+            Assert.That(endpoint.Address, Is.EqualTo("127.0.0.1"));
+            Assert.That(endpoint.Port, Is.EqualTo(LanServices.DefaultPort));
+
+            var clientWire = new RecordingWire();
+            var client = new NgoNetTransport(new LanServices(), clientWire);
+
+            Assert.That(client.TryJoinAsClient(new NetSessionConfig(), "LAN"), Is.True,
+                "the default code dials loopback");
+            Assert.That(((LocalEndpoint)clientWire.LastEndpoint).Address, Is.EqualTo("127.0.0.1"));
+
+            Assert.That(client.TryJoinAsClient(new NetSessionConfig(), "NOPE42"), Is.False,
+                "a code the dial parser cannot read refuses like an expired lobby — never throws");
+
+            var lanClient = new NgoNetTransport(new LanServices(), new RecordingWire());
+            Assert.That(lanClient.TryJoinAsClient(new NetSessionConfig(), "LAN:192.168.0.12:7799"),
+                Is.True, "an addressed code dials across the room");
+        }
+
+        /// <summary>Minimal T-20-shaped wire: records endpoints, carries no bytes.</summary>
+        private sealed class RecordingWire : INetWire
+        {
+            public RelayEndpoint LastEndpoint;
+
+            public bool IsUp { get; private set; }
+
+            public event Action<string> PeerDisconnected
+            {
+                add { }
+                remove { }
+            }
+
+            public void StartHost(RelayEndpoint endpoint)
+            {
+                LastEndpoint = endpoint;
+                IsUp = true;
+            }
+
+            public void StartClient(RelayEndpoint endpoint)
+            {
+                LastEndpoint = endpoint;
+                IsUp = true;
+            }
+
+            public void Shutdown()
+            {
+                IsUp = false;
+            }
+        }
+
+        // ==========================================================================================
         //  rig — one host, one remote seat, one wire
         // ==========================================================================================
 

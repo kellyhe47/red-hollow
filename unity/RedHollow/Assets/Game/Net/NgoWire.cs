@@ -117,11 +117,20 @@ namespace RedHollow.Game.Net
             ApplyRelayData(endpoint, asHost: false);
             HookDisconnects();
 
-            // The payload is how this machine's session peer id reaches the host's approval
-            // callback — the only moment the two identities are ever in the same hand.
-            _networkManager.NetworkConfig.ConnectionData = string.IsNullOrEmpty(_localPeerId)
+            // The payload is how this machine's session identity reaches the host's approval
+            // callback — the only moment the two sides' identities are ever in the same hand.
+            // Peer id alone (the T-20 shape) when no lobby identity was set; peer id + account +
+            // class (ticket 030's hello) when one was.
+            var payload = _localPeerId ?? string.Empty;
+            if (!string.IsNullOrEmpty(_localAccountId) || !string.IsNullOrEmpty(_localHeroClass))
+            {
+                payload = payload + "\n" + (_localAccountId ?? string.Empty)
+                          + "\n" + (_localHeroClass ?? string.Empty);
+            }
+
+            _networkManager.NetworkConfig.ConnectionData = payload.Length == 0
                 ? new byte[0]
-                : Encoding.UTF8.GetBytes(_localPeerId);
+                : Encoding.UTF8.GetBytes(payload);
 
             _networkManager.StartClient();
         }
@@ -157,6 +166,47 @@ namespace RedHollow.Game.Net
         }
 
         /// <summary>
+        /// Ticket 030 — the joiner's whole lobby identity (peer id, account/callsign, class
+        /// pick), so the host's door can seat it through <see cref="NetSession.TryJoin"/> the
+        /// moment it knocks. Newline-joined into the same connection payload the peer id already
+        /// crossed in; a client that set only the peer id still connects (hello fields empty).
+        /// </summary>
+        public void SetLocalIdentity(string peerId, string accountId, string heroClass)
+        {
+            _localPeerId = peerId;
+            _localAccountId = accountId;
+            _localHeroClass = heroClass;
+        }
+
+        private string _localAccountId;
+        private string _localHeroClass;
+
+        /// <summary>
+        /// Ticket 030 — a remote peer knocked with its identity: (peerId, accountId, heroClass).
+        /// The shell forwards this to <see cref="NetSession.TryJoin"/> and, on a refusal, to
+        /// <see cref="Kick"/> — admission stays the session's decision (R-50/R-53), the wire only
+        /// reports who is at the door.
+        /// </summary>
+        public event Action<string, string, string> PeerHello;
+
+        /// <summary>
+        /// Ticket 030 — drop one peer's connection (the wire half of a refused
+        /// <see cref="NetSession.TryJoin"/>: a knocker the session turned away must not stay on
+        /// the wire receiving snapshots).
+        /// </summary>
+        public void Kick(string peerId)
+        {
+            foreach (var pair in _peerIdsByClientId)
+            {
+                if (string.Equals(pair.Value, peerId, StringComparison.Ordinal))
+                {
+                    _networkManager.DisconnectClient(pair.Key);
+                    return;
+                }
+            }
+        }
+
+        /// <summary>
         /// Register which session peer an NGO client id speaks for — called by the shell's
         /// connection-approval hook once it has read the peer id out of the connection payload.
         /// </summary>
@@ -168,6 +218,27 @@ namespace RedHollow.Game.Net
             }
 
             _peerIdsByClientId[clientId] = peerId;
+        }
+
+        /// <summary>The session peer an NGO client id speaks for, or null before its handshake.</summary>
+        internal string PeerIdOf(ulong clientId)
+        {
+            return _peerIdsByClientId.TryGetValue(clientId, out var peerId) ? peerId : null;
+        }
+
+        /// <summary>
+        /// Ticket 030 — the replication channel over this wire, host side. Create AFTER
+        /// <see cref="StartHost"/> (NGO's messaging manager exists only while listening).
+        /// </summary>
+        public IHostMatchChannel CreateHostMatchChannel()
+        {
+            return new NgoMatchChannel(this, _networkManager, asHost: true);
+        }
+
+        /// <summary>Ticket 030 — the client half. Create AFTER <see cref="StartClient"/>.</summary>
+        public IClientMatchChannel CreateClientMatchChannel()
+        {
+            return new NgoMatchChannel(this, _networkManager, asHost: false);
         }
 
         private void HookDisconnects()
@@ -207,7 +278,21 @@ namespace RedHollow.Game.Net
         {
             if (request.Payload != null && request.Payload.Length > 0)
             {
-                MapPeer(request.ClientNetworkId, Encoding.UTF8.GetString(request.Payload));
+                // "peerId" (the T-20 shape) or "peerId\naccount\nclass" (ticket 030's hello).
+                var payload = Encoding.UTF8.GetString(request.Payload);
+                var parts = payload.Split('\n');
+                var peerId = parts[0];
+
+                MapPeer(request.ClientNetworkId, peerId);
+
+                if (parts.Length >= 3)
+                {
+                    var hello = PeerHello;
+                    if (hello != null)
+                    {
+                        hello(peerId, parts[1], parts[2]);
+                    }
+                }
             }
 
             response.Approved = true;
@@ -237,25 +322,44 @@ namespace RedHollow.Game.Net
         }
 
         /// <summary>
-        /// Hand UnityTransport the Relay connection data the allocation answered. The endpoint is
-        /// opaque above this seam; only here may it be opened back up into its fields.
+        /// Hand UnityTransport the connection data the allocation answered. The endpoint is
+        /// opaque above this seam; only here may it be opened back up into its fields. Two kinds
+        /// exist: the Relay allocation the cloud path mints, and ticket 030's
+        /// <see cref="LocalEndpoint"/> — a plain address/port for NGO on loopback or a LAN, which
+        /// crosses as ordinary connection data with no Relay handshake at all.
         /// </summary>
         private void ApplyRelayData(RelayEndpoint endpoint, bool asHost)
         {
-            var relay = endpoint as UgsRelayEndpoint;
-            if (relay == null)
-            {
-                throw new ArgumentException(
-                    "NgoWire needs the UgsRelayEndpoint the real services adapter mints; got "
-                    + (endpoint == null ? "null" : endpoint.GetType().Name),
-                    nameof(endpoint));
-            }
-
             var transport = _networkManager.NetworkConfig.NetworkTransport as UnityTransport;
             if (transport == null)
             {
                 throw new InvalidOperationException(
-                    "the NetworkManager's transport must be UnityTransport to carry Relay data");
+                    "the NetworkManager's transport must be UnityTransport to carry connection data");
+            }
+
+            if (endpoint is LocalEndpoint local)
+            {
+                if (asHost)
+                {
+                    // Bind every interface so a LAN client can dial the advertised address.
+                    transport.SetConnectionData(local.Address, local.Port, "0.0.0.0");
+                }
+                else
+                {
+                    transport.SetConnectionData(local.Address, local.Port);
+                }
+
+                return;
+            }
+
+            var relay = endpoint as UgsRelayEndpoint;
+            if (relay == null)
+            {
+                throw new ArgumentException(
+                    "NgoWire needs the UgsRelayEndpoint the real services adapter mints (or a "
+                    + "LocalEndpoint for direct connections); got "
+                    + (endpoint == null ? "null" : endpoint.GetType().Name),
+                    nameof(endpoint));
             }
 
             if (asHost)
@@ -269,6 +373,106 @@ namespace RedHollow.Game.Net
                 transport.SetClientRelayData(
                     relay.Host, relay.Port, relay.AllocationIdBytes, relay.Key,
                     relay.ConnectionData, relay.HostConnectionData, relay.IsSecure);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Ticket 030 — <see cref="IHostMatchChannel"/> / <see cref="IClientMatchChannel"/> over NGO
+    /// custom messages: snapshots broadcast host→clients, commands client→server, both reliable
+    /// and fragmented (a late-wave snapshot outgrows a single datagram). As thin as
+    /// <see cref="NgoWire"/> itself and untestable for the same reason — every replication
+    /// DECISION lives in <see cref="RemotePartyDriver"/> / <see cref="ClientMatchPresenter"/> and
+    /// is pinned over the in-memory pair; this class only carries strings.
+    /// </summary>
+    public sealed class NgoMatchChannel : IHostMatchChannel, IClientMatchChannel
+    {
+        private const string SnapshotMessage = "rh_snapshot";
+        private const string CommandMessage = "rh_command";
+
+        /// <summary>Fragmented-delivery ceiling; a snapshot is a few KB, this is headroom.</summary>
+        private const int MaxPayloadBytes = 4 * 1024 * 1024;
+
+        private readonly NgoWire _wire;
+        private readonly NetworkManager _networkManager;
+
+        public NgoMatchChannel(NgoWire wire, NetworkManager networkManager, bool asHost)
+        {
+            _wire = wire;
+            _networkManager = networkManager;
+
+            if (asHost)
+            {
+                _networkManager.CustomMessagingManager.RegisterNamedMessageHandler(
+                    CommandMessage, OnCommandMessage);
+            }
+            else
+            {
+                _networkManager.CustomMessagingManager.RegisterNamedMessageHandler(
+                    SnapshotMessage, OnSnapshotMessage);
+            }
+        }
+
+        public event Action<string, string> CommandReceived;
+
+        public event Action<string> SnapshotReceived;
+
+        public void Broadcast(string snapshot)
+        {
+            using (var writer = NewWriter(snapshot))
+            {
+                _networkManager.CustomMessagingManager.SendNamedMessageToAll(
+                    SnapshotMessage, writer, NetworkDelivery.ReliableFragmentedSequenced);
+            }
+        }
+
+        public void SendCommand(string payload)
+        {
+            using (var writer = NewWriter(payload))
+            {
+                _networkManager.CustomMessagingManager.SendNamedMessage(
+                    CommandMessage, NetworkManager.ServerClientId, writer,
+                    NetworkDelivery.ReliableFragmentedSequenced);
+            }
+        }
+
+        private static FastBufferWriter NewWriter(string payload)
+        {
+            var writer = new FastBufferWriter(
+                Encoding.UTF8.GetByteCount(payload) + 8,
+                Unity.Collections.Allocator.Temp,
+                MaxPayloadBytes);
+            writer.WriteValueSafe(payload);
+            return writer;
+        }
+
+        private void OnCommandMessage(ulong senderClientId, FastBufferReader reader)
+        {
+            var peerId = _wire.PeerIdOf(senderClientId);
+            if (peerId == null)
+            {
+                // A command from a connection that never completed its identity handshake has no
+                // seat to play as; dropping it is the same reading the disconnect path takes.
+                return;
+            }
+
+            reader.ReadValueSafe(out string payload);
+
+            var handler = CommandReceived;
+            if (handler != null)
+            {
+                handler(peerId, payload);
+            }
+        }
+
+        private void OnSnapshotMessage(ulong senderClientId, FastBufferReader reader)
+        {
+            reader.ReadValueSafe(out string payload);
+
+            var handler = SnapshotReceived;
+            if (handler != null)
+            {
+                handler(payload);
             }
         }
     }
