@@ -483,6 +483,21 @@
         "the entry behaviour is a thin pump (Cecil invariant holds; logic stays in ShellBootstrap)",
         "input reaches the hero (WASD + mouse aim + SPACE/Q/E) in play mode"
       ]
+    },
+    {
+      "id": "T-23",
+      "title": "Interactive UI controls \u2014 clickable screens over the 012 models",
+      "owns_requirements": [],
+      "grades_fixtures": [],
+      "depends_on": [
+        "T-22"
+      ],
+      "scope": "Found while closing T-22: the shell UI has labels and screen roots but ZERO interactive controls (no Button, no InputField). Play boots to a title screen nobody can click through. Adds uGUI controls wired to the existing model actions: S1 callsign input + HOST + join-code input + JOIN, S2 class picks + READY, S3 shop item clicks + ghost placement clicks + READY UP, S4 level-up badge click + picker choice cards + ESC menu (leave/volume), S6/S7 PLAY AGAIN-RETRY + MAIN MENU, L hotkey for the picker. All actions already exist on the 012 models; this is wiring, not logic.",
+      "acceptance": [
+        "every wireframe control is clickable and routed to its model action",
+        "a solo Play session can be driven title->host->lobby->ready->planning->combat entirely by mouse/keyboard",
+        "controls stay thin: no logic beyond calling the model (Cecil invariant holds)"
+      ]
     }
   ]
 }
