@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Headless balance probe: drives the REAL GameSim at shipped numbers with a scripted
+       solo player, mirroring the Unity shell's host schedule (HostLoop + MatchSession +
+       ShellBootstrap combat routing). Analysis tooling only — never shipped, never a test
+       the suite depends on. See Program.cs for what it measures and what it approximates. -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../sim/GameSim/GameSim.csproj" />
+  </ItemGroup>
+
+</Project>
