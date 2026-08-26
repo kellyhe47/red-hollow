@@ -35,6 +35,7 @@ namespace RedHollow.Game.View
         {
             Pulsing = pulsing;
             Flaring = flaring;
+            CavernBlockout.ApplyTunnelLook(gameObject, pulsing, flaring);
         }
     }
 
@@ -61,6 +62,7 @@ namespace RedHollow.Game.View
         public void SetLost(bool lost)
         {
             Lost = lost;
+            CavernBlockout.ApplyLostLook(gameObject, lost);
         }
     }
 }

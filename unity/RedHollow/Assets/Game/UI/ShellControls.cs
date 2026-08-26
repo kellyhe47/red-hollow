@@ -167,6 +167,7 @@ namespace RedHollow.Game.UI
             _pickerPanel = new GameObject("LevelUpPicker", typeof(RectTransform));
             _pickerPanel.transform.SetParent(combat.transform, false);
             UiStyle.Anchor((RectTransform)_pickerPanel.transform, 0.2f, 0.32f, 0.8f, 0.68f);
+            _pickerPanel.SetActive(false);
 
             // ---- the ESC overlay — an OVERLAY, not a screen (R-55): it hangs beside the screen
             // roots so it can sit on top of whichever one is active, shown exactly while the
@@ -480,7 +481,16 @@ namespace RedHollow.Game.UI
                 LevelUpBadgeButton.gameObject.SetActive(badgeOn);
             }
 
-            var choices = hud == null
+            if (_pickerPanel != null)
+            {
+                var pickerOn = hud != null && hud.PickerOpen;
+                if (_pickerPanel.activeSelf != pickerOn)
+                {
+                    _pickerPanel.SetActive(pickerOn);
+                }
+            }
+
+            var choices = hud == null || hud.PickerOpen == false
                 ? (IReadOnlyList<LevelUpChoice>)new LevelUpChoice[0]
                 : hud.PickerChoices;
 

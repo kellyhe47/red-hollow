@@ -632,6 +632,8 @@ namespace RedHollow.Game.UI
 
             RegisterResourceArt(catalog, ShellArtKeys.GroundTile, "RedHollowArt/cavern-ground");
             RegisterResourceArt(catalog, ShellArtKeys.GunslingerCharacter, "RedHollowArt/gunslinger");
+            RegisterResourceArt(catalog, HeroClass.Rancher, "RedHollowArt/rancher");
+            RegisterResourceArt(catalog, HeroClass.Sawbones, "RedHollowArt/sawbones");
             RegisterResourceArt(catalog, ShellArtKeys.RevolverShotIcon, "RedHollowArt/gs-revolver-shot");
             RegisterResourceArt(catalog, ShellArtKeys.ButtonFrame, "RedHollowArt/button-normal");
 
@@ -1298,35 +1300,53 @@ namespace RedHollow.Game.UI
                         return null;
                     }
 
-                    sprite = Sprite.Create(
-                        texture,
-                        new Rect(0f, 0f, texture.width, texture.height),
-                        new Vector2(0.5f, 0.5f),
-                        100f);
+                    var standing = artKey != ShellArtKeys.GroundTile
+                        && artKey != ShellArtKeys.RevolverShotIcon
+                        && artKey != ShellArtKeys.ButtonFrame;
+                    sprite = standing
+                        ? ViewLook.CreateStandingSprite(texture)
+                        : Sprite.Create(
+                            texture,
+                            new Rect(0f, 0f, texture.width, texture.height),
+                            new Vector2(0.5f, 0.5f),
+                            100f);
+                    if (sprite == null)
+                    {
+                        return null;
+                    }
                 }
 
                 var go = new GameObject("art_" + artKey.Replace('/', '_'));
                 var renderer = go.AddComponent<SpriteRenderer>();
                 renderer.sprite = sprite;
-                // SpriteRenderer faces +Z (XY plane). The match camera looks down -Y at XZ,
-                // so an unrotated sprite is edge-on and invisible. Lay it on the colony floor.
-                go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
 
-                // Ground is sized by MatchSceneBuilder to cover the play area. Characters and
-                // props that come in smaller than a body from y-down get enlarged so they read
-                // at camera height 60 (~2-3 world units across).
-                if (artKey != ShellArtKeys.GroundTile)
+                if (artKey == ShellArtKeys.GroundTile)
                 {
-                    var across = Mathf.Max(sprite.bounds.size.x, sprite.bounds.size.y);
-                    const float minCharacterSpan = 2.5f;
-                    if (across > 0.0001f && across < minCharacterSpan)
-                    {
-                        var s = minCharacterSpan / across;
-                        go.transform.localScale = new Vector3(s, s, 1f);
-                    }
+                    // SpriteRenderer faces +Z (XY plane). Lay the tile on the colony floor.
+                    go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                    return go;
                 }
 
-                return go;
+                var across = Mathf.Max(sprite.bounds.size.x, sprite.bounds.size.y);
+                const float characterSpan = 7.2f;
+                if (across > 0.0001f)
+                {
+                    var s = characterSpan / across;
+                    go.transform.localScale = new Vector3(s, s, 1f);
+                }
+
+                if (artKey == ShellArtKeys.RevolverShotIcon || artKey == ShellArtKeys.ButtonFrame)
+                {
+                    // Icons / UI frames used as world sprites stay floor-laid tokens.
+                    go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                    return go;
+                }
+
+                // Heroes and monsters: upright camera-facing billboard + blob shadow.
+                // SpriteRenderer is already unlit (keeps canon alpha); do not swap to
+                // opaque URP Unlit or the standing art punches a solid rectangle.
+                var height = sprite.bounds.size.y * go.transform.localScale.y;
+                return UnitBillboard.WrapStandingSprite(go, height);
             });
         }
 

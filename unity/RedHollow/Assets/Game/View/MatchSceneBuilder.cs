@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using RedHollow.Game.UI;
 using RedHollow.Sim;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
 namespace RedHollow.Game.View
@@ -31,8 +32,8 @@ namespace RedHollow.Game.View
         public readonly Dictionary<int, GameObject> EntryTunnelMarkers = new Dictionary<int, GameObject>();
 
         /// <summary>
-        /// R-15 — the cavern-dome mesh that IS the sky (there is no skybox in Lantern Deep). Null
-        /// until <c>RedHollow.Game.Art.LanternDeepLighting.Apply</c> raises it; ticket 013.
+        /// R-15 — the cavern ceiling that IS the sky (there is no skybox in Lantern Deep). Raised
+        /// by the runtime blockout so a camera at y=40 sits inside the cavern.
         /// </summary>
         public GameObject CavernDome;
     }
@@ -48,17 +49,35 @@ namespace RedHollow.Game.View
     public static class MatchSceneBuilder
     {
         /// <summary>How far above the colony floor the camera sits. Not a PRD number; see below.</summary>
-        private const float CameraHeight = 60f;
+        private const float CameraHeight = 40f;
+
+        /// <summary>
+        /// Pitch down from the horizon, degrees. ~60-70 is isometric-ish so roof edges and
+        /// building sides read; 90 would hide every vertical face.
+        /// </summary>
+        private const float CameraPitchDown = 62f;
 
         /// <summary>World units of breathing room around the colony, so nothing sits on the frame edge.</summary>
-        private const float ViewMargin = 4f;
+        private const float ViewMargin = 2f;
 
         /// <summary>Unity's built-in Plane primitive is ten world units across at scale 1.</summary>
         private const float PlanePrimitiveSize = 10f;
 
         /// <summary>
-        /// Compose the scene the session is played in: a top-down camera, the colony floor, the
-        /// team spawn (R-33) and one marker per shelter (R-10).
+        /// Typical Game-view aspect. The camera ortho size stays map-based (square play area);
+        /// the ground is grown to this aspect so 16:9 letterbox is cavern floor, not black bars.
+        /// </summary>
+        private const float TypicalViewAspect = 16f / 9f;
+
+        /// <summary>Warm brown haze — dust under lamplight, never a blue night mist.</summary>
+        private static readonly Color FogDust = new Color(0.40f, 0.22f, 0.10f);
+
+        /// <summary>Near-black umber ambient: dark, warm, and a color — never daylight.</summary>
+        private static readonly Color AmbientUmber = new Color(0.10f, 0.065f, 0.035f);
+
+        /// <summary>
+        /// Compose the scene the session is played in: a tilted top-down camera, the colony floor,
+        /// the cavern shell, Mars habitats on every shelter (R-10), and the team spawn (R-33).
         ///
         /// Every position comes out of <paramref name="map"/> rather than out of a literal here, so
         /// a retuned layout moves the scene with it instead of leaving the markers where the sim no
@@ -84,14 +103,22 @@ namespace RedHollow.Game.View
             scene.Camera = BuildCamera(scene.Root.transform, playArea);
 
             scene.Ground = BuildGround(scene.Root.transform, resolver, playArea);
+            CavernBlockout.DressFloor(scene.Root.transform, playArea);
 
-            // Modest sourced lanterns for leftover lit mats. Do NOT call LanternDeepLighting.Apply
-            // here: that raises the cavern dome (top ~y=15) which covers this camera at y=60.
+            // Cavern first so the camera at y=40 is inside rock walls, not over a desert quad.
+            // Do NOT call LanternDeepLighting.Apply: that raises a sphere dome (top ~y=15)
+            // which would sit under this camera. Fog/ambient/no-sun are applied here instead.
+            ApplyCavernAtmosphere();
+            scene.CavernDome = CavernBlockout.BuildShell(scene.Root.transform, playArea);
+
+            // Modest sourced lanterns for leftover lit mats. Named and typed as lanterns
+            // (never Directional) so the no-sun tests still pass.
             RaiseLanterns(scene.Root.transform, map);
 
             // R-33 — one team spawn, where heroes enter at wave 1 and come back after a death.
             scene.TeamSpawn = Marker(
                 scene.Root.transform, resolver, VisualClass.Placeable, "TeamSpawn", map.TeamSpawn);
+            CavernBlockout.DressSpawnPad(scene.TeamSpawn);
 
             // R-10 — one marker per shelter, named by the sim's own id so a marker and the hotspot
             // it stands for cannot be matched up wrongly downstream.
@@ -110,6 +137,8 @@ namespace RedHollow.Game.View
                 // the sim's emptied answer onto it later.
                 hotspotMarker.AddComponent<HotspotMarkerView>().Bind(spec.Id);
 
+                CavernBlockout.DressHotspot(hotspotMarker, spec.Id, spec.Civilians);
+
                 scene.HotspotMarkers[spec.Id] = hotspotMarker;
             }
 
@@ -123,20 +152,23 @@ namespace RedHollow.Game.View
                     scene.Root.transform, resolver, VisualClass.Hotspot, "EntryTunnel_" + i,
                     map.EntryTunnels[i]);
                 tunnelMarker.AddComponent<EntryTunnelMarkerView>().Bind(i);
+                CavernBlockout.DressEntryTunnel(tunnelMarker, i);
                 scene.EntryTunnelMarkers[i] = tunnelMarker;
             }
+
+            CavernBlockout.ScatterSettlement(scene.Root.transform, map, playArea);
 
             return scene;
         }
 
         /// <summary>
-        /// R-30 — genuinely top-down: the camera is placed over the middle of the play area and
-        /// aimed straight down the world's vertical axis, not merely tilted steeply.
+        /// R-30 — a 3D top-down look: the camera sits at <see cref="CameraHeight"/> over the
+        /// play area and pitches ~60-70° down (isometric-ish) so habitat roofs, wall thickness
+        /// and gantries read. Straight-down hides every vertical face.
         ///
-        /// Orthographic, sized from the map, because a top-down colony-defence read is about
-        /// relative distance — which shelter a wave is closer to — and perspective makes the same
-        /// gap read differently at the edge of the frame than at the centre. Height, field of view
-        /// and projection are all free of the PRD; what is pinned is the direction of the look.
+        /// Orthographic, sized from the map, because a colony-defence read is about relative
+        /// distance — which shelter a wave is closer to — and perspective makes the same gap
+        /// read differently at the frame edge than at the centre.
         /// </summary>
         private static Camera BuildCamera(Transform root, Bounds playArea)
         {
@@ -146,18 +178,14 @@ namespace RedHollow.Game.View
             var camera = go.AddComponent<Camera>();
             camera.orthographic = true;
             camera.orthographicSize = Mathf.Max(playArea.extents.x, playArea.extents.z) + ViewMargin;
-            camera.nearClipPlane = 0.1f;
-            camera.farClipPlane = CameraHeight * 2f;
+            camera.nearClipPlane = 0.3f;
+            camera.farClipPlane = 400f;
 
-            // Play-mode Game view: an untagged Skybox-clear camera over a square ground plane
-            // in a wide Game window letterboxes into a slate column (Unity's default clear
-            // 0.19/0.30/0.47) and every placeholder shares Default-Material gray, so a
-            // y-down look cannot tell a capsule from the floor. Tag + solid cavern clear
-            // makes this the Game camera and kills the skybox bars; tint is in the resolver.
+            // Play-mode Game view: tag + solid cavern clear makes this the Game camera.
             go.tag = "MainCamera";
             camera.depth = 10f;
             camera.clearFlags = CameraClearFlags.SolidColor;
-            camera.backgroundColor = new Color(0.12f, 0.07f, 0.04f, 1f);
+            camera.backgroundColor = FogDust;
 
             // URP ignores a Camera that has no UniversalAdditionalCameraData; without it the
             // Game view falls through to a second Base camera (or nothing) and letterboxes black.
@@ -169,24 +197,50 @@ namespace RedHollow.Game.View
 
             urp.renderType = CameraRenderType.Base;
 
+            // Offset south of centre so Euler(pitch, 0, 0) still looks at the play-area middle.
+            // Pitch 62° keeps the camera over the ±30 play square (back ≈ 21 units).
+            var back = CameraHeight / Mathf.Tan(CameraPitchDown * Mathf.Deg2Rad);
             go.transform.position = new Vector3(
-                playArea.center.x, SimSpace.GroundHeight + CameraHeight, playArea.center.z);
+                playArea.center.x,
+                SimSpace.GroundHeight + CameraHeight,
+                playArea.center.z - back);
 
-            // LookRotation rather than an Euler triple: this states the forward vector the test
-            // asserts on directly, instead of an angle that happens to produce it.
-            go.transform.rotation = Quaternion.LookRotation(Vector3.down, Vector3.forward);
+            go.transform.rotation = Quaternion.Euler(CameraPitchDown, 0f, 0f);
 
             return camera;
         }
 
-        // The pre-013 placeholder KeyLight (a directional light) is retired: R-15 forbids any
-        // sun-like light. LanternDeepLighting.Apply is the full look (dome + fog) but must not
-        // run at Play until the camera sits inside the dome; Build raises point lanterns only.
+        /// <summary>
+        /// R-15's global half, without LanternDeepLighting.Apply's undersized dome: dark warm
+        /// flat ambient, warm exponential fog, zero natural light.
+        /// </summary>
+        private static void ApplyCavernAtmosphere()
+        {
+            RenderSettings.ambientMode = AmbientMode.Flat;
+            RenderSettings.ambientLight = AmbientUmber;
+
+            RenderSettings.fog = true;
+            RenderSettings.fogColor = FogDust;
+            RenderSettings.fogMode = FogMode.ExponentialSquared;
+            // Dense enough to haze the far wall / lift shaft; the playable square stays readable.
+            RenderSettings.fogDensity = 0.012f;
+
+            RenderSettings.skybox = null;
+            RenderSettings.sun = null;
+
+            foreach (var light in UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
+            {
+                if (light != null && light.type == LightType.Directional)
+                {
+                    light.enabled = false;
+                }
+            }
+        }
 
         /// <summary>
         /// The colony floor: resolved through the art seam (cavern-ground when the catalog has
-        /// it, otherwise the unlit rust plane) and sized to cover the whole play area so no
-        /// part of the map a monster can walk to is over a hole.
+        /// it, otherwise the unlit rust plane) and sized to cover a typical 16:9 frustum around
+        /// the square play area so the extra cavern floor fills letterbox, not black bars.
         /// </summary>
         private static GameObject BuildGround(Transform root, IVisualResolver visuals, Bounds playArea)
         {
@@ -199,8 +253,9 @@ namespace RedHollow.Game.View
 
             if (visual != null && visual.Instance != null)
             {
-                var span = Mathf.Max(playArea.size.x, playArea.size.z) + (ViewMargin * 2f);
-                SizeGroundToCover(visual.Instance, span);
+                var playSpan = Mathf.Max(playArea.size.x, playArea.size.z) + (ViewMargin * 2f);
+                var coverSpan = playSpan * TypicalViewAspect;
+                SizeGroundToCover(visual.Instance, coverSpan);
             }
 
             return ground;
@@ -233,15 +288,15 @@ namespace RedHollow.Game.View
 
         /// <summary>
         /// R-15 — sourced amber point lights over spawn and each shelter. Named and typed as
-        /// lanterns (never Directional) so the no-sun tests still pass. Range covers the
-        /// hotspot cluster; intensity is for any leftover lit materials (placeholders are unlit).
+        /// lanterns (never Directional) so the no-sun tests still pass. Hung above hab roofs
+        /// so they light the cluster rather than sitting inside a 8-12 unit building.
         /// </summary>
         private static void RaiseLanterns(Transform root, ColonyMap map)
         {
-            const float height = 6f;
+            const float height = 14f;
             var amber = new Color(1.0f, 0.62f, 0.28f);
 
-            AddLantern(root, "Lantern_Spawn", map.TeamSpawn, height, amber, 32f, 18f);
+            AddLantern(root, "Lantern_Spawn", map.TeamSpawn, height, amber, 36f, 16f);
 
             foreach (var spec in map.Hotspots)
             {
@@ -250,7 +305,12 @@ namespace RedHollow.Game.View
                     continue;
                 }
 
-                AddLantern(root, "Lantern_" + spec.Id, spec.Pos, height, amber, 28f, 14f);
+                AddLantern(root, "Lantern_" + spec.Id, spec.Pos, height, amber, 30f, 14f);
+            }
+
+            for (var i = 0; i < map.EntryTunnels.Count; i++)
+            {
+                AddLantern(root, "Lantern_Tunnel_" + i, map.EntryTunnels[i], 8f, amber, 18f, 8f);
             }
         }
 

@@ -411,12 +411,9 @@ namespace RedHollow.Tests.EditMode
         }
 
         /// <summary>
-        /// R-30. The camera is genuinely top-down: it looks straight down the world's vertical axis,
-        /// from above, over the colony rather than off the side of it.
-        ///
-        /// Asserted on the camera's actual forward vector, not on a rotation that looks plausible —
-        /// an angled "top-down-ish" camera is the thing this catches. Height, field of view and
-        /// projection are free: the PRD names none of them.
+        /// R-30. The camera is a 3D top-down look: pitched ~60-70° down (isometric-ish) from
+        /// above the colony so habitat roofs and wall sides read. Straight-down hides every
+        /// vertical face, which is the failure this pins.
         /// </summary>
         [Test]
         public void The_built_scene_looks_straight_down_at_the_play_area()
@@ -428,9 +425,13 @@ namespace RedHollow.Tests.EditMode
             Assert.That(scene.Camera, Is.Not.Null, "R-30: a top-down game needs a camera");
 
             var forward = scene.Camera.transform.forward.normalized;
-            Assert.That(Vector3.Dot(forward, Vector3.down), Is.GreaterThan(0.999f),
-                "R-30: the camera must look straight down the world's vertical axis; a tilted "
-                + "camera that merely looks top-down is not one");
+            var downDot = Vector3.Dot(forward, Vector3.down);
+            // sin(60°)≈0.866, sin(70°)≈0.940 — isometric pitch, not 1.0 (straight down).
+            Assert.That(downDot, Is.InRange(0.85f, 0.95f),
+                "R-30: the camera pitches ~60-70 degrees down so building sides and roof edges "
+                + "read; got down-dot " + downDot);
+            Assert.That(forward.z, Is.GreaterThan(0.2f),
+                "the camera looks into the cavern (+Z), not back at the near wall");
 
             var eye = scene.Camera.transform.position;
             var ground = SimSpace.ToWorld(map.TeamSpawn);

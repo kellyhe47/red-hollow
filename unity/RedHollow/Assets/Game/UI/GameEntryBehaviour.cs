@@ -95,6 +95,23 @@ namespace RedHollow.Game.UI
             _shell.AttachScene(_matchScene);
         }
 
+        /// <summary>
+        /// Play-only: skip S1/S2 so pressing Play lands in a live wave-1 match. EditMode tests
+        /// drive Awake/Update reflectively and never call Start, so they still see a title shell.
+        /// </summary>
+        private void Start()
+        {
+            if (!Application.isPlaying || _shell == null)
+            {
+                return;
+            }
+
+            _shell.Title.SetCallsign("Kelly");
+            _shell.RequestHost();
+            _shell.Lobby.PickClass(HeroClass.Gunslinger);
+            _shell.Lobby.SetReady(true);
+        }
+
         private void Update()
         {
             if (_shell == null)

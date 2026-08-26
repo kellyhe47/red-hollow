@@ -133,6 +133,11 @@ namespace RedHollow.Game.View
 
             try
             {
+                if (visualClass == VisualClass.Hero || visualClass == VisualClass.Monster)
+                {
+                    return UnitBillboard.CreatePlaceholder(visualClass);
+                }
+
                 var primitive = GameObject.CreatePrimitive(PrimitiveFor(visualClass));
                 primitive.name = name;
                 ScalePlaceholder(primitive, visualClass);
@@ -153,13 +158,7 @@ namespace RedHollow.Game.View
                 case VisualClass.Ground:
                     return PrimitiveType.Plane;
 
-                case VisualClass.Hero:
-                case VisualClass.Monster:
-                    return PrimitiveType.Capsule;
-
                 case VisualClass.Hotspot:
-                    // Cube, not a cylinder: from y-down a cylinder is the same gray disc as a
-                    // capsule. A cube is a square footprint that reads as a building.
                     return PrimitiveType.Cube;
 
                 default:
@@ -168,21 +167,20 @@ namespace RedHollow.Game.View
         }
 
         /// <summary>
-        /// Footprint from a y-down camera. Default primitives are ~1 unit across — a gray disc
-        /// at camera height 60. Hotspots get a wide cube so they read as buildings, not capsules.
+        /// Footprint from the isometric match camera at height 60 over a ~60-unit colony.
+        /// Heroes/monsters are upright billboards (see <see cref="UnitBillboard"/>). Hotspot
+        /// cubes are a fallback volume — MatchSceneBuilder dresses them as Mars habs.
         /// </summary>
         private static void ScalePlaceholder(GameObject go, VisualClass visualClass)
         {
             switch (visualClass)
             {
-                case VisualClass.Hero:
-                case VisualClass.Monster:
-                    go.transform.localScale = new Vector3(2.2f, 1.2f, 2.2f);
+                case VisualClass.Hotspot:
+                    go.transform.localScale = new Vector3(7.5f, 8.5f, 7.5f);
                     break;
 
-                case VisualClass.Hotspot:
-                    // Wide square from above, short enough not to poke the camera.
-                    go.transform.localScale = new Vector3(2.8f, 1.4f, 2.8f);
+                case VisualClass.Placeable:
+                    go.transform.localScale = new Vector3(3.2f, 1.6f, 3.2f);
                     break;
             }
         }
@@ -199,14 +197,12 @@ namespace RedHollow.Game.View
                 case VisualClass.Ground:
                     return Vector3.zero;
 
-                case VisualClass.Hero:
-                case VisualClass.Monster:
-                    // Capsule height 2 * 1.2 scale.
-                    return new Vector3(0f, 1.2f, 0f);
-
                 case VisualClass.Hotspot:
-                    // Cube height 1 * 1.4 scale.
-                    return new Vector3(0f, 0.7f, 0f);
+                    return new Vector3(0f, 4.25f, 0f);
+
+                case VisualClass.Placeable:
+                    // Cube height 1 * 1.6 scale.
+                    return new Vector3(0f, 0.8f, 0f);
 
                 default:
                     return new Vector3(0f, 0.5f, 0f);
