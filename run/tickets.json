@@ -468,6 +468,21 @@
         "MatchViewBinder receives an ArtVisualResolver whose catalog registers the imported representative assets, chained over the placeholder",
         "the Cecil invariant still holds (UI/feel MonoBehaviours never write sim state)"
       ]
+    },
+    {
+      "id": "T-22",
+      "title": "Play-mode entry point \u2014 the scene actually boots the shell",
+      "owns_requirements": [],
+      "grades_fixtures": [],
+      "depends_on": [
+        "T-21"
+      ],
+      "scope": "Found by the owner pressing Play: RedHollow.unity contains zero MonoBehaviours, so nothing runs. ShellBootstrap (021) is only ever constructed by tests. Adds a thin scene-resident entry behaviour that constructs ShellBootstrap on load and pumps it every frame, routes HeroInput, ensures camera + EventSystem exist, and is actually present in the committed scene asset.",
+      "acceptance": [
+        "the committed scene contains the entry behaviour; pressing Play boots the shell (title screen visible, hosting a solo match reaches combat with visible world + HUD)",
+        "the entry behaviour is a thin pump (Cecil invariant holds; logic stays in ShellBootstrap)",
+        "input reaches the hero (WASD + mouse aim + SPACE/Q/E) in play mode"
+      ]
     }
   ]
 }
