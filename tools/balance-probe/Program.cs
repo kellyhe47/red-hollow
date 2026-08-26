@@ -35,15 +35,30 @@ namespace RedHollow.Tools.BalanceProbe
             Console.WriteLine("hero: stationary gunslinger, basics only, perfect aim, 0.25s cadence");
             Console.WriteLine();
 
-            RunPolicy("hero only (no purchases)", buyTurrets: false, buySpikes: false);
-            RunPolicy("hero + turrets", buyTurrets: true, buySpikes: false);
-            RunPolicy("hero + turrets + spikes", buyTurrets: true, buySpikes: true);
+            RunPolicy("hero only (no purchases)",
+                buyTurrets: false, buySpikes: false, buyWalls: false, useAbilities: false, reposition: false);
+            RunPolicy("hero + turrets",
+                buyTurrets: true, buySpikes: false, buyWalls: false, useAbilities: false, reposition: false);
+            RunPolicy("hero + turrets + spikes",
+                buyTurrets: true, buySpikes: true, buyWalls: false, useAbilities: false, reposition: false);
+            RunPolicy("hero + walls + turrets + spikes",
+                buyTurrets: true, buySpikes: true, buyWalls: true, useAbilities: false, reposition: false);
+            RunPolicy("full kit: walls/turrets/spikes + abilities + positioning",
+                buyTurrets: true, buySpikes: true, buyWalls: true, useAbilities: true, reposition: true);
+            RunPolicy("skilled: full kit + threat-priority aim, anchored at spawn",
+                buyTurrets: true, buySpikes: true, buyWalls: true, useAbilities: true, reposition: false,
+                threatAim: true);
+            RunPolicy("TWO players, skilled full kit (the R-50 duo)",
+                buyTurrets: true, buySpikes: true, buyWalls: true, useAbilities: true, reposition: false,
+                threatAim: true, heroCount: 2);
         }
 
-        private static void RunPolicy(string name, bool buyTurrets, bool buySpikes)
+        private static void RunPolicy(
+            string name, bool buyTurrets, bool buySpikes, bool buyWalls, bool useAbilities,
+            bool reposition, bool threatAim = false, int heroCount = 1)
         {
             Console.WriteLine("== policy: " + name + " ==");
-            var run = new SoloRun(buyTurrets, buySpikes);
+            var run = new SoloRun(buyTurrets, buySpikes, buyWalls, useAbilities, reposition, threatAim, heroCount);
             run.Play();
             Console.WriteLine();
         }
@@ -68,6 +83,11 @@ namespace RedHollow.Tools.BalanceProbe
 
         private readonly bool _buyTurrets;
         private readonly bool _buySpikes;
+        private readonly bool _buyWalls;
+        private readonly bool _useAbilities;
+        private readonly bool _reposition;
+        private readonly bool _threatAim;
+        private readonly int _heroCount;
 
         private readonly ColonyMap _map = ColonyMap.V1();
         private readonly SimConfig _config = new SimConfig();
@@ -75,12 +95,21 @@ namespace RedHollow.Tools.BalanceProbe
         private readonly MatchState _state;
         private readonly MatchSim _sim;
 
-        private readonly Hero _hero;
-        private readonly string _playerId = "player_1";
-        private const string AccountId = "acc_probe";
+        /// <summary>One scripted player: their hero plus the per-player clocks the shell keeps.</summary>
+        private sealed class BotPlayer
+        {
+            public Hero Hero;
+            public string PlayerId;
+            public string AccountId;
+            public double AttackClock;
+            public double QCooldownUntil;
+            public double ECooldownUntil;
+        }
+
+        private readonly List<BotPlayer> _bots = new List<BotPlayer>();
+        private readonly InMemoryProfileStore _profiles = new InMemoryProfileStore();
 
         // ---- mirrors of the shell's per-step state ----
-        private double _attackClock;
         private double _turretAccrual = TurretFirePeriodSeconds;
         private readonly HashSet<string> _trapOccupancy = new HashSet<string>();
         private readonly HashSet<string> _trapOccupancyNow = new HashSet<string>();
@@ -91,38 +120,59 @@ namespace RedHollow.Tools.BalanceProbe
         // ---- per-wave report ----
         private int _heroDowns;
 
-        public SoloRun(bool buyTurrets, bool buySpikes)
+        public SoloRun(
+            bool buyTurrets, bool buySpikes, bool buyWalls, bool useAbilities, bool reposition,
+            bool threatAim = false, int heroCount = 1)
         {
             _buyTurrets = buyTurrets;
             _buySpikes = buySpikes;
+            _buyWalls = buyWalls;
+            _useAbilities = useAbilities;
+            _reposition = reposition;
+            _threatAim = threatAim;
+            _heroCount = heroCount;
 
             _state = _map.CreateMatchState(_config);
             _state.Wave.TotalWaves = _config.TotalWaves;
             _state.Phase = MatchPhase.Combat;
             _state.Status = MatchStatus.InProgress;
 
-            _sim = new MatchSim(_state, _config, null, _clock, null) { ColonyMap = _map };
+            // The production wiring (ColonyMatchFactory): walls actually block lanes.
+            var pathOracle = new BarricadePathOracle(_state);
+            _sim = new MatchSim(_state, _config, _profiles, _clock, pathOracle) { ColonyMap = _map };
+            pathOracle.BlockingRadius = _sim.PlaceableFootprintRadius;
 
             var kit = _config.HeroKits.KitFor(HeroClass.Gunslinger);
-            _hero = new Hero
+            for (var i = 1; i <= heroCount; i++)
             {
-                Id = "hero_1",
-                HeroClass = HeroClass.Gunslinger,
-                AccountId = AccountId,
-                Pos = _map.TeamSpawn,
-                Hp = kit.MaxHp,
-                MaxHp = kit.MaxHp,
-                Alive = true,
-            };
-            _state.Heroes[_hero.Id] = _hero;
-            _state.Players.Add(new PlayerSlot
-            {
-                Id = _playerId,
-                AccountId = AccountId,
-                HeroClass = HeroClass.Gunslinger,
-                Ready = false,
-                Connected = true,
-            });
+                var accountId = "acc_probe_" + i;
+                var hero = new Hero
+                {
+                    Id = "hero_" + i,
+                    HeroClass = HeroClass.Gunslinger,
+                    AccountId = accountId,
+                    Pos = _map.TeamSpawn,
+                    Hp = kit.MaxHp,
+                    MaxHp = kit.MaxHp,
+                    Alive = true,
+                };
+                _state.Heroes[hero.Id] = hero;
+                _state.Players.Add(new PlayerSlot
+                {
+                    Id = "player_" + i,
+                    AccountId = accountId,
+                    HeroClass = HeroClass.Gunslinger,
+                    Ready = false,
+                    Connected = true,
+                });
+
+                _bots.Add(new BotPlayer
+                {
+                    Hero = hero,
+                    PlayerId = "player_" + i,
+                    AccountId = accountId,
+                });
+            }
         }
 
         public void Play()
@@ -184,8 +234,13 @@ namespace RedHollow.Tools.BalanceProbe
             // ---- MatchSession.DrivePlaceableCombat ----
             DrivePlaceableCombat();
 
-            // ---- ShellBootstrap.HandleCombatActions (the bot player) ----
-            FireHeroBasics();
+            // ---- ShellBootstrap.HandleCombatActions (one per seated bot player) ----
+            foreach (var bot in _bots)
+            {
+                RepositionHero(bot);
+                FireHeroBasics(bot);
+                CastAbilities(bot);
+            }
 
             // ---- MatchSession.AdvanceTheCampaign ----
             AdvanceTheCampaign();
@@ -196,12 +251,7 @@ namespace RedHollow.Tools.BalanceProbe
 
         private void TickRespawnsCountingDowns()
         {
-            var wasDown = !_hero.Alive;
             _sim.TickHeroRespawns();
-            if (wasDown && _hero.Alive)
-            {
-                // Back at spawn on full HP (R-33); the bot resumes firing next step.
-            }
         }
 
         // ---- mirrors ------------------------------------------------------------------------
@@ -305,7 +355,10 @@ namespace RedHollow.Tools.BalanceProbe
                         break;
 
                     case TargetKind.Hero:
-                        var wasAlive = _hero.Alive;
+                        var victim = _state.Heroes.TryGetValue(monster.TargetId, out var struck)
+                            ? struck
+                            : null;
+                        var wasAlive = victim != null && victim.Alive;
                         _sim.ApplyHeroDamage(new HeroDamageRequest
                         {
                             AttackerId = monster.Id,
@@ -313,7 +366,7 @@ namespace RedHollow.Tools.BalanceProbe
                             Damage = stats.AttackDamage,
                             TargetId = monster.TargetId,
                         });
-                        if (wasAlive && !_hero.Alive)
+                        if (wasAlive && victim != null && !victim.Alive)
                         {
                             _heroDowns++;
                         }
@@ -387,7 +440,7 @@ namespace RedHollow.Tools.BalanceProbe
             }
 
             DetectTrapCrossings();
-            ReapDeadOnRoster(creditPlacer: true);
+            ReapDeadOnRoster(null);
         }
 
         private void DetectTrapCrossings()
@@ -445,10 +498,14 @@ namespace RedHollow.Tools.BalanceProbe
 
         /// <summary>
         /// The shell's kill accounting, both halves: placeable kills (Alive already false) and
-        /// hero-basic kills (Hp 0, Alive still true). XP credit goes to the one account either way.
+        /// hero-basic kills (Hp 0, Alive still true). XP credits the acting player, or the first
+        /// seat for placeable kills (owner credit is exercised by the EditMode suite; the probe
+        /// only needs the bounty and the level curve to flow).
         /// </summary>
-        private void ReapDeadOnRoster(bool creditPlacer)
+        private void ReapDeadOnRoster(BotPlayer credited)
         {
+            credited = credited ?? _bots[0];
+
             _scratch.Clear();
             _scratch.AddRange(_state.Wave.LivingMonsterIds);
 
@@ -472,66 +529,48 @@ namespace RedHollow.Tools.BalanceProbe
                     MonsterId = monsterId,
                     MonsterType = monster.Type,
                     Bounty = stats == null ? 0 : stats.Bounty,
-                    KillerHeroId = _hero.Id,
+                    KillerHeroId = credited.Hero.Id,
                 };
 
                 _sim.RecordMonsterKill(kill);
-                _sim.AwardKillXp(kill, AccountId);
+                _sim.AwardKillXp(kill, credited.AccountId);
             }
         }
 
-        /// <summary>The bot player: hold SPACE, perfect aim at the nearest living monster in reach.</summary>
-        private void FireHeroBasics()
+        /// <summary>One bot player's held SPACE: perfect aim, the shell's cadence and reap.</summary>
+        private void FireHeroBasics(BotPlayer bot)
         {
-            if (_state.IsOver || _state.Phase != MatchPhase.Combat || !_hero.Alive)
+            var hero = bot.Hero;
+            if (_state.IsOver || _state.Phase != MatchPhase.Combat || !hero.Alive)
             {
-                _attackClock = 0.0;
+                bot.AttackClock = 0.0;
                 return;
             }
 
-            _attackClock += StepSeconds;
-            if (_attackClock < AttackCadenceSeconds)
-            {
-                return;
-            }
-
-            _attackClock -= AttackCadenceSeconds;
-
-            Monster nearest = null;
-            var best = double.MaxValue;
-            foreach (var monster in _state.Monsters.Values)
-            {
-                if (!monster.Alive)
-                {
-                    continue;
-                }
-
-                var distance = _hero.Pos.DistanceTo(monster.Pos);
-                if (distance < best)
-                {
-                    best = distance;
-                    nearest = monster;
-                }
-            }
-
-            if (nearest == null || best > AimLineLength)
+            bot.AttackClock += StepSeconds;
+            if (bot.AttackClock < AttackCadenceSeconds)
             {
                 return;
             }
 
-            var kit = _config.HeroKits.KitFor(_hero.HeroClass);
+            bot.AttackClock -= AttackCadenceSeconds;
+
+            var line = AimLineToNearest(hero);
+            if (line.Count == 0)
+            {
+                return;
+            }
+
+            var kit = _config.HeroKits.KitFor(hero.HeroClass);
             _sim.ResolveHeroAttack(new HeroAttackRequest
             {
-                AttackerId = _hero.Id,
-                AttackerClass = _hero.HeroClass,
+                AttackerId = hero.Id,
+                AttackerClass = hero.HeroClass,
                 Damage = kit.BasicAttackDamage,
-                EntitiesOnLine = new List<LineEntity>
-                {
-                    new LineEntity { Id = nearest.Id, Kind = "monster", Pos = nearest.Pos },
-                },
+                EntitiesOnLine = line,
             });
 
-            ReapDeadOnRoster(creditPlacer: false);
+            ReapDeadOnRoster(bot);
         }
 
         /// <summary>MatchSession.AdvanceTheCampaign, verbatim policy.</summary>
@@ -574,24 +613,48 @@ namespace RedHollow.Tools.BalanceProbe
                 Shop();
             }
 
-            _sim.SetPlayerReady(_playerId);
+            foreach (var bot in _bots)
+            {
+                _sim.SetPlayerReady(bot.PlayerId);
+            }
         }
 
         private void Shop()
         {
+            SpendSkillPoints();
+
+            // R-05 — planning knows which breaches the coming wave opens; a real player builds there.
+            var preview = _sim.PreviewUpcomingWave();
+            var activeMouths = preview.ActiveEntryTunnels
+                .Where(i => i >= 0 && i < _map.EntryTunnels.Count)
+                .Select(i => _map.EntryTunnels[i])
+                .ToList();
+
+            if (_buyWalls)
+            {
+                // A wall just outside each ACTIVE breach (3.5 clears the 3.0 mouth exclusion):
+                // the wave redirects onto it (R-16 via the production oracle) and stalls in the
+                // turret/spike kill box instead of walking at a shelter.
+                foreach (var mouth in activeMouths)
+                {
+                    BuyAt(PlaceableType.Barricade, PulledToward(mouth, _map.TeamSpawn, 3.5));
+                }
+            }
+
             if (_buySpikes)
             {
-                // A spike line just outside every breach mouth: the wave walks in over it.
-                foreach (var tunnel in _map.EntryTunnels)
+                // A spike line just inside every active breach: the wave walks in over it.
+                foreach (var mouth in activeMouths)
                 {
-                    BuyAt(PlaceableType.SpikeTrap, PulledToward(tunnel, _map.TeamSpawn, 4.0));
+                    BuyAt(PlaceableType.SpikeTrap, PulledToward(mouth, _map.TeamSpawn, 7.0));
                 }
             }
 
             if (_buyTurrets)
             {
                 // Turret nests beside each shelter (outside the R-24 building exclusion), plus one
-                // by the spawn. Range 8 covers the shelter a wave is chewing.
+                // by the spawn. Range 8 covers the shelter a wave is chewing — and the wall a
+                // redirected wave is chewing sits in range of the breach-side nests.
                 foreach (var hotspot in _map.Hotspots)
                 {
                     BuyAt(PlaceableType.Turret, PulledToward(hotspot.Pos, _map.TeamSpawn, 4.5));
@@ -599,6 +662,318 @@ namespace RedHollow.Tools.BalanceProbe
 
                 BuyAt(PlaceableType.Turret, new Vec2(0.0, 3.5));
             }
+        }
+
+        /// <summary>
+        /// R-42 — a real player spends level-ups: unlock Q, unlock E, then rank both to the cap.
+        /// Rejections (no points, capped) are ordinary results, so the loop just walks the wishlist.
+        /// </summary>
+        private void SpendSkillPoints()
+        {
+            if (!_useAbilities)
+            {
+                return;
+            }
+
+            var wishlist = new[]
+            {
+                "unlock_Q", "unlock_E", "rank_Q", "rank_E", "rank_Q", "rank_E", "rank_Q", "rank_E",
+            };
+
+            foreach (var bot in _bots)
+            {
+                foreach (var choice in wishlist)
+                {
+                    var profile = _profiles.Load(bot.AccountId);
+                    if (profile.SkillPoints <= 0)
+                    {
+                        break;
+                    }
+
+                    _sim.SpendSkillPoint(new SpendSkillPointRequest
+                    {
+                        AccountId = bot.AccountId,
+                        HeroId = bot.Hero.Id,
+                        Choice = choice,
+                    });
+                }
+            }
+        }
+
+        /// <summary>
+        /// The bot's positioning: hold the busiest lane at a rifleman's distance — walk toward the
+        /// living wave's centre of mass, but back off if the nearest monster is inside 8 ground
+        /// units. Direction only; the sim owns the pace (R-30).
+        /// </summary>
+        private void RepositionHero(BotPlayer bot)
+        {
+            var hero = bot.Hero;
+            if (!_reposition || _state.IsOver || _state.Phase != MatchPhase.Combat || !hero.Alive)
+            {
+                return;
+            }
+
+            Monster nearest = null;
+            var nearestDistance = double.MaxValue;
+            double cx = 0.0, cy = 0.0;
+            var living = 0;
+            foreach (var monster in _state.Monsters.Values)
+            {
+                if (!monster.Alive)
+                {
+                    continue;
+                }
+
+                living++;
+                cx += monster.Pos.X;
+                cy += monster.Pos.Y;
+
+                var distance = hero.Pos.DistanceTo(monster.Pos);
+                if (distance < nearestDistance)
+                {
+                    nearestDistance = distance;
+                    nearest = monster;
+                }
+            }
+
+            if (living == 0)
+            {
+                return;
+            }
+
+            Vec2 direction;
+            if (nearest != null && nearestDistance < 8.0)
+            {
+                // Back off the closest attacker.
+                direction = new Vec2(hero.Pos.X - nearest.Pos.X, hero.Pos.Y - nearest.Pos.Y);
+            }
+            else if (nearest != null && nearestDistance > 14.0)
+            {
+                // Close toward the wave's centre of mass to shorten the intercept.
+                direction = new Vec2((cx / living) - hero.Pos.X, (cy / living) - hero.Pos.Y);
+            }
+            else
+            {
+                return;
+            }
+
+            var magnitude = Math.Sqrt((direction.X * direction.X) + (direction.Y * direction.Y));
+            if (magnitude <= 0.0)
+            {
+                return;
+            }
+
+            _sim.MoveHero(new HeroMoveRequest
+            {
+                HeroId = hero.Id,
+                Direction = new Vec2(direction.X / magnitude, direction.Y / magnitude),
+                DeltaSeconds = StepSeconds,
+            });
+        }
+
+        /// <summary>
+        /// Q/E on cooldown at the nearest cluster, with an HONEST aim line: only monsters inside
+        /// the shell's 1.5-wide corridor toward the nearest monster ride it. Client-side cooldown
+        /// tracking mirrors a player watching the HUD; a mistimed cast is just a rejection.
+        /// </summary>
+        private void CastAbilities(BotPlayer bot)
+        {
+            var hero = bot.Hero;
+            if (!_useAbilities || _state.IsOver || _state.Phase != MatchPhase.Combat || !hero.Alive)
+            {
+                return;
+            }
+
+            var now = _clock.ElapsedSeconds;
+            var line = AimLineToNearest(hero);
+            if (line.Count == 0)
+            {
+                return;
+            }
+
+            var aim = line[0].Pos;
+            var dx = aim.X - hero.Pos.X;
+            var dy = aim.Y - hero.Pos.Y;
+            var magnitude = Math.Sqrt((dx * dx) + (dy * dy));
+            var aimDirection = magnitude > 0.0 ? new Vec2(dx / magnitude, dy / magnitude) : new Vec2(0.0, 0.0);
+
+            if (now >= bot.QCooldownUntil)
+            {
+                var outcome = _sim.CastAbility(new HeroAbilityRequest
+                {
+                    CasterId = hero.Id,
+                    Slot = AbilitySlot.Q,
+                    AimDirection = aimDirection,
+                    EntitiesOnLine = line,
+                });
+                if (outcome != null && outcome.Accepted)
+                {
+                    bot.QCooldownUntil = now + _config.HeroKits.KitFor(hero.HeroClass).QCooldownSeconds;
+                    ReapDeadOnRoster(bot);
+                }
+                else
+                {
+                    bot.QCooldownUntil = now + 1.0;
+                }
+            }
+
+            if (now >= bot.ECooldownUntil)
+            {
+                var outcome = _sim.CastAbility(new HeroAbilityRequest
+                {
+                    CasterId = hero.Id,
+                    Slot = AbilitySlot.E,
+                    AimDirection = aimDirection,
+                    EntitiesOnLine = line,
+                });
+                if (outcome != null && outcome.Accepted)
+                {
+                    bot.ECooldownUntil = now + _config.HeroKits.KitFor(hero.HeroClass).ECooldownSeconds;
+                    ReapDeadOnRoster(bot);
+                }
+                else
+                {
+                    bot.ECooldownUntil = now + 1.0;
+                }
+            }
+        }
+
+        /// <summary>
+        /// The shell's aim-line geometry (length 30, full width 1.5) toward the nearest living
+        /// monster: every living monster inside the corridor, nearest first — exactly what
+        /// AimLine.EntitiesAlong reports when the cursor tracks the closest body.
+        /// </summary>
+        private List<LineEntity> AimLineToNearest(Hero hero)
+        {
+            var nearest = _threatAim ? MostUrgentMonster(hero) : NearestMonsterToHero(hero);
+
+            var line = new List<LineEntity>();
+            if (nearest == null || hero.Pos.DistanceTo(nearest.Pos) > AimLineLength)
+            {
+                return line;
+            }
+
+            var dx = nearest.Pos.X - hero.Pos.X;
+            var dy = nearest.Pos.Y - hero.Pos.Y;
+            var magnitude = Math.Sqrt((dx * dx) + (dy * dy));
+            if (magnitude <= 0.0)
+            {
+                line.Add(new LineEntity { Id = nearest.Id, Kind = "monster", Pos = nearest.Pos });
+                return line;
+            }
+
+            var ux = dx / magnitude;
+            var uy = dy / magnitude;
+
+            var candidates = new List<(double Along, Monster Monster)>();
+            foreach (var monster in _state.Monsters.Values)
+            {
+                if (!monster.Alive)
+                {
+                    continue;
+                }
+
+                var relX = monster.Pos.X - hero.Pos.X;
+                var relY = monster.Pos.Y - hero.Pos.Y;
+                var along = (relX * ux) + (relY * uy);
+                if (along <= 0.0 || along > AimLineLength)
+                {
+                    continue;
+                }
+
+                var lateral = Math.Abs((relX * -uy) + (relY * ux));
+                if (lateral > 0.75)
+                {
+                    continue;
+                }
+
+                candidates.Add((along, monster));
+            }
+
+            candidates.Sort((a, b) => a.Along.CompareTo(b.Along));
+            foreach (var candidate in candidates)
+            {
+                line.Add(new LineEntity
+                {
+                    Id = candidate.Monster.Id,
+                    Kind = "monster",
+                    Pos = candidate.Monster.Pos,
+                });
+            }
+
+            return line;
+        }
+
+        private Monster NearestMonsterToHero(Hero hero)
+        {
+            Monster nearest = null;
+            var best = double.MaxValue;
+            foreach (var monster in _state.Monsters.Values)
+            {
+                if (!monster.Alive)
+                {
+                    continue;
+                }
+
+                var distance = hero.Pos.DistanceTo(monster.Pos);
+                if (distance < best)
+                {
+                    best = distance;
+                    nearest = monster;
+                }
+            }
+
+            return nearest;
+        }
+
+        /// <summary>
+        /// What a skilled player shoots first: the monster closest to LANDING damage — smallest
+        /// gap to its own target (a shelter about to lose civilians outranks a walker in the open;
+        /// a monster chewing a wall can wait unless nothing else is closer to hurting anyone).
+        /// Ties toward the hero so the reticle does not flick across the map for equal threats.
+        /// </summary>
+        private Monster MostUrgentMonster(Hero shooter)
+        {
+            Monster best = null;
+            var bestUrgency = double.MaxValue;
+            var bestHeroDistance = double.MaxValue;
+
+            foreach (var monster in _state.Monsters.Values)
+            {
+                if (!monster.Alive || shooter.Pos.DistanceTo(monster.Pos) > AimLineLength)
+                {
+                    continue;
+                }
+
+                var urgency = double.MaxValue;
+                if (!string.IsNullOrEmpty(monster.TargetId))
+                {
+                    // Chewing a wall is the defence WORKING; weight it far below a shelter run.
+                    if (_state.Hotspots.TryGetValue(monster.TargetId, out var hotspot))
+                    {
+                        urgency = monster.Pos.DistanceTo(hotspot.Pos);
+                    }
+                    else if (_state.Heroes.TryGetValue(monster.TargetId, out var hero))
+                    {
+                        urgency = monster.Pos.DistanceTo(hero.Pos) + 20.0;
+                    }
+                    else if (_state.Placeables.TryGetValue(monster.TargetId, out var placeable))
+                    {
+                        urgency = monster.Pos.DistanceTo(placeable.Pos) + 40.0;
+                    }
+                }
+
+                var heroDistance = shooter.Pos.DistanceTo(monster.Pos);
+                if (urgency < bestUrgency
+                    || (urgency == bestUrgency && heroDistance < bestHeroDistance))
+                {
+                    bestUrgency = urgency;
+                    bestHeroDistance = heroDistance;
+                    best = monster;
+                }
+            }
+
+            return best;
         }
 
         /// <summary>Buy one placeable near <paramref name="pos"/>, nudging until the zone accepts.</summary>
@@ -627,7 +1002,7 @@ namespace RedHollow.Tools.BalanceProbe
 
                 var result = _sim.PurchasePlacement(new PurchaseRequest
                 {
-                    PlayerId = _playerId,
+                    PlayerId = _bots[0].PlayerId,
                     PlaceableType = type,
                     Cost = stats.Cost,
                     Pos = candidate,
