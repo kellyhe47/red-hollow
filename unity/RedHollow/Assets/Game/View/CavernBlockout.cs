@@ -781,16 +781,12 @@ namespace RedHollow.Game.View
         }
 
         /// <summary>
-        /// Authored string-lights strip hung across the spawn street, plus a line of
-        /// small amber points along each span. Overhead, not a deck fill-grid.
+        /// 3D courtyard strings: a sagging cable of chained capsules with hanging
+        /// globe bulbs. Same three spans over spawn — not a painted quad, not a
+        /// new lighting grid.
         /// </summary>
         private static void HangStringLights(Transform parent, Vector3 spawn)
         {
-            var tex = ViewLook.LoadTexture("RedHollowArt/string-lights");
-            var punched = PunchDarkToAlpha(tex);
-            var mat = punched != null
-                ? ViewLook.UnlitCutout(new Color(1.08f, 0.88f, 0.52f), punched)
-                : ViewLook.Unlit(AmberGlow);
             var glow = ViewLook.Unlit(AmberGlow);
             var dark = DarkMetalMaterial();
 
@@ -801,93 +797,82 @@ namespace RedHollow.Game.View
                 new Vector3(0f, 8.1f, -1.8f),
                 new Vector3(0f, 8.6f, -0.2f),
             };
+            const float half = 8.25f;
+            const float sag = 1.55f;
+            const int segs = 12;
+            const float cableD = 0.18f;
             for (var i = 0; i < spans.Length; i++)
             {
                 var pos = spawn + spans[i];
-                Box(parent, "StringCable_" + i,
-                    new Vector3(pos.x, pos.y, pos.z),
-                    new Vector3(16.5f, 0.14f, 0.14f), dark);
+                var strip = new GameObject("StringLights_" + i);
+                strip.transform.SetParent(parent, false);
+                strip.transform.position = pos;
 
-                var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
-                go.name = "StringLights_" + i;
-                go.transform.SetParent(parent, false);
-                go.transform.position = new Vector3(pos.x, pos.y - 0.55f, pos.z);
-                go.transform.localRotation = Quaternion.Euler(62f, 180f, 0f);
-                go.transform.localScale = new Vector3(16.5f, 2.6f, 1f);
-                ViewLook.StripCollider(go);
-                if (mat != null)
+                Vector3 prev = CablePoint(half, sag, 0f);
+                for (var s = 1; s <= segs; s++)
                 {
-                    ViewLook.Paint(go, mat, castShadows: false);
+                    var t = s / (float)segs;
+                    var next = CablePoint(half, sag, t);
+                    PlaceTube(strip.transform, "StringCable_" + i + "_" + s,
+                        prev, next, cableD, dark);
+                    prev = next;
                 }
 
                 for (var b = 0; b < 3; b++)
                 {
                     var x = -6.0f + (b * 6.0f);
-                    var bulbPos = new Vector3(pos.x + x, pos.y - 0.70f, pos.z);
+                    var t = (x + half) / (half * 2f);
+                    var hang = CablePoint(half, sag, t);
+                    var bulbLocal = hang + new Vector3(0f, -0.70f, 0f);
+                    PlaceTube(strip.transform, "StringDrop_" + i + "_" + b,
+                        hang, bulbLocal, 0.07f, dark);
+                    Box(strip.transform, "StringSocket_" + i + "_" + b,
+                        hang + new Vector3(0f, -0.16f, 0f),
+                        new Vector3(0.16f, 0.20f, 0.16f), dark, castShadows: true);
+
                     var bulb = GameObject.CreatePrimitive(PrimitiveType.Sphere);
                     bulb.name = "StringGlobe_" + i + "_" + b;
-                    bulb.transform.SetParent(parent, false);
-                    bulb.transform.position = bulbPos;
-                    bulb.transform.localScale = new Vector3(0.28f, 0.34f, 0.28f);
+                    bulb.transform.SetParent(strip.transform, false);
+                    bulb.transform.localPosition = bulbLocal;
+                    bulb.transform.localScale = new Vector3(0.62f, 0.70f, 0.62f);
                     ViewLook.StripCollider(bulb);
                     if (glow != null)
                     {
                         ViewLook.Paint(bulb, glow, castShadows: false);
                     }
 
-                    PointLamp(parent, "StringBulb_" + i + "_" + b,
-                        bulbPos, 4f, 4f);
+                    PointLamp(strip.transform, "StringBulb_" + i + "_" + b,
+                        bulbLocal, 4f, 4f);
                 }
             }
         }
 
-        /// <summary>
-        /// Authored string-lights PNG is RGB on black. Punch near-black to alpha so
-        /// UnlitCutout shows bulbs, not a black slab over the street.
-        /// </summary>
-        private static Texture2D PunchDarkToAlpha(Texture2D source)
+        private static Vector3 CablePoint(float half, float sag, float t)
         {
-            if (source == null)
+            var x = Mathf.Lerp(-half, half, t);
+            var y = -4f * sag * t * (1f - t);
+            return new Vector3(x, y, 0f);
+        }
+
+        /// <summary>World-facing capsule tube between two local points. Occupies volume.</summary>
+        private static void PlaceTube(
+            Transform parent, string name, Vector3 a, Vector3 b, float diameter, Material mat)
+        {
+            var delta = b - a;
+            var len = delta.magnitude;
+            if (len < 0.001f || mat == null)
             {
-                return null;
+                return;
             }
 
-            Color[] pixels;
-            try
-            {
-                pixels = source.GetPixels();
-            }
-            catch (System.Exception)
-            {
-                return source;
-            }
-
-            var copy = new Texture2D(source.width, source.height, TextureFormat.RGBA32, false);
-            copy.wrapMode = TextureWrapMode.Clamp;
-            copy.filterMode = FilterMode.Bilinear;
-            copy.name = source.name + "_cut";
-            for (var i = 0; i < pixels.Length; i++)
-            {
-                var c = pixels[i];
-                var luma = (0.3f * c.r) + (0.59f * c.g) + (0.11f * c.b);
-                if (luma < 0.08f)
-                {
-                    c.a = 0f;
-                }
-                else
-                {
-                    c.a = 1f;
-                    c.r = Mathf.Min(1f, c.r * 1.25f + 0.08f);
-                    c.g = Mathf.Min(1f, c.g * 1.15f + 0.04f);
-                    c.b = Mathf.Min(1f, c.b * 1.05f + 0.02f);
-                }
-
-                pixels[i] = c;
-            }
-
-            copy.SetPixels(pixels);
-            copy.Apply(false, false);
-            return copy;
+            var go = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            go.name = name;
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = (a + b) * 0.5f;
+            go.transform.localRotation = Quaternion.FromToRotation(Vector3.up, delta / len);
+            go.transform.localScale = new Vector3(diameter, len * 0.5f, diameter);
+            ViewLook.StripCollider(go);
+            ViewLook.Paint(go, mat, castShadows: true);
         }
 
         /// <summary>Presentation-only punctual amber. Never Directional. No shadows.</summary>
