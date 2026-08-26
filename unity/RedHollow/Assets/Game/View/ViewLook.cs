@@ -227,6 +227,11 @@ namespace RedHollow.Game.View
             {
                 material.SetTextureScale("_MainTex", scale);
             }
+
+            if (material.HasProperty("_BumpMap"))
+            {
+                material.SetTextureScale("_BumpMap", scale);
+            }
         }
 
         public static void Paint(GameObject go, Material material, bool castShadows = false)

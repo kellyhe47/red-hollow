@@ -293,11 +293,17 @@ namespace RedHollow.Game.View
         private const bool LanternSoftShadows = true;
 
         /// <summary>
-        /// Above typical 2–3 story habs and the 62° camera's roof tops, low enough
-        /// that a 40–52 unit range still makes a pool on the ground. 4-story stacks
-        /// peak near 32; a lamp at 36 with range 26 never reached the street.
+        /// Hung above 4-story stacks (peak ~y=32) so the lamp is not inside a cube.
+        /// Range must exceed height or the pool never reaches the street
+        /// (range 26 at y=36 missed the floor last time).
         /// </summary>
-        private const float ClusterLanternHeight = 28f;
+        private const float ClusterLanternHeight = 36f;
+
+        /// <summary>Sphere radius from the cluster lamp; 48 clears y=0 with a street pool.</summary>
+        private const float ClusterLanternRange = 48f;
+
+        /// <summary>Spawn / shelter keys hang over open courtyards, below the 4-story peak.</summary>
+        private const float KeyLanternHeight = 28f;
 
         /// <summary>
         /// XZ of settlement masts (CavernBlockout.ScatterSettlement) plus fill over the
@@ -336,7 +342,7 @@ namespace RedHollow.Game.View
             // a 2048 atlas (URP dropped 112 maps on the first lit2 pass).
             var keyShadows = LanternSoftShadows ? LightShadows.Soft : LightShadows.None;
 
-            AddLantern(root, "Lantern_Spawn", map.TeamSpawn, ClusterLanternHeight, amber, 52f, 100f, keyShadows);
+            AddLantern(root, "Lantern_Spawn", map.TeamSpawn, KeyLanternHeight, amber, 52f, 100f, keyShadows);
 
             foreach (var spec in map.Hotspots)
             {
@@ -345,7 +351,7 @@ namespace RedHollow.Game.View
                     continue;
                 }
 
-                AddLantern(root, "Lantern_" + spec.Id, spec.Pos, ClusterLanternHeight, amber, 44f, 82f, keyShadows);
+                AddLantern(root, "Lantern_" + spec.Id, spec.Pos, KeyLanternHeight, amber, 44f, 82f, keyShadows);
             }
 
             for (var i = 0; i < map.EntryTunnels.Count; i++)
@@ -356,7 +362,7 @@ namespace RedHollow.Game.View
             for (var i = 0; i < ClusterLanterns.Length; i++)
             {
                 AddLantern(root, "Lantern_Cluster_" + i, ClusterLanterns[i], ClusterLanternHeight,
-                    amber, 40f, 72f, LightShadows.None);
+                    amber, ClusterLanternRange, 72f, LightShadows.None);
             }
         }
 

@@ -39,6 +39,7 @@ namespace RedHollow.EditorTools
         private const string LookPath = "/workspace/unity/shots/lykos-look.png";
         private const string LitPath = "/workspace/unity/shots/lykos-lit.png";
         private const string Lit2Path = "/workspace/unity/shots/lykos-lit2.png";
+        private const string Lit3Path = "/workspace/unity/shots/lykos-lit3.png";
         private const double MatchTimeoutSeconds = 240.0;
 
         private static double _enteredAt;
@@ -179,7 +180,7 @@ namespace RedHollow.EditorTools
             var timedOut = elapsed >= MatchTimeoutSeconds;
             var matchOver = MatchIsOver();
             var frontsOnlyDone = _playMode == "fronts" && _hotspotFrontsCaptured;
-            var lookOnlyDone = (_playMode == "look" || _playMode == "lit" || _playMode == "lit2")
+            var lookOnlyDone = (_playMode == "look" || _playMode == "lit" || _playMode == "lit2" || _playMode == "lit3")
                 && _lookCaptured;
             // Turret last-hit is already proven. Stay in Play until victory, defeat, or timeout
             // so autoplay can finish a 10-wave run (or dump the leak if it cannot).
@@ -1294,7 +1295,8 @@ namespace RedHollow.EditorTools
                 return;
             }
 
-            var lookPath = _playMode == "lit2" ? Lit2Path
+            var lookPath = _playMode == "lit3" ? Lit3Path
+                : _playMode == "lit2" ? Lit2Path
                 : _playMode == "lit" ? LitPath
                 : LookPath;
             DumpCamera(Camera.main, lookPath);
@@ -1349,6 +1351,8 @@ namespace RedHollow.EditorTools
                 .Append(" exists=").Append(File.Exists(LitPath)).Append('\n');
             sb.Append("lykosLit2Shot=").Append(Lit2Path)
                 .Append(" exists=").Append(File.Exists(Lit2Path)).Append('\n');
+            sb.Append("lykosLit3Shot=").Append(Lit3Path)
+                .Append(" exists=").Append(File.Exists(Lit3Path)).Append('\n');
             DumpShaders(sb);
         }
 
@@ -1370,6 +1374,13 @@ namespace RedHollow.EditorTools
                     var shader = mat != null && mat.shader != null ? mat.shader.name : "null";
                     sb.Append(" shader=").Append(shader)
                         .Append(" receive=").Append(renderer != null && renderer.receiveShadows);
+                    Texture bump = null;
+                    if (mat != null && mat.HasProperty("_BumpMap"))
+                    {
+                        bump = mat.GetTexture("_BumpMap");
+                    }
+
+                    sb.Append(" bump=").Append(bump != null ? bump.name : "none");
                 }
 
                 sb.Append('\n');
