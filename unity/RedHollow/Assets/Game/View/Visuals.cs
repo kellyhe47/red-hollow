@@ -229,7 +229,7 @@ namespace RedHollow.Game.View
         }
 
         /// <summary>
-        /// Ground / hotspot / placeable placeholders are URP Lit so the 8 lanterns shade them.
+        /// Ground / hotspot / placeable placeholders are URP Lit so sourced lanterns shade them.
         /// Heroes and monsters never reach here (UnitBillboard is Unlit). T16 pins none of the
         /// colours. Default-Material-with-zero-lights was the first-playtest black; we Lit only
         /// now that sourced point lights actually exist.

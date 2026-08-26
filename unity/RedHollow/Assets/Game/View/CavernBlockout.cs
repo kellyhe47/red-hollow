@@ -724,17 +724,17 @@ namespace RedHollow.Game.View
                 Box(hab.transform, bodyName,
                     new Vector3(ox, y + storyH * 0.5f, oz),
                     new Vector3(sx, storyH, sz),
-                    metal);
+                    metal, castShadows: true);
                 // Western wear: a thin wood eave so the dark roof cap is a separate plane,
                 // not the same brown as the wall, at 62° down.
                 Box(hab.transform, corniceName,
                     new Vector3(ox, y + storyH + 0.08f, oz),
                     new Vector3(sx + 0.55f, 0.16f, sz + 0.55f),
-                    trim);
+                    trim, castShadows: true);
                 Box(hab.transform, roofName,
                     new Vector3(ox, y + storyH + 0.42f, oz),
                     new Vector3(sx + 0.9f, 0.58f, sz + 0.9f),
-                    roof);
+                    roof, castShadows: true);
 
                 y += storyH + 0.58f;
             }
@@ -801,7 +801,9 @@ namespace RedHollow.Game.View
             var tex = ViewLook.LoadTexture("RedHollowArt/hab-block-roof")
                 ?? ViewLook.LoadTexture("RedHollowArt/colony-decking")
                 ?? ViewLook.LoadTexture("RedHollowArt/hab-block-cladding");
-            var mat = ViewLook.Lit(tex != null ? RoofTint : Roof, tex, smoothness: 0.12f);
+            var mat = ViewLook.Lit(tex != null ? RoofTint : Roof, tex,
+                NormalFor("RedHollowArt/hab-block-roof", "RedHollowArt/colony-decking"),
+                smoothness: 0.12f);
             if (mat != null && tex != null)
             {
                 ViewLook.SetTiling(mat, new Vector2(1.6f, 1.6f));
@@ -817,7 +819,9 @@ namespace RedHollow.Game.View
                 ?? ViewLook.LoadTexture("RedHollowArt/colony-wall")
                 ?? ViewLook.LoadTexture("RedHollowArt/metal-floor-plate")
                 ?? ViewLook.LoadTexture("RedHollowArt/cavern-ground");
-            var mat = ViewLook.Lit(tex != null ? HabWallTint : Metal, tex, smoothness: 0.16f);
+            var mat = ViewLook.Lit(tex != null ? HabWallTint : Metal, tex,
+                NormalFor("RedHollowArt/hab-block-wall", "RedHollowArt/colony-wall"),
+                smoothness: 0.16f);
             if (mat != null && tex != null)
             {
                 ViewLook.SetTiling(mat, new Vector2(1.05f, 1.35f));
@@ -836,7 +840,7 @@ namespace RedHollow.Game.View
         {
             var tex = ViewLook.LoadTexture("RedHollowArt/wood-trim");
             return ViewLook.Lit(tex != null ? new Color(0.75f, 0.55f, 0.32f) : WoodTrim, tex,
-                smoothness: 0.22f);
+                NormalFor("RedHollowArt/wood-trim"), smoothness: 0.22f);
         }
 
         private static Material Tiled(string resourcePath, Color tint, Vector2 scale,
@@ -844,7 +848,7 @@ namespace RedHollow.Game.View
         {
             var tex = ViewLook.LoadTexture(resourcePath)
                 ?? (altPath != null ? ViewLook.LoadTexture(altPath) : null);
-            var mat = ViewLook.Lit(tint, tex, smoothness: 0.14f);
+            var mat = ViewLook.Lit(tint, tex, NormalFor(resourcePath, altPath), smoothness: 0.14f);
             if (mat != null && tex != null)
             {
                 ViewLook.SetTiling(mat, scale);
@@ -853,14 +857,33 @@ namespace RedHollow.Game.View
             return mat;
         }
 
+        /// <summary>
+        /// Bind an authored normal if it is already imported next to the albedo
+        /// (RedHollowArt/cavern-ground_normal etc.). Missing file is a no-op (R-15).
+        /// </summary>
+        private static Texture NormalFor(string resourcePath, string altPath = null)
+        {
+            var n = ViewLook.LoadTexture(resourcePath + "_normal");
+            if (n != null)
+            {
+                return n;
+            }
+
+            return altPath != null ? ViewLook.LoadTexture(altPath + "_normal") : null;
+        }
+
         private static Material DarkMetalMaterial()
         {
             var tex = ViewLook.LoadTexture("RedHollowArt/hab-block-cladding")
                 ?? ViewLook.LoadTexture("RedHollowArt/metal-floor-plate");
-            return ViewLook.Lit(MetalDark, tex, smoothness: 0.28f);
+            return ViewLook.Lit(MetalDark, tex,
+                NormalFor("RedHollowArt/hab-block-cladding", "RedHollowArt/metal-floor-plate"),
+                smoothness: 0.28f);
         }
 
-        private static GameObject Box(Transform parent, string name, Vector3 localPos, Vector3 scale, Material material)
+        private static GameObject Box(
+            Transform parent, string name, Vector3 localPos, Vector3 scale, Material material,
+            bool castShadows = false)
         {
             var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
             go.name = name;
@@ -868,7 +891,7 @@ namespace RedHollow.Game.View
             go.transform.localPosition = localPos;
             go.transform.localScale = scale;
             ViewLook.StripCollider(go);
-            ViewLook.Paint(go, material);
+            ViewLook.Paint(go, material, castShadows);
             return go;
         }
     }

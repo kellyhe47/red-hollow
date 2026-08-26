@@ -38,6 +38,7 @@ namespace RedHollow.EditorTools
         private const string HotspotFrontsPath = "/workspace/unity/shots/hotspot-fronts.png";
         private const string LookPath = "/workspace/unity/shots/lykos-look.png";
         private const string LitPath = "/workspace/unity/shots/lykos-lit.png";
+        private const string Lit2Path = "/workspace/unity/shots/lykos-lit2.png";
         private const double MatchTimeoutSeconds = 240.0;
 
         private static double _enteredAt;
@@ -178,7 +179,8 @@ namespace RedHollow.EditorTools
             var timedOut = elapsed >= MatchTimeoutSeconds;
             var matchOver = MatchIsOver();
             var frontsOnlyDone = _playMode == "fronts" && _hotspotFrontsCaptured;
-            var lookOnlyDone = (_playMode == "look" || _playMode == "lit") && _lookCaptured;
+            var lookOnlyDone = (_playMode == "look" || _playMode == "lit" || _playMode == "lit2")
+                && _lookCaptured;
             // Turret last-hit is already proven. Stay in Play until victory, defeat, or timeout
             // so autoplay can finish a 10-wave run (or dump the leak if it cannot).
             // "fronts" mode exits after the hotspot-front dump so art wiring can be checked
@@ -1292,7 +1294,9 @@ namespace RedHollow.EditorTools
                 return;
             }
 
-            var lookPath = _playMode == "lit" ? LitPath : LookPath;
+            var lookPath = _playMode == "lit2" ? Lit2Path
+                : _playMode == "lit" ? LitPath
+                : LookPath;
             DumpCamera(Camera.main, lookPath);
             _lookCaptured = true;
             PurchaseLog.Add("lykos-look shot path=" + lookPath
@@ -1343,6 +1347,8 @@ namespace RedHollow.EditorTools
                 .Append(" exists=").Append(File.Exists(LookPath)).Append('\n');
             sb.Append("lykosLitShot=").Append(LitPath)
                 .Append(" exists=").Append(File.Exists(LitPath)).Append('\n');
+            sb.Append("lykosLit2Shot=").Append(Lit2Path)
+                .Append(" exists=").Append(File.Exists(Lit2Path)).Append('\n');
             DumpShaders(sb);
         }
 
@@ -1382,6 +1388,7 @@ namespace RedHollow.EditorTools
                     .Append(" intensity=").Append(light.intensity.ToString("0.0"))
                     .Append(" range=").Append(light.range.ToString("0.0"))
                     .Append(" unit=").Append(light.lightUnit)
+                    .Append(" shadows=").Append(light.shadows)
                     .Append(" pos=").Append(light.transform.position)
                     .Append('\n');
             }

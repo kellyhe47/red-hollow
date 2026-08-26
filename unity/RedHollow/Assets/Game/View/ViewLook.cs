@@ -7,7 +7,7 @@ namespace RedHollow.Game.View
 {
     /// <summary>
     /// Shared materials and primitive hygiene for the runtime colony blockout.
-    /// Habs / ground / cavern walls use URP Lit so the 8 sourced lanterns shade them.
+    /// Habs / ground / cavern walls use URP Lit so sourced amber lanterns shade them.
     /// Characters stay Unlit billboards. Presentation only — no sim types.
     /// </summary>
     public static class ViewLook
@@ -229,7 +229,7 @@ namespace RedHollow.Game.View
             }
         }
 
-        public static void Paint(GameObject go, Material material)
+        public static void Paint(GameObject go, Material material, bool castShadows = false)
         {
             if (go == null || material == null)
             {
@@ -243,9 +243,13 @@ namespace RedHollow.Game.View
             }
 
             renderer.sharedMaterial = material;
-            renderer.shadowCastingMode = ShadowCastingMode.Off;
-            // Lit meshes must receive the lanterns; Unlit ignores lights either way.
-            renderer.receiveShadows = IsLitShader(material);
+            var lit = IsLitShader(material);
+            // Habs cast so Soft lantern shadows read; ground/walls stay Off so the
+            // cavern does not self-shadow into umber. Unlit billboards never cast.
+            renderer.shadowCastingMode = lit && castShadows
+                ? ShadowCastingMode.On
+                : ShadowCastingMode.Off;
+            renderer.receiveShadows = lit;
         }
 
         /// <summary>

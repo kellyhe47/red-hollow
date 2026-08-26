@@ -287,16 +287,56 @@ namespace RedHollow.Game.View
         }
 
         /// <summary>
-        /// R-15 — sourced amber point lights over spawn and each shelter. Named and typed as
-        /// lanterns (never Directional) so the no-sun tests still pass. Hung above hab roofs
-        /// so they light the cluster rather than sitting inside a 8-12 unit building.
+        /// Soft shadows on sourced lanterns. llvmpipe may hitch or go black with cubemap
+        /// point shadows; flip this off and keep the extra lights if PlayCapture dies.
+        /// </summary>
+        private const bool LanternSoftShadows = true;
+
+        /// <summary>
+        /// Above typical 2–3 story habs and the 62° camera's roof tops, low enough
+        /// that a 40–52 unit range still makes a pool on the ground. 4-story stacks
+        /// peak near 32; a lamp at 36 with range 26 never reached the street.
+        /// </summary>
+        private const float ClusterLanternHeight = 28f;
+
+        /// <summary>
+        /// XZ of settlement masts (CavernBlockout.ScatterSettlement) plus fill over the
+        /// hab cluster gaps the 8 spawn/shelter/tunnel lanterns leave umber.
+        /// </summary>
+        private static readonly Vec2[] ClusterLanterns =
+        {
+            new Vec2(10.0, 10.0),
+            new Vec2(-11.0, 8.0),
+            new Vec2(8.0, -12.0),
+            new Vec2(-9.0, -9.0),
+            new Vec2(16.0, 2.0),
+            new Vec2(-15.0, -4.0),
+            new Vec2(18.0, 18.0),
+            new Vec2(-18.0, 18.0),
+            new Vec2(18.0, -18.0),
+            new Vec2(-18.0, -18.0),
+            new Vec2(0.0, 18.0),
+            new Vec2(0.0, -18.0),
+            new Vec2(22.0, 10.0),
+            new Vec2(-22.0, -6.0),
+            new Vec2(12.0, -4.0),
+            new Vec2(-6.0, 16.0),
+        };
+
+        /// <summary>
+        /// R-15 — sourced amber point lights over spawn, each shelter, each tunnel mouth,
+        /// and a denser cluster through the packed habs. Named and typed as lanterns
+        /// (never Directional) so the no-sun tests still pass. Hung above roofs so the
+        /// 62° camera sees lit tops rather than a lamp inside a stack.
         /// </summary>
         private static void RaiseLanterns(Transform root, ColonyMap map)
         {
-            const float height = 22f;
             var amber = new Color(1.0f, 0.62f, 0.28f);
+            // Soft only on the four keys: 24 point lights * 6 cubemap faces overflow
+            // a 2048 atlas (URP dropped 112 maps on the first lit2 pass).
+            var keyShadows = LanternSoftShadows ? LightShadows.Soft : LightShadows.None;
 
-            AddLantern(root, "Lantern_Spawn", map.TeamSpawn, height, amber, 56f, 110f);
+            AddLantern(root, "Lantern_Spawn", map.TeamSpawn, ClusterLanternHeight, amber, 52f, 100f, keyShadows);
 
             foreach (var spec in map.Hotspots)
             {
@@ -305,17 +345,24 @@ namespace RedHollow.Game.View
                     continue;
                 }
 
-                AddLantern(root, "Lantern_" + spec.Id, spec.Pos, height, amber, 48f, 85f);
+                AddLantern(root, "Lantern_" + spec.Id, spec.Pos, ClusterLanternHeight, amber, 44f, 82f, keyShadows);
             }
 
             for (var i = 0; i < map.EntryTunnels.Count; i++)
             {
-                AddLantern(root, "Lantern_Tunnel_" + i, map.EntryTunnels[i], 10f, amber, 36f, 36f);
+                AddLantern(root, "Lantern_Tunnel_" + i, map.EntryTunnels[i], 14f, amber, 36f, 50f, LightShadows.None);
+            }
+
+            for (var i = 0; i < ClusterLanterns.Length; i++)
+            {
+                AddLantern(root, "Lantern_Cluster_" + i, ClusterLanterns[i], ClusterLanternHeight,
+                    amber, 40f, 72f, LightShadows.None);
             }
         }
 
         private static void AddLantern(
-            Transform root, string name, Vec2 pos, float height, Color color, float range, float intensity)
+            Transform root, string name, Vec2 pos, float height, Color color, float range, float intensity,
+            LightShadows shadows)
         {
             var go = new GameObject(name);
             go.transform.SetParent(root, false);
@@ -328,9 +375,9 @@ namespace RedHollow.Game.View
             light.lightUnit = LightUnit.Candela;
             light.intensity = intensity;
             light.range = range;
-            light.shadows = LightShadows.None;
+            light.shadows = shadows;
             light.renderMode = LightRenderMode.ForcePixel;
-            // URP additional-light data so the 8 lanterns are realtime punctual, not baked.
+            // URP additional-light data so lanterns are realtime punctual, not baked.
             light.GetUniversalAdditionalLightData();
         }
 

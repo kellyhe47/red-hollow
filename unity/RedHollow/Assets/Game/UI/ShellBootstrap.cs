@@ -1416,6 +1416,7 @@ namespace RedHollow.Game.UI
                     plane.name = "art_" + artKey.Replace('/', '_');
                     ViewLook.StripCollider(plane);
                     var groundMat = ViewLook.Lit(new Color(0.82f, 0.58f, 0.38f), groundTex,
+                        ViewLook.LoadTexture(resourcePath + "_normal"),
                         smoothness: 0.12f);
                     if (groundMat != null)
                     {
