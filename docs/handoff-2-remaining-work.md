@@ -208,13 +208,14 @@ is where blocking-on-art creeps in. **Chain a real resolver in FRONT of it**; do
 look.
 
 **R-15 / DEC-026 presentation:** art-to-scene means a **3D Lykos cavern** (stacked colony meshes,
-rock walls, lift shaft), a **tilted isometric camera (~60–70° down)**, and **2D standing-card**
-heroes/monsters — not a 2D tilemap, not a western main street, not sculpted character models.
-Lantern Deep lighting still holds: dark warm ambient, amber **point** lights, volumetric fog,
-rock-dome mesh as sky; **no sun / directional golden-hour**. **URP 17.5.0 is the active pipeline**
-(adopted deliberately for exactly this; see the git log for 010). Read
-`docs/comfy-prompts/00-shared-style.md` before touching visuals. Environment Comfy tiles are
-albedo/normal/AO for those 3D meshes.
+rock walls, lift shaft), a **tilted isometric camera (~60–70° down)**, and **camera-facing
+upright billboards** for heroes/monsters (blob shadow, lantern tint/haze) — not XZ-flat sprites,
+not 8-dir cycles, not a 2D tilemap, not a western main street, not sculpted character models.
+A later 3D hero swaps the view mesh only. Lantern Deep lighting still holds: dark warm ambient,
+amber **point** lights, volumetric fog, rock-dome mesh as sky; **no sun / directional golden-hour**.
+**URP 17.5.0 is the active pipeline** (adopted deliberately for exactly this; see the git log
+for 010). Read `docs/comfy-prompts/00-shared-style.md` before touching visuals. Environment Comfy
+tiles are albedo/normal/AO for those 3D meshes.
 
 R-64 feel targets hang off these sim events: `monster_damaged`, `hero_damaged`, `hero_died`,
 `hero_respawned`, `civilians_killed`, `hotspot_emptied`, `placeable_created`,

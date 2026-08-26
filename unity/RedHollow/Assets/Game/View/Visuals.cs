@@ -122,10 +122,11 @@ namespace RedHollow.Game.View
         }
 
         /// <summary>
-        /// A visible primitive for the class. Heroes/monsters/lamps are short blocks with
-        /// height (readable under a y-down camera, standing in the 3D cavern). The cavern
-        /// floor itself is built by <see cref="CavernEnvironment"/>, so Ground here is only
-        /// the seam fallback. Shape is presentation — T16 pins a Renderer, not a mesh.
+        /// A visible primitive for the class. Heroes and monsters are the same 2.5D
+        /// camera-facing cards the catalog uses (no texture → tinted placeholder).
+        /// Hotspots are a short lamp block. Ground is unused in the match (the cavern
+        /// is <see cref="CavernEnvironment"/>). Shape is presentation — T16 pins a
+        /// Renderer, not a mesh.
         /// </summary>
         private static GameObject CreatePlaceholder(VisualClass visualClass)
         {
@@ -145,12 +146,14 @@ namespace RedHollow.Game.View
 
                 if (visualClass == VisualClass.Hero)
                 {
-                    return TopDownArt.BlockToken(name, 2.4f, 3.2f, TopDownArt.Amber);
+                    return TopDownArt.StandingCard(
+                        name, TopDownArt.HeroFootprint, null, TopDownArt.Amber);
                 }
 
                 if (visualClass == VisualClass.Monster)
                 {
-                    return TopDownArt.BlockToken(name, 2.2f, 2.6f, TopDownArt.HostileGreen);
+                    return TopDownArt.StandingCard(
+                        name, TopDownArt.MonsterFootprint, null, TopDownArt.HostileGreen);
                 }
 
                 return TopDownArt.BlockToken(name, 1.8f, 1.6f, TopDownArt.Brass);

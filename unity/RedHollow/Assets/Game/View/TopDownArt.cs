@@ -4,10 +4,10 @@ using UnityEngine.Rendering;
 namespace RedHollow.Game.View
 {
     /// <summary>
-    /// Presentation sizes and paint for a y-down camera. The cavern itself is 3D meshes
-    /// (see <see cref="CavernEnvironment"/>); heroes and monsters are 2.5D cards standing
-    /// in that space. Capsules collapse to a speck at ortho ~34 — footprints stay large
-    /// enough to read, small enough that stacked colony blocks still dwarf them.
+    /// Presentation sizes and paint for the tilted Lykos camera. The cavern is 3D meshes
+    /// (<see cref="CavernEnvironment"/>). Heroes and monsters are camera-facing upright
+    /// cards (2.5D) with a blob shadow — never XZ-flat sprites (those go edge-on) and
+    /// never 8-dir sprite cycles. A later 3D hero swaps this view mesh only.
     /// </summary>
     internal static class TopDownArt
     {
@@ -21,6 +21,11 @@ namespace RedHollow.Game.View
         internal static readonly Color HostileGreen = new Color(0.32f, 0.62f, 0.26f);
         internal static readonly Color CavernBrown = new Color(0.42f, 0.26f, 0.14f);
         internal static readonly Color Brass = new Color(0.50f, 0.38f, 0.18f);
+
+        /// <summary>Warm multiply so unlit cards sit in lantern light, not studio-white.</summary>
+        internal static readonly Color LanternTint = new Color(1.0f, 0.84f, 0.62f);
+
+        internal static readonly Color BlobShadow = new Color(0.04f, 0.02f, 0.012f);
 
         internal static Color ColorFor(VisualClass visualClass)
         {
@@ -73,19 +78,34 @@ namespace RedHollow.Game.View
         }
 
         /// <summary>
-        /// 2.5D sprite card standing in the cavern: an upright quad that billboards toward
-        /// the match camera so a 65° tilt still reads the art (not an edge, not a floor sticker).
+        /// v1 character visual: camera-facing upright billboard + blob shadow under the
+        /// feet. The card yaws toward the match camera and stays world-up (not XZ-flat,
+        /// not an 8-dir cycle). Later 3D heroes replace this object; they do not need a
+        /// second sprite pipeline.
         /// </summary>
         internal static GameObject StandingCard(string name, float footprint, Texture texture, Color tint)
         {
-            var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
-            go.name = name;
-            StripCollider(go);
-            go.transform.localScale = new Vector3(footprint, footprint * 1.35f, 1f);
-            go.transform.localPosition = new Vector3(0f, footprint * 0.55f, 0f);
-            Paint(go, tint, texture, 1f);
-            go.AddComponent<SpriteBillboard>();
-            return go;
+            var root = new GameObject(name);
+
+            var shadow = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            shadow.name = name + "_shadow";
+            StripCollider(shadow);
+            shadow.transform.SetParent(root.transform, false);
+            // Unity cylinder: 1m diameter, 2m tall. Squash into a ground blob.
+            shadow.transform.localScale = new Vector3(footprint * 0.72f, 0.035f, footprint * 0.48f);
+            shadow.transform.localPosition = new Vector3(0f, 0.04f, 0f);
+            Paint(shadow, BlobShadow);
+
+            var card = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            card.name = name + "_card";
+            StripCollider(card);
+            card.transform.SetParent(root.transform, false);
+            card.transform.localScale = new Vector3(footprint, footprint * 1.35f, 1f);
+            card.transform.localPosition = new Vector3(0f, footprint * 0.55f, 0f);
+            Paint(card, tint * LanternTint, texture, 1f);
+            card.AddComponent<SpriteBillboard>();
+
+            return root;
         }
 
         /// <summary>A squat 3D token — placeholder heroes/monsters/lamps, not sculpted characters.</summary>

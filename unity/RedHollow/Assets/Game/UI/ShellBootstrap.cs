@@ -1298,9 +1298,9 @@ namespace RedHollow.Game.UI
 
         /// <summary>
         /// One representative asset entry: load the Resources copy and stand it up. Heroes
-        /// and monsters are 2.5D cards in the 3D cavern; placeables stay XZ decals. The
-        /// cavern-ground tile is still registered (T21) but is not the match floor — the
-        /// floor is <c>CavernEnvironment</c> meshes.
+        /// and monsters are camera-facing upright cards (blob shadow, lantern tint) in the
+        /// 3D cavern — never XZ-flat sprites. Placeables stay XZ decals. The cavern-ground
+        /// tile is still registered (T21) but is not the match floor.
         /// </summary>
         private static void RegisterResourceArt(ArtCatalog catalog, string artKey, string resourcePath)
         {

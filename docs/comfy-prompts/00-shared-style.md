@@ -33,7 +33,7 @@ This is a **tilted 3D top-down / isometric** scene (~60–70° down), not straig
 
 - **Environment:** simple 3D meshes (rock slabs, cavern walls, stacked colony blocks) with URP Lit materials, amber **point** lanterns, fog/haze, rock-dome as sky. Comfy environment tiles are **albedo / normal / AO for those mesh UVs** — they wrap 3D geometry; they are not laid as a flat tiled quad that *is* the world.
 - **Camera:** steep top-down so building **side walls and roof edges** read. Bird's-eye flattens the colony into roofs and is the wrong target.
-- **Characters (v1):** heroes and monsters are **2D painted sheets** rendered as **standing cards / billboards** in that 3D space (2.5D). Do **not** sculpt 3D character meshes for v1 — deferred on purpose.
+- **Characters (v1):** **camera-facing upright billboards** (world-up, yaw to the lens) with a **blob shadow** under the feet, in lantern tint and haze. One canon painted sheet per character. **Not** XZ-flat floor sprites (edge-on under the tilt). **Not** 8-direction walk cycles — do not over-invest; a later 3D hero **swaps the view mesh only**. Do **not** sculpt 3D character meshes for v1.
 - **Western split:** gunslinger/rancher/sawbones (and monster) art may stay western. The cavern and colony buildings may not.
 
 ## Prompt contract

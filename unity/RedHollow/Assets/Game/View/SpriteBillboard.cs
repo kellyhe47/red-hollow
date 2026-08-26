@@ -3,9 +3,10 @@ using UnityEngine;
 namespace RedHollow.Game.View
 {
     /// <summary>
-    /// Keeps a 2.5D sprite card facing the match camera. HeroView's Y-facing would otherwise
-    /// turn an upright quad edge-on (and Unity quads are single-sided). Presentation only —
-    /// no sim state.
+    /// v1 2.5D character card: stay upright (world up) and yaw to face the match camera.
+    /// XZ-flat sprites go edge-on under the 65° tilt. HeroView's aim rotation would also
+    /// turn a parented quad sideways. Presentation only — no sim state, no 8-dir cycles.
+    /// A later 3D hero swaps the view mesh; this component comes off with the card.
     /// </summary>
     public sealed class SpriteBillboard : MonoBehaviour
     {
@@ -17,8 +18,6 @@ namespace RedHollow.Game.View
                 return;
             }
 
-            // Stand upright, yaw toward the camera. Flattened Y so they occupy the 3D
-            // cavern as figures, not camera-aligned HUD cards.
             var toEye = cam.transform.position - transform.position;
             toEye.y = 0f;
             if (toEye.sqrMagnitude < 1e-8f)
